@@ -1,0 +1,10 @@
+{
+  "name": "@harkana/plot",
+  "private": true,
+  "exports": {
+    ".": "./index.js"
+  },
+  "devDependencies": {
+    "plotly.js-dist": "^2.35.3"
+  }
+}

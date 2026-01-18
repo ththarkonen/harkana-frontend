@@ -1,0 +1,13 @@
+{
+  "name": "@harkana/ui-theme",
+  "private": true,
+  "main": "tailwind.preset.ts",
+  "dependencies": {
+    "@tailwindcss/cli": "^4.1.18"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.1.18",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^3.4.19"
+  }
+}

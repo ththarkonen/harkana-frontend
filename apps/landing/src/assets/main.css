@@ -1,0 +1,18 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand: #d33479;
+  --color-brand-light: #e65f9a;
+  --color-brand-dark: #a91f5e;
+}
+
+@font-face {
+  font-family: "MSB";
+  src: url('@/assets/msb.ttf') format('truetype');
+  font-weight: 400; /* adjust if needed */
+  font-style: normal;
+}
+
+.brand-logo {
+    font-family: 'MSB';
+}

@@ -1,0 +1,11 @@
+{
+  "name": "@harkana/tokens",
+  "private": true,
+  "exports": {
+    ".": "./tokens.js"
+  },
+  "devDependencies": {
+    "aws-amplify": "^5.3.29",
+    "axios": "^1.13.2"
+  }
+}

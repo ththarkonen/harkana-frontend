@@ -1,0 +1,30 @@
+{
+  "name": "@harkana/ui-core",
+  "private": true,
+  "peerDependencies": {
+    "vue": "^3.4.0"
+  },
+  "exports": {
+    ".": "./src/index.js",
+
+    "./MainMenu": "./src/components/MainMenu.vue",
+    "./ProjectViewer": "./src/components/ProjectViewer.vue",
+    "./Settings": "./src/components/Settings.vue",
+    "./DataFormats": "./src/components/DataFormats.vue"
+  },
+  "dependencies": {
+    "@harkana/plot": "workspace:*",
+    "@harkana/tokens": "workspace:*",
+    "@harkana/tools": "workspace:*",
+    "@paddle/paddle-js": "^1.6.1",
+    "@tailwindcss/cli": "^4.1.18",
+    "katex": "^0.16.27"
+  },
+  "devDependencies": {
+    "aws-amplify": "^5.3.29",
+    "json-editor-vue": "^0.18.1",
+    "lodash": "^4.17.21",
+    "qrcode": "^1.5.4",
+    "vue-router": "^4.6.4"
+  }
+}
