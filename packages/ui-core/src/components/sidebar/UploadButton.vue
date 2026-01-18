@@ -16,9 +16,9 @@
         <Modal ref = "modal" title = "Project initialization" :showClose = "!closeDisabled">
             <!-- Main -->
             <template #main>
-                <hr class="border-gray-700 my-2" />
+                <hr class = "h-0.5 my-2 bg-gray border-0">
 
-                <p class="text-white mb-2">
+                <p class="text-white mb-2 truncate">
                     ({{ currentIteration }} / {{ nFiles }}) - {{ activeFile.name || 'No file selected' }}
                 </p>
 
@@ -26,7 +26,7 @@
                 <ProgressRow :state="validationState">Validating input file.</ProgressRow>
                 <ProgressRow :state="estimateState">Estimating Raman spectrum.</ProgressRow>
 
-                <hr class="border-gray-700 my-2" />
+                <hr class = "h-0.5 my-2 bg-gray border-0">
 
                 <p class="text-red-500 mt-2" v-if="showError">
                     <i class="fa fa-exclamation-triangle fa-lg mr-2"></i>
