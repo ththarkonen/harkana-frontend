@@ -10,9 +10,13 @@
     "./MainMenu": "./src/components/MainMenu.vue",
     "./ProjectViewer": "./src/components/ProjectViewer.vue",
     "./Settings": "./src/components/Settings.vue",
-    "./DataFormats": "./src/components/DataFormats.vue"
+    "./DataFormats": "./src/components/DataFormats.vue",
+    "./SignIn": "./src/components/SignIn.vue",
+    "./Application": "./src/components/Application.vue"
   },
   "dependencies": {
+    "@aws-amplify/ui-vue": "^3.1.30",
+    "@harkana/ui-loading": "workspace:*",
     "@harkana/plot": "workspace:*",
     "@harkana/tokens": "workspace:*",
     "@harkana/tools": "workspace:*",

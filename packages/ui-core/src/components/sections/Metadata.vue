@@ -57,8 +57,6 @@ import { ref, onMounted} from "vue"
 import { settings as settingslib, utils} from "@harkana/tools"
 
 import SettingsButton from "../settings/SettingsButton.vue"
-import Spinner from "../general/Spinner.vue"
-
 import JsonEditorVue from 'json-editor-vue'
 
 const updating = ref(false)
