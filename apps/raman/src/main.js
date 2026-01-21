@@ -1,32 +1,34 @@
-import { createApp } from 'vue'
-import App from './App.vue'
-import router from './router'
+import { Amplify } from "aws-amplify"
+import awsconfig from "./aws-exports"
+Amplify.configure( awsconfig )
 
-import { initMathJax } from 'mathjax-vue3';
-import VueMathjax from 'vue-mathjax-next';
+import Application from "@harkana/ui-core/Application"
 
-import { library } from '@fortawesome/fontawesome-svg-core'
+import { createApp } from "vue"
+import { initMathJax } from "mathjax-vue3"
+import VueMathjax from "vue-mathjax-next"
+import router from "./router"
 
-import { fas } from '@fortawesome/free-solid-svg-icons'
-import { fab } from '@fortawesome/free-brands-svg-icons';
-import { far } from '@fortawesome/free-regular-svg-icons';
-import { dom } from "@fortawesome/fontawesome-svg-core";
+import { library } from "@fortawesome/fontawesome-svg-core"
 
-library.add( fas );
-library.add( fab );
-library.add( far );
-dom.watch();
+import { fas } from "@fortawesome/free-solid-svg-icons"
+import { fab } from "@fortawesome/free-brands-svg-icons"
+import { far } from "@fortawesome/free-regular-svg-icons"
+import { dom } from "@fortawesome/fontawesome-svg-core"
 
-import 'vue-json-pretty/lib/styles.css'
-import 'katex/dist/katex.min.css'
+library.add( fas )
+library.add( fab )
+library.add( far )
+dom.watch()
 
-import '@/assets/css/general.scss'
+import "vue-json-pretty/lib/styles.css"
+import "katex/dist/katex.min.css"
+import "@aws-amplify/ui-vue/styles.css"
+import "@/assets/css/general.scss"
 
-var app = createApp( App )
-
+var app = createApp( Application )
 app.use( router )
 
 initMathJax({ url: "https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-AMS-MML_SVG.js"})
 app.use( VueMathjax )
-
-app.mount('#app')
+app.mount("#app")
