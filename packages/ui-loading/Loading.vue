@@ -1,17 +1,16 @@
 <template>
     <div 
-        ref="overlay"
-        class="fixed inset-0 z-[9999] flex items-center justify-center bg-dark-gray rounded-lg border-brand border-2 transition-opacity duration-100"
-        :style="{
+        ref = "overlay"
+        class = "fixed inset-0 z-[9999] flex items-center justify-center bg-dark-gray rounded-lg border-brand border-2 transition-opacity duration-100"
+        :style = "{
             opacity: opacity,
-            pointerEvents: opacity > 0 ? 'auto' : 'none'
-        }"
-    >
-        <Spinner class="text-brand" />
+            pointerEvents: opacity > 0 ? 'auto' : 'none'}">
+        <Spinner class = "text-brand" />
     </div>
 </template>
 
 <script setup>
+
 import { ref, watch } from 'vue'
 import Spinner from './Spinner.vue'
 
@@ -28,9 +27,9 @@ watch(() => props.visible, (newVal) => {
         // Show immediately
         opacity.value = 1
     } else {
-        // Fade out over 300ms
+        // Fade out over 100ms
         const duration = 100
-        const interval = 16 // ~60fps
+        const interval = 16
         const decrement = interval / duration
         let currentOpacity = 1
 
@@ -44,6 +43,7 @@ watch(() => props.visible, (newVal) => {
         }, interval)
     }
 })
+
 </script>
 
 
