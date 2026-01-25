@@ -9,7 +9,7 @@ function redirect( event, section = "Profile") {
 
 	if (event === "Sign out") {
 		const auth = Amplify.Auth
-		auth.signOut({ global: true })
+		auth.signOut()
 	} else if (event == "Settings" || event == "Data formats") {
 
         var parameters = {};
