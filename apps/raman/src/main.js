@@ -29,6 +29,12 @@ import "@/assets/css/general.scss"
 var app = createApp( Application )
 app.use( router )
 
+app.config.errorHandler = ( e, instance, info) => {
+    console.error('Global Vue error:', e);
+    console.error('Component:', instance);
+    console.error('Info:', info);
+};
+
 initMathJax({ url: "https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-AMS-MML_SVG.js"})
 app.use( VueMathjax )
 app.mount("#app")
