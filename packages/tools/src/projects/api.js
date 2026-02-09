@@ -1,4 +1,4 @@
-import { Amplify, Storage} from 'aws-amplify'
+import { Amplify } from 'aws-amplify'
 import awsconfig from '@/aws-exports.js'
 import axios from 'axios';
 
