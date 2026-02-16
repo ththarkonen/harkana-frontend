@@ -25,7 +25,7 @@ var apiParameters = async function( project ){
     parameters.name = user.attributes.given_name;
     parameters.family = user.attributes.family_name;
 
-    return { params: parameters}
+    return { params: parameters, headers: {"Authorization" : `Bearer ${jwt}`}}
 }
 
 var list = async function(){
