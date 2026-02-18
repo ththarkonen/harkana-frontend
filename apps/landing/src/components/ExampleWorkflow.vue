@@ -34,13 +34,13 @@
 			</div>
 
 			<!-- Navigation Arrows -->
-			<button @click = "prev" class = "absolute top-1/2 text-3xl -left-4 transform-translate-y-1/2
+			<button @click = "prev" type = "button" aria-label = "Previous workflow step" class = "absolute top-1/2 text-3xl -left-4 transform-translate-y-1/2
 											 bg-brand-light text-gray-900 w-10 h-10 rounded-full shadow
 											 hover:bg-brand transition flex items-center justify-center">
 				‹
 			</button>
 
-			<button @click = "next" class = "absolute top-1/2 text-3xl -right-4 transform -translate-y-1/2
+			<button @click = "next" type = "button" aria-label = "Next workflow step" class = "absolute top-1/2 text-3xl -right-4 transform -translate-y-1/2
 											 bg-brand-light text-gray-900 w-10 h-10 rounded-full shadow
 											 hover:bg-brand transition flex items-center justify-center">
 				›
@@ -48,9 +48,33 @@
 
 			<!-- Dots -->
 			<div class = "flex justify-center mt-6 space-x-3">
-				<button @click = "goTo( idx )" v-for = "( slide, idx) in slides" :key = "idx"
+				<button @click = "goTo( idx )" type = "button" v-for = "( slide, idx) in slides" :key = "idx"
+						:aria-label = "`Go to step ${idx + 1}: ${slide.title}`"
+						:aria-current = "idx === currentIndex ? 'true' : 'false'"
 						:class="['w-3 h-3 rounded-full transition', idx === currentIndex ? 'bg-brand' : 'bg-gray-400']">
 				</button>
+			</div>
+
+			<div class = "mt-10 text-center bg-white border border-gray-200 rounded-xl p-6">
+				<p class = "text-lg text-gray-700 mb-4">
+					Ready to run this workflow on your own data?
+				</p>
+				<div class = "flex flex-col sm:flex-row gap-3 justify-center">
+					<a
+						:href = "carsToolUrl"
+						target = "_blank"
+						rel = "noopener noreferrer"
+						class = "bg-brand text-white font-semibold px-5 py-3 rounded-lg hover:bg-brand-dark transition">
+						Start free CARS analysis
+					</a>
+					<a
+						:href = "ramanToolUrl"
+						target = "_blank"
+						rel = "noopener noreferrer"
+						class = "border border-brand text-brand font-semibold px-5 py-3 rounded-lg hover:bg-brand hover:text-white transition">
+						Start free Raman analysis
+					</a>
+				</div>
 			</div>
 
 		</div>
@@ -62,6 +86,9 @@
 
 import { ref } from 'vue'
 const currentIndex = ref(0)
+
+const carsToolUrl = 'https://cars.harkana.com'
+const ramanToolUrl = 'https://raman.harkana.com'
 
 const slides = [
 	{

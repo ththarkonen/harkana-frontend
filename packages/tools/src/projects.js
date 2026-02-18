@@ -9,7 +9,7 @@ import share from "./sharing.js"
 import settingslib from "./settings.js"
 import calibrationlib from './projects/calibration.js';
 
-import api from "./projects/api.js"
+import api from "./api/data.ts"
 import create from './projects/constructors.js';
 import { getProjects, setProjects, setInfo, getInfo} from './projects/helpers.js';
 

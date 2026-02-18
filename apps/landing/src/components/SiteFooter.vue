@@ -1,7 +1,7 @@
 <template>
 <footer class="text-center py-6 bg-gray-100 text-gray-600">
     <p>
-        © 2025 HARKANA. All rights reserved.
+        © {{ currentYear }} HARKANA. All rights reserved.
     </p>
     <p>
         Contact us:
@@ -13,7 +13,13 @@
         Frontend software repository
     </a>
     <p>
-        <a href="/legal" class="text-brand hover:text-brand-light">Terms & Privacy</a>
+        <router-link to="/terms" class="text-brand hover:text-brand-light">Terms & Privacy</router-link>
     </p>
 </footer>
 </template>
+
+<script setup>
+
+const currentYear = new Date().getFullYear()
+
+</script>

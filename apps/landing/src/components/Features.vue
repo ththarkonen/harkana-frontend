@@ -5,6 +5,9 @@
         <h2 class = "text-3xl sm:text-4xl font-bold">
             Features
         </h2>
+        <p class = "text-base sm:text-lg text-gray-600 mt-3 max-w-3xl mx-auto">
+            Every new account includes free starter compute tokens, so you can run analyses before buying additional bundles.
+        </p>
     </div>
 
     <div class = "max-w-6xl mx-auto space-y-12">
@@ -68,11 +71,11 @@
                 </div>
 
                 <h3 class = "text-xl font-semibold mb-2">
-                    Compute Tokens
+                    Free Starter Tokens
                 </h3>
 
                 <p class = "text-gray-600">
-                    Shared compute tokens let your team run analyses without individual setup — simple, collaborative, efficient.
+                    New users receive free compute tokens at signup, and shared token pools let teams analyze data without individual setup.
                 </p>
             </div>
 
@@ -87,7 +90,7 @@
                 </h3>
 
                 <p class = "text-gray-600">
-                    You can start analyzing and sharing data immediately — no payment details needed.
+                    Start with your free tokens immediately, with no payment details needed.
                 </p>
             </div>
 

@@ -13,7 +13,7 @@ var apiParameters = async function(){
     parameters = {};
     parameters.jwt = jwt;
 
-    return { params: parameters}
+    return { params: parameters, headers: {"Authorization" : `Bearer ${jwt}`}}
 }
 
 var balance = async function( groupID ){

@@ -5,7 +5,13 @@
     </div>
     
     <!-- Mobile menu button -->
-    <button @click = "mobileMenuOpen = !mobileMenuOpen" class = "md:hidden text-white hover:text-brand focus:outline-none">
+    <button
+        @click = "mobileMenuOpen = !mobileMenuOpen"
+        type = "button"
+        :aria-label = "mobileMenuOpen ? 'Close navigation menu' : 'Open navigation menu'"
+        :aria-expanded = "mobileMenuOpen"
+        aria-controls = "mobile-navigation"
+        class = "md:hidden text-white hover:text-brand focus:outline-none">
         <svg v-if = "!mobileMenuOpen" class = "w-6 h-6" fill = "none" stroke = "currentColor" viewBox = "0 0 24 24">
             <path stroke-linecap = "round" stroke-linejoin = "round" stroke-width = "2" d = "M4 6h16M4 12h16M4 18h16"></path>
         </svg>
@@ -18,7 +24,12 @@
     <nav class="hidden md:flex items-center space-x-6">
         <!-- Dropdown -->
         <div class = "relative">
-            <button @click = "dropdownOpen = !dropdownOpen"
+            <button
+                    @click = "dropdownOpen = !dropdownOpen"
+                    type = "button"
+                    aria-label = "Toggle tools menu"
+                    :aria-expanded = "dropdownOpen"
+                    aria-controls = "desktop-tools-menu"
                     class = "flex items-center text-xl hover:text-brand focus:outline-none">
                 Tools
                 <svg
@@ -31,15 +42,15 @@
                 </svg>
             </button>
 
-            <div v-show = "dropdownOpen" class = "absolute right-0 mt-2 px-2 inline-block bg-white
+            <div id = "desktop-tools-menu" v-show = "dropdownOpen" class = "absolute right-0 mt-2 px-2 inline-block bg-white
                                                 border border-brand rounded-lg shadow-lg py-2 text-left z-30">
 
-                <a  href = "https://cars.harkana.com" target="_blank" rel = "noopener noreferrer"
+                <a  :href = "carsToolUrl" target="_blank" rel = "noopener noreferrer"
                     class="block whitespace-nowrap text-black rounded-sm px-4 py-2 hover:bg-brand hover:text-white transition">
                     Coherent anti-Stokes Raman scattering
                 </a>
 
-                <a  href = "https://raman.harkana.com" target = "_blank" rel = "noopener noreferrer"
+                <a  :href = "ramanToolUrl" target = "_blank" rel = "noopener noreferrer"
                     class = "block whitespace-nowrap text-black rounded-sm px-4 py-2 hover:bg-brand hover:text-white transition">
                     Raman scattering
                 </a>
@@ -51,13 +62,40 @@
         <router-link to="/#features" class="text-xl hover:text-brand">Features</router-link>
         <router-link to="/pricing" class="text-xl hover:text-brand">Pricing</router-link>
         <router-link to="/terms" class="text-xl hover:text-brand">Terms & Privacy</router-link>
+        <router-link
+            to = "/#tools"
+            class = "bg-brand text-white font-semibold text-sm px-4 py-2 rounded-lg shadow hover:bg-brand-dark transition">
+            Start free analysis
+        </router-link>
     </nav>
 
     <!-- Mobile Navigation -->
-    <nav v-show = "mobileMenuOpen" class = "md:hidden absolute top-full left-0 w-full bg-gray-700 shadow-lg py-4 px-4 space-y-4">
+    <nav id = "mobile-navigation" v-show = "mobileMenuOpen" class = "md:hidden absolute top-full left-0 w-full bg-gray-700 shadow-lg py-4 px-4 space-y-4">
+        <div class = "grid gap-2">
+            <a
+                :href = "carsToolUrl"
+                target = "_blank"
+                rel = "noopener noreferrer"
+                class = "inline-flex justify-center bg-brand text-white font-semibold rounded-lg px-4 py-2 hover:bg-brand-dark transition">
+                Start free CARS analysis
+            </a>
+            <a
+                :href = "ramanToolUrl"
+                target = "_blank"
+                rel = "noopener noreferrer"
+                class = "inline-flex justify-center bg-brand text-white font-semibold rounded-lg px-4 py-2 hover:bg-brand-dark transition">
+                Start free Raman analysis
+            </a>
+        </div>
+
         <!-- Mobile Tools Dropdown -->
         <div>
-            <button @click = "mobileDropdownOpen = !mobileDropdownOpen"
+            <button
+                    @click = "mobileDropdownOpen = !mobileDropdownOpen"
+                    type = "button"
+                    aria-label = "Toggle tools menu"
+                    :aria-expanded = "mobileDropdownOpen"
+                    aria-controls = "mobile-tools-menu"
                     class="flex items-center justify-between w-full text-lg hover:text-brand focus:outline-none py-2">
                 Tools
                 <svg
@@ -69,12 +107,12 @@
                 </svg>
             </button>
             
-            <div v-show="mobileDropdownOpen" class="pl-4 mt-2 space-y-2">
-                <a  href = "https://cars.harkana.com" target = "_blank" rel = "noopener noreferrer"
+            <div id = "mobile-tools-menu" v-show="mobileDropdownOpen" class="pl-4 mt-2 space-y-2">
+                <a  :href = "carsToolUrl" target = "_blank" rel = "noopener noreferrer"
                     class = "block text-gray-300 hover:text-brand py-2">
                     Coherent anti-Stokes Raman scattering
                 </a>
-                <a  href = "https://raman.harkana.com" target="_blank" rel="noopener noreferrer"
+                <a  :href = "ramanToolUrl" target="_blank" rel="noopener noreferrer"
                     class = "block text-gray-300 hover:text-brand py-2">
                     Raman scattering
                 </a>
@@ -100,6 +138,9 @@
 <script setup>
 
 import { ref } from 'vue'
+
+const carsToolUrl = 'https://cars.harkana.com'
+const ramanToolUrl = 'https://raman.harkana.com'
 
 const dropdownOpen = ref(false)
 const mobileMenuOpen = ref(false)
