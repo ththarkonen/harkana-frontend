@@ -1,5 +1,5 @@
 <template>
-<section class = "relative h-screen flex items-center justify-center text-center px-6">
+<section class = "relative min-h-screen min-h-[100svh] flex items-center justify-center text-center px-6">
 
     <video id = "lazy-hero-video" class = "absolute inset-0 w-full h-full object-cover"
             autoplay loop muted playsinline preload = "none"
@@ -23,19 +23,33 @@
             Streamline your spectroscopy workflow: automatic correction, collaborative data sharing, and DOI generation for reproducible research.
         </p>
 
-        <div class = "flex flex-col sm:flex-row gap-4 justify-center">
-            <router-link to = "/#examples" class="bg-brand font-bold text-white px-6 py-3 rounded-lg shadow hover:bg-brand-dark transition">
-                Examples
-            </router-link>
-            <router-link to = "/#features" class="bg-brand font-bold text-white px-6 py-3 rounded-lg shadow hover:bg-brand-dark transition">
-                Features
-            </router-link>
-            <router-link to = "/#example-workflow" class="bg-brand font-bold text-white px-6 py-3 rounded-lg shadow hover:bg-brand-dark transition">
-                Example workflow
-            </router-link>
-            <router-link to = "/#tools" class="bg-brand font-bold text-white px-6 py-3 rounded-lg shadow hover:bg-brand-dark transition">
-                Tools
-            </router-link>
+        <div class = "space-y-4">
+            <div class = "flex flex-col sm:flex-row gap-4 justify-center">
+                <a :href = "carsToolUrl" target = "_blank" rel = "noopener noreferrer"
+                    class = "bg-brand font-bold text-white px-6 py-3 rounded-lg shadow hover:bg-brand-dark transition">
+                    Start free CARS analysis
+                </a>
+                <a :href = "ramanToolUrl" target = "_blank" rel = "noopener noreferrer"
+                    class = "bg-brand font-bold text-white px-6 py-3 rounded-lg shadow hover:bg-brand-dark transition">
+                    Start free Raman analysis
+                </a>
+            </div>
+
+            <p class = "text-sm sm:text-base text-gray-300">
+                New users can sign up and run first analyses for free. No credit card required.
+            </p>
+
+            <div class = "flex flex-wrap gap-3 justify-center">
+                <router-link to = "/#examples" class="bg-white/10 font-semibold text-white px-4 py-2 rounded-lg hover:bg-white/20 transition">
+                    Example results
+                </router-link>
+                <router-link to = "/#example-workflow" class="bg-white/10 font-semibold text-white px-4 py-2 rounded-lg hover:bg-white/20 transition">
+                    How it works
+                </router-link>
+                <router-link to = "/#tools" class="bg-white/10 font-semibold text-white px-4 py-2 rounded-lg hover:bg-white/20 transition">
+                    All tools
+                </router-link>
+            </div>
         </div>
 
     </div>
@@ -47,6 +61,9 @@
 
 import { ref, onMounted} from 'vue'
 const videoLoaded = ref(false)
+
+const carsToolUrl = 'https://cars.harkana.com'
+const ramanToolUrl = 'https://raman.harkana.com'
 
 onMounted(() => {
 
