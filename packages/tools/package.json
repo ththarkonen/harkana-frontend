@@ -7,7 +7,7 @@
   "devDependencies": {
     "@zip.js/zip.js": "^2.8.11",
     "aws-amplify": "^5.3.29",
-    "axios": "^1.13.2",
+    "axios": "^1.13.5",
     "papaparse": "^5.5.3",
     "streamsaver": "^2.0.6"
   },
