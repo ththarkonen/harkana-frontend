@@ -165,15 +165,11 @@
 <script setup>
 
 import { Amplify } from 'aws-amplify'
-import awsconfig from '@/aws-exports.js'
-Amplify.configure( awsconfig )
 const Auth = Amplify.Auth;
 
 import { ref, computed, nextTick, onMounted} from "vue"
 import { initializePaddle } from '@paddle/paddle-js';
-
-import { settings as settingslib, utils} from "@harkana/tools"
-import tokens from "@harkana/tokens"
+import { settings as settingslib, tokens, utils} from "@harkana/tools"
 
 import TextField from "../settings/TextField.vue"
 import SettingsButton from "../settings/SettingsButton.vue"
@@ -283,6 +279,8 @@ onMounted( async () => {
     balance.value = await tokens.balance("")
 	tokenGroups.value = await tokens.listGroupsAndMembers();
 	tokenGroups.value = tokenGroups.value.filter( g => g.owner != null);
+
+    console.log( newTokenGroupName.value )
 
     await nextTick()
     await utils.wait( 100 )

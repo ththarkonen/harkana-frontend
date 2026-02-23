@@ -23,9 +23,7 @@
 <script setup>
 
 import { ref, onMounted} from "vue"
-
-import tokens from "@harkana/tokens"
-import { settings, navigation} from "@harkana/tools"
+import { settings, navigation, tokens} from "@harkana/tools"
 
 import BaseDropdown from './BaseDropdown.vue'
 import BaseDropdownItem from './BaseDropdownItem.vue'
