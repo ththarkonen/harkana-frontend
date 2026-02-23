@@ -1,16 +1,4 @@
-import { apiFetch } from './http'
-
-var buildQueryString = ( params: Record<string, string> ): string => {
-
-    const search = new URLSearchParams()
-
-    for( const key in params ){
-        search.append( key, params[key])
-    }
-
-    return search.toString()
-}
-
+import { apiFetch, buildQueryString} from './http'
 
 var apiParameters = ( project: any ) => {
 
