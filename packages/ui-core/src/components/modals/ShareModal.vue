@@ -68,6 +68,9 @@
 
 <script setup>
 
+import { Amplify } from 'aws-amplify'
+const Auth = Amplify.Auth
+
 import { ref, computed } from 'vue'
 import { sharing } from "@harkana/tools"
 
@@ -107,6 +110,11 @@ const addCollaborator = async () => {
 
         errorMessage.value = ""
         addingCollaborator.value = true
+
+        if( Auth.user.attributes.email === inputEmail.value ){
+            throw new Error("Cannot share the project with yourself.")
+        }
+
         await sharing.addCollaborator( props.project, inputEmail.value)
 
         collaborators.value = await sharing.listCollaborators( props.project )

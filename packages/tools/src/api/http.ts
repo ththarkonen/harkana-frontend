@@ -34,4 +34,13 @@ export async function apiFetch<T>( url: string, options?: RequestInit): Promise<
     return await response.json() as T
 }
 
+export const buildQueryString = ( params: Record<string, string> ): string => {
 
+    const search = new URLSearchParams()
+
+    for( const key in params ){
+        search.append( key, params[key])
+    }
+
+    return search.toString()
+}
