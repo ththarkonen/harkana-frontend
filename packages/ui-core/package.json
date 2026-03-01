@@ -11,6 +11,7 @@
     "./ProjectViewer": "./src/components/ProjectViewer.vue",
     "./Settings": "./src/components/Settings.vue",
     "./DataFormats": "./src/components/DataFormats.vue",
+    "./HyperDataFormats": "./src/components/HyperDataFormats.vue",
     "./CheckoutSuccess": "./src/components/CheckoutSuccess.vue",
     "./SignIn": "./src/components/SignIn.vue",
     "./Application": "./src/components/Application.vue",
