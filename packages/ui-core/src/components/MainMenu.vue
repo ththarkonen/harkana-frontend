@@ -27,7 +27,8 @@
 
 		<!-- Main Content -->
 		<main class="bg-dark-gray rounded-lg shadow-sm p-4 overflow-y-auto">
-			<div class = "w-full text-white font-semibold pb-4">{{ activeFolder }}
+			<div class = "w-full text-white font-semibold pb-4">
+				<div v-show = "!showInfo">{{ activeFolder }}</div>
 				<div v-if = "showBatchActions" class = "float-right">
 					<button
 						class="h-8 w-8 items-center justify-center rounded-md text-white hover:bg-green-100 hover:text-brand transition-colors"

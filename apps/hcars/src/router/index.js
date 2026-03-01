@@ -3,7 +3,7 @@ import { createWebHistory, createRouter} from "vue-router";
 const MainMenu = () => import("@harkana/ui-core/MainMenu");
 const ProjectViewer = () => import("@harkana/ui-core/HyperspectrumViewer");
 const Settings = () => import("@harkana/ui-core/Settings");
-const DataFormats = () => import("@harkana/ui-core/DataFormats");
+const DataFormats = () => import("@harkana/ui-core/HyperDataFormats");
 const CheckoutSuccess = () => import("@harkana/ui-core/CheckoutSuccess");
 
 const routes = [
