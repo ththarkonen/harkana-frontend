@@ -22,9 +22,15 @@
                     ({{ currentIteration }} / {{ nFiles }}) - {{ activeFile.name || 'No file selected' }}
                 </p>
 
-                <ProgressRow :state="uploadState">Uploading to database.</ProgressRow>
-                <ProgressRow :state="validationState">Validating input file.</ProgressRow>
-                <ProgressRow :state="estimateState">Estimating Raman spectrum.</ProgressRow>
+                <div v-if = "dataType === 'cars' || dataType === 'raman'">
+                    <ProgressRow :state="uploadState">Uploading to database. {{ uploadPercentage }}</ProgressRow>
+                    <ProgressRow :state="validationState">Validating input file.</ProgressRow>
+                    <ProgressRow :state="estimateState">Estimating Raman spectrum.</ProgressRow>
+                </div>
+                <div v-else>
+                    <ProgressRow :state="uploadState">Uploading to database. {{ uploadPercentage }}</ProgressRow>
+                    <ProgressRow :state="validationState">Parsing hyperspectral data.</ProgressRow>
+                </div>
 
                 <hr class = "h-0.5 my-2 bg-gray border-0">
 
@@ -49,6 +55,9 @@
 </template>
 
 <script setup lang="ts">
+
+const dataType = (import.meta as any).env.VITE_DATA_TYPE
+
 import { ref } from 'vue'
 import { projects as projectlib, settings as settingslib, utils } from '@harkana/tools'
 
@@ -62,6 +71,7 @@ const showError = ref(false)
 const closeDisabled = ref(false)
 const errorMessage = ref('')
 
+const uploadPercentage = ref("0%")
 const validationState = ref('')
 const uploadState = ref('')
 const estimateState = ref('')
@@ -71,6 +81,7 @@ const currentIteration = ref(0)
 const nFiles = ref(0)
 
 const resetProgress = () => {
+    uploadPercentage.value = "0%"
     validationState.value = 'idle'
     uploadState.value = 'idle'
     estimateState.value = 'idle'
@@ -92,6 +103,7 @@ const handleUpload = async (event: Event) => {
 
     var hasError = false
 
+    uploadPercentage.value = "0%"
     validationState.value = 'progress'
     uploadState.value = 'idle'
     estimateState.value = 'idle'
@@ -112,14 +124,22 @@ const handleUpload = async (event: Event) => {
         estimateState.value = 'progress'
 
         const progress = {
+            uploadPercentage: ( state ) => (uploadPercentage.value = state),
             validate: (state ) => (validationState.value = state),
-            upload: (state ) => (uploadState.value = state),
-            estimate: (state ) => (estimateState.value = state)
+            upload: ( state ) => (uploadState.value = state),
+            estimate: ( state ) => (estimateState.value = state)
         }
 
         try {
 
-            const result = await projectlib.upload( file, billingSettings.groupID, progress)
+            var result
+
+            if( dataType === "hypercars" ){
+                result = await projectlib.hyperspectrum( file, billingSettings.groupID, progress)
+            } else {
+                result = await projectlib.upload( file, billingSettings.groupID, progress)
+            }
+            
             if (result instanceof Error) throw result
 
         } catch (error: any) {

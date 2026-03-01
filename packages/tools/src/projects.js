@@ -10,12 +10,23 @@ import settingslib from "./settings.js"
 import calibrationlib from './projects/calibration.js';
 
 import api from "./api/data.ts"
+import hyperspectra from "./api/hyperspectra.ts"
+
 import create from './projects/constructors.js';
 import { getProjects, setProjects, setInfo, getInfo} from './projects/helpers.js';
 
+var formatPercentage = ( progress, state) => {
+
+	var percentage = state.loaded / state.total;
+	percentage = Number.parseFloat( percentage * 100 ).toFixed(1);
+	progress.uploadPercentage( String( percentage ) + "%" )
+}
+
 var upload = async function( file, tokenGroupID, progress){
 
-	const accessSettings = { level: "private" };
+	const accessSettings = { level: "private",
+							 progressCallback: (state) => formatPercentage( progress, state)
+	};
 
 	var projectList = await getProjects();
 
@@ -61,7 +72,6 @@ var upload = async function( file, tokenGroupID, progress){
 
 	try {
 		const settings = await settingslib.getDefaultSettings();
-
 		await Storage.put( metadataKey, settings.defaultMetadata, accessSettings);
 	} catch (error) {
 		await remove( project );
@@ -69,6 +79,67 @@ var upload = async function( file, tokenGroupID, progress){
 	};
 
 	try {
+		projectList[ project.id ] = project;
+
+		await setInfo( projectInfo )
+		await setProjects( projectList );
+
+	} catch (error) {
+		await remove( project );
+		return error
+	};
+
+	return projectList;
+}
+
+var hyperspectrum = async function( file, tokenGroupID, progress){
+
+	const accessSettings = { level: "private",
+							 progressCallback: (state) => formatPercentage( progress, state)
+	};
+
+	var projectList = await getProjects();
+
+	const projectID = utils.generateID( projectList );
+	const [ projectName, extension] = utils.parseProjectName( file );
+
+	const rawFileName = "raw_" + projectName + "." + extension;
+
+	const project = await create.project( projectID, projectName, rawFileName);
+	const projectInfo = await create.info( project );
+	 
+	const rawDataFileKey = project.id + "/" + rawFileName;
+	const rawData = await file.arrayBuffer()
+
+	try {
+		await Storage.put( rawDataFileKey, rawData, accessSettings);
+		progress.upload("success");
+	} catch (error) {
+		progress.upload("error");
+		await remove( project );
+		return error
+	};
+
+	var response
+
+	try {
+		response = await hyperspectra.parse( project, tokenGroupID);
+		progress.validate("success");
+		console.log( response )
+	} catch (error) {
+		progress.validate("error");
+		await remove( project );
+		return error
+	}
+
+	try {
+
+		project.status = response.status
+		project.jobId = response.jobId
+
+		projectInfo.status = response.status
+		projectInfo.jobId = response.jobId
+
 		projectList[ project.id ] = project;
 
 		await setInfo( projectInfo )
@@ -152,7 +223,65 @@ var list = async() => {
 	const ownedProjects = await getProjects()
 	const sharedProjects = await share.list()
 
-	return { ...ownedProjects, ...sharedProjects}
+	var ownedProjectsReady = {}
+
+	for( const [ id, project] of Object.entries( ownedProjects ) ){
+
+		const hasStatus = project.hasOwnProperty("status")
+		
+		if( !hasStatus ){
+			ownedProjectsReady[ id ] = project
+			continue
+		}
+
+		if( hasStatus ){
+
+			if( project.status === "SUCCEEDED" ){
+				ownedProjectsReady[ id ] = project
+				continue
+			}
+
+			const response = await hyperspectra.status( project )
+			
+			if( response.status === "SUCCEEDED" ){
+
+				var projectInfo = await getInfo( project )
+
+				ownedProjects[id].status = response.status
+				projectInfo.status = response.status
+
+				await setInfo( projectInfo )
+
+				project.status = response.status
+				ownedProjectsReady[ id ] = project
+				continue
+			} else if( response.status === "FAILED" ){
+				await remove( project )
+				continue
+			}
+		}
+
+	}
+
+	await setProjects( ownedProjects )
+	return { ...ownedProjectsReady, ...sharedProjects}
+}
+
+var listProcessing = async() => {
+
+	const ownedProjects = await getProjects()
+	var processing = {}
+
+	for( const [ id, project] of Object.entries( ownedProjects ) ){
+
+		const hasStatus = project.hasOwnProperty("status")
+		if( !hasStatus ) continue
+
+		if( project.status === "SUCCEEDED" ) continue
+		else processing[id] = project
+	}
+
+	return processing
 }
 
 import { copy } from "./projects/copy.js"
@@ -162,8 +291,10 @@ import { setFolders, getFolders} from "./projects/helpers.js"
 
 export default {
 	upload,
+	hyperspectrum,
 	remove,
 	list,
+	listProcessing,
 	setFolders,
 	getFolders,
 	rename,

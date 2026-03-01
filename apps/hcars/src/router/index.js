@@ -1,7 +1,7 @@
 import { createWebHistory, createRouter} from "vue-router";
 
 const MainMenu = () => import("@harkana/ui-core/MainMenu");
-const ProjectViewer = () => import("@harkana/ui-core/ProjectViewer");
+const ProjectViewer = () => import("@harkana/ui-core/HyperspectrumViewer");
 const Settings = () => import("@harkana/ui-core/Settings");
 const DataFormats = () => import("@harkana/ui-core/DataFormats");
 const CheckoutSuccess = () => import("@harkana/ui-core/CheckoutSuccess");

@@ -8,6 +8,25 @@ import streamSaver from 'streamsaver'
 import utils from '../utils.js'
 import share from "../sharing.js"
 
+var isIgnoredDownloadKey = function( key ){
+
+    if( typeof key !== "string" ) return false
+
+    const normalized = key
+        .replace(/\\/g, "/")
+        .replace(/^\/+/, "")
+        .replace(/\/+$/, "")
+
+    if( normalized.length === 0 ) return false
+    if( normalized === "spectra_tiles" ) return true
+    if( normalized === "layers" ) return true
+
+    return normalized.startsWith( "spectra_tiles/" ) ||
+        normalized.includes( "/spectra_tiles/" ) ||
+        normalized.startsWith( "layers/" ) ||
+        normalized.includes( "/layers/" )
+}
+
 var download = async function( projects ){
     
     const dataType = import.meta.env.VITE_DATA_TYPE
@@ -48,6 +67,7 @@ var downloadOwned = async function( project, zipWriter){
 
         const isStatusFile = file.key.split("/").pop() == "info.json";
         if( isStatusFile ) continue
+        if( isIgnoredDownloadKey( file.key ) ) continue
         
         const zipPath = info.name.replace(/[^a-zA-Z0-9]/g,'_') + "_" + info.id + "_" + file.key
 
@@ -64,6 +84,8 @@ var downloadShared = async function( project, zipWriter){
     const info = project.shareInfo;
     
     for( const file of response.files ){
+
+        if( isIgnoredDownloadKey( file ) ) continue
 
         const fileName = file.split("/").pop()
         const isStatusFile = fileName == "info.json";
