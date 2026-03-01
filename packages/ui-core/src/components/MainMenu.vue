@@ -11,7 +11,7 @@
 			<Logo></Logo>
 			<UploadButton class = "my-2 mb-4" @updateProjects = "updateProjectsClearChecks"></UploadButton>
 			<hr v-if = "!showInfo" class = "h-0.5 bg-gray border-0 ">
-			<ProjectFolders v-if = "!showInfo" v-model:activeFolder = "activeFolder" :projects = "projectList"></ProjectFolders>
+			<ProjectFolders v-if = "!showInfo" v-model:activeFolder = "activeFolder" :projects = "projectList" :processing="processingList"></ProjectFolders>
 		</Sidebar>
 
 		<NavigationBar>
@@ -51,7 +51,7 @@
 			</div>
 			<ProjectSearchBar v-if = "!showInfo" v-model = "searchPattern"></ProjectSearchBar>
 			<ProjectUploadInstructions v-if = "showInfo"></ProjectUploadInstructions>
-			<ProjectTable v-if = "!showInfo" :projects = "filteredProjects" :selectedProjectIDs = "activeIDs" class = "mt-4">
+			<ProjectTable v-if = "!showInfo & activeFolder !== 'Processing'" :projects = "filteredProjects" :selectedProjectIDs = "activeIDs" class = "mt-4">
 				<template v-slot:actions="{ project }">
 					<button
 						class="h-8 w-8 items-center justify-center rounded-md text-white hover:bg-green-100 hover:text-brand transition-colors"
@@ -79,6 +79,8 @@
 					</button>
 				</template>
 			</ProjectTable>
+			<ProcessingTable v-if = "activeFolder === 'Processing'" :projects = "processingList" class = "mt-4">
+			</ProcessingTable>
 		</main>
 
 	</div>
@@ -106,6 +108,7 @@ import AccountDropdown from './navbar/AccountDropdown.vue'
 import ProjectUploadInstructions from './projects/ProjectUploadInstructions.vue'
 import ProjectSearchBar from './projects/ProjectSearchBar.vue'
 import ProjectTable from './projects/ProjectTable.vue'
+import ProcessingTable from './projects/ProcessingTable.vue'
 
 import DeleteModal from './modals/DeleteModal.vue'
 import MetadataModal from './modals/MetadataModal.vue'
@@ -121,6 +124,7 @@ const emit = defineEmits(["loaded"])
 const userFolders = ref({})
 const activeFolder = ref("All projects")
 const projectList = ref({})
+const processingList = ref({})
 const searchPattern = ref("")
 
 const activeProject = ref({})
@@ -139,6 +143,8 @@ const selectedProjects = computed(() => {
 const filteredProjects = computed(() => {
 
 	parseFolders()
+
+	if( activeFolder.value === "Processing" ) return []
 	
 	activeIDs.value.clear()
 	const pattern = searchPattern.value.toLowerCase()
@@ -179,7 +185,7 @@ const sidebarStyle = computed(() => {
 })
 
 const showInfo = computed(() => {
-	return Object.keys( projectList.value ).length === 0
+	return Object.keys( projectList.value ).length === 0 && Object.keys( processingList.value ).length === 0
 })
 
 const open = async ( modal, projectArray) => {
@@ -211,6 +217,8 @@ const updateProjects = async () => {
 	userFolders.value = await folders.get()
 	projectList.value = await projects.list()
 	userFolders.value = await parseFolders()
+	processingList.value = await projects.listProcessing()
+
 	await balanceDropdown.value.updateBalance()
 }
 
@@ -221,6 +229,8 @@ const updateProjectsClearChecks = async () => {
 	userFolders.value = await folders.get()
 	projectList.value = await projects.list()
 	userFolders.value = await parseFolders()
+	processingList.value = await projects.listProcessing()
+
 	await balanceDropdown.value.updateBalance()
 }
 
@@ -228,7 +238,10 @@ onMounted( async () => {
 
 	userFolders.value = await folders.get()
 	projectList.value = await projects.list()
+	processingList.value = await projects.listProcessing()
 	userFolders.value = await parseFolders()
+
+	console.log( processingList.value )
 
 	emit("loaded")
 })

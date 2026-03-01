@@ -2,14 +2,10 @@ import { Amplify, Storage } from 'aws-amplify';
 import awsconfig from '@/aws-exports.js';
 Amplify.configure( awsconfig );
 
-const allowedModes = ["data", "estimate", "transform", "calibration"];
 import { get as getCalibration, set as setCalibration} from './projects/calibration.js';
 import share from "./sharing.js"
 
 var load = async function( project, mode){
-
-    const validMode = allowedModes.includes( mode )
-    if( !validMode ) return new Error("Invalid mode")
 
     if( project.shared ) return await share.load( project.shareInfo, mode + ".json")
 

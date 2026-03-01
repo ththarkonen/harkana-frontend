@@ -259,7 +259,12 @@ const buy = async( groupID ) => {
 
     const items = [{ priceId: import.meta.env.VITE_PADDLE_PRICE_ID, quantity: 1}]
     const custom = { userID: Auth.user.attributes.sub, groupID: groupID}
-    const settings = { locale: "en", variant: "one-page"}
+    const successUrl = window.location.origin + "/checkout-success"
+    const settings = {
+        locale: "en",
+        variant: "one-page",
+        successUrl: successUrl
+    }
 
     await paddle.value.Checkout.open({
         items: items,
@@ -270,9 +275,17 @@ const buy = async( groupID ) => {
 
 onMounted( async () => {
 
+    const paddleToken = import.meta.env.VITE_PADDLE_CLIENT_SIDE_TOKEN
+    const paddleEnvironment = import.meta.env.DEV && typeof paddleToken === "string" && paddleToken.startsWith("test_")
+        ? "sandbox"
+        : "production"
+
     paddle.value = await initializePaddle({
-        token: import.meta.env.VITE_PADDLE_CLIENT_SIDE_TOKEN
+        token: paddleToken,
+        environment: paddleEnvironment
     });
+
+    console.log( paddleToken )
 
 	billingSettings.value = await settingslib.getBilling();
 

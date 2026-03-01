@@ -11,8 +11,10 @@
     "./ProjectViewer": "./src/components/ProjectViewer.vue",
     "./Settings": "./src/components/Settings.vue",
     "./DataFormats": "./src/components/DataFormats.vue",
+    "./CheckoutSuccess": "./src/components/CheckoutSuccess.vue",
     "./SignIn": "./src/components/SignIn.vue",
-    "./Application": "./src/components/Application.vue"
+    "./Application": "./src/components/Application.vue",
+    "./HyperspectrumViewer": "./src/components/HyperspectrumViewer.vue"
   },
   "dependencies": {
     "@aws-amplify/ui-vue": "^3.1.30",

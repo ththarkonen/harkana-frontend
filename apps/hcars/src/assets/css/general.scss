@@ -1,0 +1,46 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@font-face {
+  font-family: "MSB";
+  src: url("@/assets/fonts/msb.ttf") format("truetype");
+  font-weight: 800;
+  font-style: normal;
+}
+
+body {
+    overflow-y: hidden;
+    background-color: #333;
+}
+
+:root {
+  --amplify-components-button-primary-background-color: theme(colors.brand);
+  --amplify-components-button-primary-hover-background-color: theme(colors.brand-dark);
+  --amplify-components-button-primary-focus-background-color: theme(colors.brand);
+  --amplify-components-button-primary-active-background-color: theme(colors.brand);
+
+  --amplify-components-button-primary-color: white;
+  /* Tab text */
+  --amplify-components-tabs-item-color: theme(colors.brand);
+  --amplify-components-tabs-item-hover-color: theme(colors.brand-dark);
+
+  /* Active tab */
+  --amplify-components-tabs-item-active-color: theme(colors.brand);
+  --amplify-components-tabs-item-active-border-color: theme(colors.brand);
+
+  /* Tab underline */
+  --amplify-components-tabs-item-border-color: transparent;
+
+  --amplify-components-authenticator-border-color: theme(colors.brand);
+  --amplify-components-authenticator-border-width: 5px;
+  --amplify-components-authenticator-border-radius: 0.75rem;
+}
+
+.js-plotly-plot .plotly .modebar svg {
+	display: inline;
+}
+
+.jse-menu {
+    display: none !important;
+}

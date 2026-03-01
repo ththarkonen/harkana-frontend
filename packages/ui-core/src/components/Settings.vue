@@ -49,7 +49,7 @@
                 <!-- Plain text -->
                 <Profile v-show = "selected === 'Profile'"></Profile>
                 <Tokens  v-show = "selected === 'Compute tokens'"></Tokens>
-                <Visualization v-show = "selected === 'Visualization'"></Visualization>
+                <component :is = "Visualization" v-show = "selected === 'Visualization'"></component>
                 <Metadata v-show = "selected === 'Metadata'"></Metadata>
                 <Zenodo v-show = "selected === 'Zenodo'"></Zenodo>
                 <!-- JSON -->
@@ -77,9 +77,13 @@ import AccountDropdown from './navbar/AccountDropdown.vue'
 
 import Profile from './sections/Profile.vue'
 import Tokens from './sections/Tokens.vue'
-import Visualization from './sections/Visualization.vue'
+import StandardVisualization from './sections/Visualization.vue'
+import HyperspectrumVisualization from './sections/HyperspectrumVisualization.vue'
 import Metadata from './sections/Metadata.vue'
 import Zenodo from './sections/Zenodo.vue'
+
+const dataType = import.meta.env.VITE_DATA_TYPE
+const Visualization = dataType === "hypercars" ? HyperspectrumVisualization : StandardVisualization
 
 const route = useRoute()
 const router = useRouter()

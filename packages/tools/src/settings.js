@@ -23,30 +23,38 @@ var get = async function(){
 
     const key = "settings.json"
     const accessSettings = { level: "private", download: true}
+    const defaultSettings = await getDefaultSettings()
 
     var result
 
     try {
         result = await Storage.get( key, accessSettings)
     } catch (error) {
-        return await getDefaultSettings()
+        return defaultSettings
     }
 
     const settingsString = await new Response( result.Body ).text()
     const settings = JSON.parse( settingsString )
 
-    return settings
+    return mergeSettings( defaultSettings, settings )
 }
 
 var getDefaultSettings = async function() {
+
+    const isHyperspectrum = import.meta.env.VITE_DATA_TYPE === "hypercars"
+
     return {
         layout: {
             reversed: "true",
-            layout: "vertical"
+            layout: "vertical",
+            leftPlotsReversed: "false",
+            heatmapOrigin: "bottom-left"
         },
         labels: {
-            horizontal: "\\nu",
-            vertical: "y"
+            horizontal: isHyperspectrum ? "x" : "\\nu",
+            vertical: "y",
+            spectral: "\\nu",
+            showUnits: true
         },
         legends: {
             data: "y",
@@ -74,6 +82,42 @@ var getDefaultSettings = async function() {
             median: "#d62728",
             area: "#d62728",
             opacity: 0.15
+        },
+        colormaps: {
+            mip: "Viridis",
+            layer: "Viridis"
+        },
+        hyperspectrumColors: {
+            queriedSpectrum: "#1f77b4",
+            queriedInterval: "#1f77b4",
+            roiSpectrum: "#333333",
+            roiInterval: "#333333",
+            roiBox: "#ffffff",
+            roiTitle: "#ffffff",
+            roiOverlay: "#ffffff",
+            pcaComponents: {
+                1: "#0072b2",
+                2: "#e69f00",
+                3: "#009e73",
+                4: "#d55e00",
+                5: "#cc79a7",
+                6: "#56b4e9",
+                7: "#f0e442",
+                8: "#8c564b",
+                9: "#f781bf",
+                10: "#7f7f7f"
+            }
+        },
+        hyperspectrumSpectrum: {
+            lowerBoundPercentage: 7.5,
+            upperBoundPercentage: 97.5,
+            showInterval: true,
+            intervalOpacity: 0.25
+        },
+        hyperspectrumRoi: {
+            showInterval: true,
+            intervalOpacity: 0.25,
+            overlayOpacity: 0.25
         },
         visibility: {
             plot: {
@@ -105,6 +149,32 @@ var getDefaultSettings = async function() {
             }
         }
     };
+}
+
+function mergeSettings( defaults, stored ){
+
+    if( Array.isArray( defaults ) ){
+        return Array.isArray( stored ) ? stored : defaults
+    }
+
+    if( isPlainObject( defaults ) === false ){
+        return stored === undefined ? defaults : stored
+    }
+
+    const source = isPlainObject( stored ) ? stored : {}
+    var merged = { ...defaults }
+
+    for( const key of Object.keys( source ) ){
+        merged[key] = mergeSettings( defaults?.[key], source[key] )
+    }
+
+    return merged
+}
+
+function isPlainObject( value ){
+    return value !== null &&
+        typeof value === "object" &&
+        Array.isArray( value ) === false
 }
 
 var setZenodo = async function( settings ){

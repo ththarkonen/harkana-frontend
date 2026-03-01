@@ -37,6 +37,23 @@
                 ({{ userFolders["Shared with you"]?.length ?? 0 }})
             </span>
         </li>
+        
+        <li @click = "activeFolder = 'Processing'"
+            v-if = "nProcessing > 0"
+            class = "flex cursor-pointer items-center rounded-md px-3 py-2 transition text-white"
+            :class = "activeFolder == 'Processing'
+                ? 'bg-brand'
+                : 'hover:bg-white/10'">
+
+            <div class = "flex items-center gap-2">
+                <i class = "fa fa-cog fa-spin text-xs"></i>
+                Processing
+            </div>
+
+            <span class = "ml-1 text-xs opacity-70">
+                ({{ nProcessing }})
+            </span>
+        </li>
     </ul>
 
     <hr class = "h-0.5 my-2 bg-gray border-0">
@@ -77,7 +94,8 @@ import AddFolderModal from '../modals/AddFolderModal.vue'
 const addFolderModal = ref(null)
 
 const props = defineProps({ 
-    projects: { type: Object, required: true}
+    projects: { type: Object, required: true},
+    processing: { type: Object, required: true},
 })
 
 const activeFolder = defineModel("activeFolder", { required: true, type: String})
@@ -93,6 +111,10 @@ const sortedUserFolders = computed(() => {
 	uniqueFolders = lists.removeItem( uniqueFolders, "Shared with you")
 
 	return uniqueFolders
+})
+
+const nProcessing = computed(() => {
+    return Object.keys( props.processing ).length
 })
 
 watch(() => props.projects, async ( projects ) => {
