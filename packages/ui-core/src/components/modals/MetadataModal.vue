@@ -9,6 +9,10 @@
             <p v-if = "project.shared">This project is shared and metadata cannot be modified.</p>
         </p>
 
+        <p v-if = "errorMessage.length > 0" class = "text-red-500 mb-2">
+            {{ errorMessage }}
+        </p>
+
         <hr class = "h-0.5 bg-gray border-0 my-4">
 
         <!-- Scrollable JSON editor -->
@@ -49,6 +53,7 @@ const modal = ref(null)
 const preview = ref(null)
 const metadata = ref({})
 const isUploading = ref(false)
+const errorMessage = ref("")
 
 const upload = async () => {
 
@@ -75,7 +80,16 @@ const upload = async () => {
 
 const open = async () => {
 
-    metadata.value = await md.load( props.project )
+    errorMessage.value = ""
+
+    try{
+        metadata.value = await md.load( props.project )
+    } catch( error ){
+        console.log( error )
+        metadata.value = {}
+        errorMessage.value = error?.message ?? "Failed to load project metadata."
+    }
+
     preview.value = structuredClone( toRaw( metadata.value ) )
 
     modal.value.open()
@@ -85,4 +99,3 @@ const close = () => modal.value.close()
 defineExpose({ open, close})
 
 </script>
-

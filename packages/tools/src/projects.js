@@ -40,10 +40,9 @@ var upload = async function( file, tokenGroupID, progress){
 	
 	const metadataKey = project.id + "/" + "metadata.json"; 
 	const rawDataFileKey = project.id + "/" + rawFileName;
-	const rawData = await file.arrayBuffer()
 
 	try {
-		await Storage.put( rawDataFileKey, rawData, accessSettings);
+		await Storage.put( rawDataFileKey, file, accessSettings);
 		progress.upload("success");
 	} catch (error) {
 		progress.upload("error");
@@ -109,10 +108,9 @@ var hyperspectrum = async function( file, tokenGroupID, progress){
 	const projectInfo = await create.info( project );
 	 
 	const rawDataFileKey = project.id + "/" + rawFileName;
-	const rawData = await file.arrayBuffer()
 
 	try {
-		await Storage.put( rawDataFileKey, rawData, accessSettings);
+		await Storage.put( rawDataFileKey, file, accessSettings);
 		progress.upload("success");
 	} catch (error) {
 		progress.upload("error");
@@ -153,7 +151,71 @@ var hyperspectrum = async function( file, tokenGroupID, progress){
 	return projectList;
 }
 
-var remove = async function( project ){
+const PROJECT_DELETE_FILE_CONCURRENCY = 16
+const PROJECT_DELETE_FILE_RETRIES = 2
+const PROJECT_DELETE_FILE_RETRY_DELAY_MS = 200
+
+var removeProjectFileWithRetry = async function( fileKey, accessSettings ){
+
+	var lastError = null
+
+	for( var attempt = 0; attempt <= PROJECT_DELETE_FILE_RETRIES; attempt++ ){
+		try{
+			await Storage.remove( fileKey, accessSettings )
+			return
+		} catch( error ){
+			lastError = error
+
+			if( attempt >= PROJECT_DELETE_FILE_RETRIES ){
+				break
+			}
+
+			await utils.wait( PROJECT_DELETE_FILE_RETRY_DELAY_MS * ( attempt + 1 ))
+		}
+	}
+
+	throw lastError
+}
+
+var removeProjectFiles = async function( projectFiles, accessSettings, onProgress = null ){
+
+	const files = Array.isArray( projectFiles?.results ) ? projectFiles.results : []
+	const totalFiles = files.length
+	var deletedFiles = 0
+
+	if( typeof onProgress === "function" ){
+		onProgress({
+			stage: "deleting-files",
+			deletedFiles,
+			totalFiles
+		})
+	}
+
+	if( totalFiles === 0 ) return
+
+	for( var index = 0; index < totalFiles; index += PROJECT_DELETE_FILE_CONCURRENCY ){
+		const batch = files.slice( index, index + PROJECT_DELETE_FILE_CONCURRENCY )
+
+		await Promise.all(
+			batch.map( async( file ) => {
+				await removeProjectFileWithRetry( file.key, accessSettings )
+				deletedFiles += 1
+
+				if( typeof onProgress === "function" ){
+					onProgress({
+						stage: "deleting-files",
+						deletedFiles,
+						totalFiles
+					})
+				}
+			})
+		)
+	}
+}
+
+var remove = async function( project, options = {} ){
+
+	const onProgress = typeof options?.onProgress === "function" ? options.onProgress : null
 
 	var folders = await getFolders();
 	for( const folderName in folders ){
@@ -166,6 +228,14 @@ var remove = async function( project ){
 	const accessSettings = { level: "private",
 							 identityId: project.owner.id,
 							 pageSize: "ALL"};
+
+	if( onProgress ){
+		onProgress({
+			stage: "listing-files",
+			deletedFiles: 0,
+			totalFiles: 0
+		})
+	}
 
 	var projectFiles = await Storage.list( project.id + "/", accessSettings);
 	var projectList = await getProjects();
@@ -180,9 +250,7 @@ var remove = async function( project ){
 	const response = await share.removeProject( project )
 	console.log( response )
 
-	for( const file of projectFiles.results ){
-		Storage.remove( file.key, accessSettings);
-	};
+	await removeProjectFiles( projectFiles, accessSettings, onProgress )
 
 	return projectList;
 }
@@ -221,7 +289,14 @@ var rename = async function( project, name){
 var list = async() => {
 
 	const ownedProjects = await getProjects()
-	const sharedProjects = await share.list()
+	var sharedProjects = {}
+
+	try{
+		sharedProjects = await share.list()
+	} catch( error ){
+		console.log( error )
+		sharedProjects = {}
+	}
 
 	var ownedProjectsReady = {}
 

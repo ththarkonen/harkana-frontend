@@ -19,7 +19,7 @@
 
 			<hr class = "h-0.5 bg-gray border-0 ">
 
-			<SidebarButton @click = "metadataModal.open()" class = "mt-4">
+			<SidebarButton @click = "openMetadataModal" class = "mt-4">
 				Metadata
 			</SidebarButton>
 
@@ -67,6 +67,15 @@
 		<NavigationBar>
 			<template v-slot:left-items>
 				<button @click = "sidebarOpen = true" class = "md:hidden mr-4 px-3 py-2 rounded bg-slate-100">☰</button>
+				<BaseDropdown>
+					<template v-slot:trigger>
+						<span class = "font-medium">Project</span>
+					</template>
+
+					<BaseDropdownItem @select = "openProjectChat">
+						Notes
+					</BaseDropdownItem>
+				</BaseDropdown>
 				<ProjectNameInput :project = "project"></ProjectNameInput>
 			</template>
 			<template v-slot:right-items>
@@ -76,9 +85,9 @@
 
 
 		<!-- Main Content -->
-		<main class="bg-dark-gray rounded-lg shadow-sm p-0">
-			<div ref = "graph" class = "w-full h-full bg-white"></div>
-		</main>
+			<main class="relative z-0 bg-dark-gray rounded-lg overflow-hidden shadow-sm p-0">
+				<div ref = "graph" class = "w-full h-full bg-white rounded-lg"></div>
+			</main>
 
 	</div>
 
@@ -90,6 +99,8 @@
 	</ComparisonSelectModal>
 	<ShareModal ref = "shareModal" :project = "project"></ShareModal>
 	<ZenodoModal ref = "zenodoModal" :project = "project"></ZenodoModal>
+	<ProjectChatWindow v-model = "projectChatOpen"
+					   :project = "project"></ProjectChatWindow>
 </div>
 </template>
 
@@ -113,12 +124,15 @@ import CalibrationControls from './sidebar/CalibrationControls.vue'
 
 import NavigationBar from './navbar/NavigationBar.vue'
 import AccountDropdown from './navbar/AccountDropdown.vue'
+import BaseDropdown from './navbar/BaseDropdown.vue'
+import BaseDropdownItem from './navbar/BaseDropdownItem.vue'
 import ProjectNameInput from './navbar/ProjectNameInput.vue'
 
 import MetadataModal from './modals/MetadataModal.vue'
 import ComparisonSelectModal from './modals/ComparisonSelectModal.vue'
 import ShareModal from './modals/ShareModal.vue'
 import ZenodoModal  from './modals/ZenodoModal.vue'
+import ProjectChatWindow from './chat/ProjectChatWindow.vue'
 
 const metadataModal = ref(null)
 const comparisonSelectModal = ref(null)
@@ -151,6 +165,7 @@ const marker = ref({
 })
 
 const graph = ref(null)
+const projectChatOpen = ref(false)
 
 const sidebarOpen = ref(false)
 const sidebarStyle = computed(() => {
@@ -166,6 +181,14 @@ const download = async() => {
 
 	await utils.wait(1000)
 	downloading.value = false
+}
+
+const openProjectChat = () => {
+	projectChatOpen.value = true
+}
+
+const openMetadataModal = () => {
+	metadataModal.value?.open()
 }
 
 watch( comparisonProjectID, async () => {
@@ -245,6 +268,3 @@ onMounted( async () => {
 })
 
 </script>
-
-
-

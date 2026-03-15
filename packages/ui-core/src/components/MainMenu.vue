@@ -94,7 +94,7 @@
 
 <script setup>
 
-import { ref, computed, nextTick, onMounted} from 'vue'
+import { ref, computed, nextTick, onMounted, onBeforeUnmount, watch } from 'vue'
 import { folders, projects } from "@harkana/tools"
 
 import Sidebar from './sidebar/Sidebar.vue'
@@ -189,6 +189,14 @@ const showInfo = computed(() => {
 	return Object.keys( projectList.value ).length === 0 && Object.keys( processingList.value ).length === 0
 })
 
+const hasProcessingProjects = computed(() => {
+	return Object.keys( processingList.value ).length > 0
+})
+
+const PROCESSING_REFRESH_INTERVAL_MS = 2 * 60 * 1000
+const refreshingProcessing = ref(false)
+var processingRefreshTimer = null
+
 const open = async ( modal, projectArray) => {
 
 	activeProject.value = projectArray[0]
@@ -235,6 +243,36 @@ const updateProjectsClearChecks = async () => {
 	await balanceDropdown.value.updateBalance()
 }
 
+const refreshProcessingProjects = async () => {
+
+	if( refreshingProcessing.value ) return
+	refreshingProcessing.value = true
+
+	try{
+		await updateProjects()
+	} catch( error ){
+		console.log( error )
+	} finally {
+		refreshingProcessing.value = false
+	}
+}
+
+const startProcessingRefresh = () => {
+
+	if( processingRefreshTimer !== null ) return
+
+	processingRefreshTimer = setInterval(() => {
+		void refreshProcessingProjects()
+	}, PROCESSING_REFRESH_INTERVAL_MS )
+}
+
+const stopProcessingRefresh = () => {
+
+	if( processingRefreshTimer === null ) return
+	clearInterval( processingRefreshTimer )
+	processingRefreshTimer = null
+}
+
 onMounted( async () => {
 
 	userFolders.value = await folders.get()
@@ -247,7 +285,20 @@ onMounted( async () => {
 	emit("loaded")
 })
 
-</script>
+watch( hasProcessingProjects, ( hasProcessing ) => {
 
+	if( hasProcessing ){
+		startProcessingRefresh()
+		return
+	}
+
+	stopProcessingRefresh()
+}, { immediate: true })
+
+onBeforeUnmount(() => {
+	stopProcessingRefresh()
+})
+
+</script>
 
 

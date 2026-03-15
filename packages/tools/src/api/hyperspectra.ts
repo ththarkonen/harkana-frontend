@@ -50,6 +50,40 @@ var apiParameters = ( project: any ) => {
     return parameters
 }
 
+var resolveDataType = ( dataType: string = "" ) => {
+
+    const normalized = String( dataType ?? "" ).trim()
+    if( normalized.length > 0 ){
+        return normalized
+    }
+
+    return String((import.meta as any).env.VITE_DATA_TYPE ?? "" ).trim()
+}
+
+var resolveDataSource = ( dataSource: string = "" ) => {
+    return String( dataSource ?? "" ).trim()
+}
+
+var resolveConfidenceLevels = ( confidenceLevels: Array<number | string> = [] ) => {
+
+    if( Array.isArray( confidenceLevels ) === false || confidenceLevels.length === 0 ){
+        return ""
+    }
+
+    const normalizedLevels = confidenceLevels
+        .map(( value ) => Number.parseInt( String( value ), 10 ))
+        .filter(( value ) => Number.isInteger( value ) && value > 0 && value <= 100 )
+
+    if( normalizedLevels.length === 0 ){
+        return ""
+    }
+
+    const uniqueLevels = Array.from( new Set( normalizedLevels ))
+    uniqueLevels.sort(( left, right ) => left - right )
+
+    return uniqueLevels.join( "," )
+}
+
 var parse = async ( project: any, tokenGroupID: string) => {
 
     var parameters = apiParameters( project )
@@ -61,13 +95,55 @@ var parse = async ( project: any, tokenGroupID: string) => {
     return await apiFetch<{ success: boolean }>( url )
 }
 
-var spectrum = async ( project: any, x: number, y: number, groupID: string = "" ) => {
+var estimate = async (
+    project: any,
+    groupID: string = ""
+) => {
+
+	var parameters = apiParameters( project )
+	parameters.groupID = groupID ?? ""
+
+    const dataType = String((import.meta as any).env.VITE_DATA_TYPE ?? "" ).trim()
+    if( dataType.toLowerCase() === "hypercars" ){
+        parameters.dataType = dataType
+    } else {
+        delete parameters.dataType
+    }
+
+    const base = (import.meta as any).env.VITE_BASE_URL + "/hyperspectrum/estimate"
+    const url = base + "?" + buildQueryString( parameters )
+
+    return await apiFetch<any>( url )
+}
+
+var spectrum = async (
+    project: any,
+    x: number,
+    y: number,
+    groupID: string = "",
+    dataType: string = "",
+    dataSource: string = "",
+    confidenceLevels: Array<number | string> = []
+) => {
 
     const projectReference = resolveProjectReference( project )
     var parameters = apiParameters( project )
+    parameters.projectID = projectReference.projectID
+    if( projectReference.isShared || projectReference.projectKey.length > 0 ){
+        parameters.projectKey = projectReference.projectKey
+    }
     parameters.x = String( Math.round( Number( x )))
     parameters.y = String( Math.round( Number( y )))
     parameters.groupID = groupID ?? ""
+    parameters.dataType = resolveDataType( dataType )
+    const resolvedDataSource = resolveDataSource( dataSource )
+    if( resolvedDataSource.length > 0 ){
+        parameters.dataSource = resolvedDataSource
+    }
+    const resolvedConfidenceLevels = resolveConfidenceLevels( confidenceLevels )
+    if( resolvedConfidenceLevels.length > 0 ){
+        parameters.confidenceLevels = resolvedConfidenceLevels
+    }
 
     const route = projectReference.isShared
         ? "/hyperspectrum/shared/spectrum"
@@ -86,13 +162,25 @@ var meanSpectrum = async (
     deduplicate: boolean = true,
     strictBounds: boolean = false,
     lowerPercentage: number = 2.5,
-    upperPercentage: number = 97.5
+    upperPercentage: number = 97.5,
+    dataType: string = "",
+    dataSource: string = "",
+    confidenceLevels: Array<number | string> = []
 ) => {
 
     var parameters: Record<string, string> = {}
     parameters.groupID = groupID ?? ""
     parameters.lowerPercentage = String( Number.isFinite( Number( lowerPercentage )) ? Number( lowerPercentage ) : 2.5 )
     parameters.upperPercentage = String( Number.isFinite( Number( upperPercentage )) ? Number( upperPercentage ) : 97.5 )
+    parameters.dataType = resolveDataType( dataType )
+    const resolvedDataSource = resolveDataSource( dataSource )
+    if( resolvedDataSource.length > 0 ){
+        parameters.dataSource = resolvedDataSource
+    }
+    const resolvedConfidenceLevels = resolveConfidenceLevels( confidenceLevels )
+    if( resolvedConfidenceLevels.length > 0 ){
+        parameters.confidenceLevels = resolvedConfidenceLevels
+    }
     const projectReference = resolveProjectReference( project )
     if( projectReference.isShared || projectReference.projectKey.length > 0 ){
         parameters.projectKey = projectReference.projectKey
@@ -107,7 +195,7 @@ var meanSpectrum = async (
 
     const body: Record<string, any> = {
         projectID: projectReference.projectID,
-        dataType: (import.meta as any).env.VITE_DATA_TYPE,
+        dataType: resolveDataType( dataType ),
         points,
         deduplicate,
         strictBounds
@@ -122,15 +210,18 @@ var meanSpectrum = async (
     })
 }
 
-var status = async ( project: any ) => {
+var status = async ( projectOrJobID: any ) => {
 
-    const jobId = String( project?.jobId ?? "" ).trim()
-    if( jobId.length === 0 ){
+    const resolvedJobID = typeof projectOrJobID === "string"
+        ? String( projectOrJobID ).trim()
+        : String( projectOrJobID?.jobId ?? "" ).trim()
+
+    if( resolvedJobID.length === 0 ){
         throw new Error( "Missing project.jobId for hyperspectrum status query" )
     }
 
     var parameters: Record<string, string> = {}
-    parameters.jobId = jobId
+    parameters.jobId = resolvedJobID
 
     const base = (import.meta as any).env.VITE_BASE_URL + "/hyperspectrum/status"
     const url = base + "?" + buildQueryString( parameters )
@@ -151,7 +242,8 @@ var createRoi = async (
     },
     groupID: string = "",
     lowerPercentage?: number,
-    upperPercentage?: number
+    upperPercentage?: number,
+    confidenceLevels: Array<number | string> = []
 ) => {
 
     const projectReference = requireOwnedProjectReference( project )
@@ -196,6 +288,11 @@ var createRoi = async (
         parameters.upperPercentage = String( normalizedUpperPercentage )
     }
 
+    const resolvedConfidenceLevels = resolveConfidenceLevels( confidenceLevels )
+    if( hasMultiplePoints && resolvedConfidenceLevels.length > 0 ){
+        parameters.confidenceLevels = resolvedConfidenceLevels
+    }
+
     const base = (import.meta as any).env.VITE_BASE_URL + "/hyperspectrum/roi"
     const url = base + "?" + buildQueryString( parameters )
 
@@ -228,4 +325,4 @@ var deleteRoi = async ( project: any, roiId: string, groupID: string = "" ) => {
     })
 }
 
-export default { parse, spectrum, meanSpectrum, status, createRoi, deleteRoi }
+export default { parse, estimate, spectrum, meanSpectrum, status, createRoi, deleteRoi }

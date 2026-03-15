@@ -4,7 +4,7 @@
 	<div class="border-2 border-brand rounded-lg p-4 mb-8 shadow-black shadow-lg">
 		<p>
 			<strong>Hyperspectrum Visualization Settings</strong> control how hyperspectral image views and spectra
-			are displayed. These options cover axis labels, unit display, scalar heatmap colormaps, PCA component
+			are displayed. These options cover axis labels, unit display, scalar heatmap colormaps, UMAP channel colors, PCA component
 			colors, queried-spectrum styling, uncertainty display, and orientation for the image views and spectral side plots.
 		</p>
 	</div>
@@ -65,6 +65,23 @@
 					{{ scale }}
 				</option>
 			</select>
+		</div>
+
+		<hr class="h-0.5 bg-gray border-0 my-4">
+
+		<div class="flex flex-col gap-2 rounded-lg border-2 border-brand bg-black/5 p-4 shadow-sm">
+			<h4 class="font-semibold text-black">UMAP channel colors</h4>
+			<div class="grid grid-cols-1 gap-4 mt-2">
+				<ColorPicker v-model = "umapChannelColors.r"
+							 description = "UMAP red channel color">
+				</ColorPicker>
+				<ColorPicker v-model = "umapChannelColors.g"
+							 description = "UMAP green channel color">
+				</ColorPicker>
+				<ColorPicker v-model = "umapChannelColors.b"
+							 description = "UMAP blue channel color">
+				</ColorPicker>
+			</div>
 		</div>
 
 		<hr class="h-0.5 bg-gray border-0 my-4">
@@ -203,6 +220,11 @@
 						 class = "mt-3">
 			</ColorPicker>
 
+			<ColorPicker v-model = "roiColors.selectionBox"
+						 description = "Current selection box color"
+						 class = "mt-3">
+			</ColorPicker>
+
 			<div class="flex flex-col gap-2 mt-4">
 				<label class="font-semibold text-black">ROI overlay opacity</label>
 				<input v-model.number = "roiOptions.overlayOpacity"
@@ -211,6 +233,83 @@
 					   min = "0"
 					   max = "1"
 					   step = "0.01"/>
+			</div>
+		</div>
+
+		<div class="rounded-lg border-2 border-brand bg-black/5 p-4 shadow-sm mt-4">
+			<h4 class="font-semibold text-black">Hyperspectrum viewer defaults</h4>
+			<p class="text-sm text-black/70 mt-1">
+				These defaults are applied when you open a hyperspectrum project.
+			</p>
+
+			<div class="grid grid-cols-1 gap-4 mt-4 md:grid-cols-2">
+				<div class="flex flex-col gap-2">
+					<label class="font-semibold text-black">Display mode</label>
+					<select v-model = "viewerDefaults.displayMode"
+							class="w-full border border-gray-600 rounded px-3 py-2 bg-white text-black focus:outline-none focus:ring-2 focus:ring-brand">
+						<option value = "mip">MIP</option>
+						<option value = "mip_hsv">HSV-mapped MIP</option>
+						<option value = "umap">UMAP</option>
+						<option value = "layer">Layer</option>
+						<option value = "pca">PCA classification</option>
+						<option value = "pca_mip">PCA MIP</option>
+						<option value = "pca_rgb">PCA RGB</option>
+						<option value = "rpca">RPCA classification</option>
+						<option value = "rpca_mip">RPCA MIP</option>
+						<option value = "rpca_rgb">RPCA RGB</option>
+					</select>
+				</div>
+
+				<div class="flex flex-col gap-2">
+					<label class="font-semibold text-black">Heatmap interaction</label>
+					<select v-model = "viewerDefaults.heatmapInteraction"
+							class="w-full border border-gray-600 rounded px-3 py-2 bg-white text-black focus:outline-none focus:ring-2 focus:ring-brand">
+						<option value = "select">Select spectra</option>
+						<option value = "zoom">Zoom</option>
+					</select>
+				</div>
+
+				<div class="flex flex-col gap-2">
+					<label class="font-semibold text-black">Selection confidence level</label>
+					<select v-model = "viewerDefaults.selectionConfidenceLevel"
+							class="w-full border border-gray-600 rounded px-3 py-2 bg-white text-black focus:outline-none focus:ring-2 focus:ring-brand">
+						<option value = "none">No uncertainty</option>
+						<option value = "50">50%</option>
+						<option value = "75">75%</option>
+						<option value = "90">90%</option>
+						<option value = "95">95%</option>
+					</select>
+				</div>
+
+				<div class="flex flex-col gap-2">
+					<label class="font-semibold text-black">Loadings</label>
+					<select v-model = "viewerDefaults.loadings"
+							class="w-full border border-gray-600 rounded px-3 py-2 bg-white text-black focus:outline-none focus:ring-2 focus:ring-brand">
+						<option value = "hide">Hide</option>
+						<option value = "show">Show</option>
+					</select>
+				</div>
+
+				<div class="flex flex-col gap-2">
+					<label class="font-semibold text-black">False-coloring basis</label>
+					<select v-model = "viewerDefaults.falseColoringBasis"
+							class="w-full border border-gray-600 rounded px-3 py-2 bg-white text-black focus:outline-none focus:ring-2 focus:ring-brand">
+						<option value = "measurement">Measurements</option>
+						<option value = "raman">Estimated Raman spectra</option>
+					</select>
+					<p class="text-xs text-black/60">
+						If Raman coloring is not available yet, measurements are used automatically.
+					</p>
+				</div>
+
+				<div class="flex flex-col gap-2">
+					<label class="font-semibold text-black">Estimate ROI uncertainty</label>
+					<select v-model = "viewerDefaults.roiEstimateUncertainty"
+							class="w-full border border-gray-600 rounded px-3 py-2 bg-white text-black focus:outline-none focus:ring-2 focus:ring-brand">
+						<option value = "show">Show</option>
+						<option value = "hide">Hide</option>
+					</select>
+				</div>
 			</div>
 		</div>
 
@@ -251,6 +350,12 @@
 
 		<SettingsButton @click = "updateSettings" :loading = "updating" class = "mt-4 disabled:opacity-50 disabled:cursor-not-allowed">
 			Update visualization settings
+		</SettingsButton>
+
+		<SettingsButton @click = "resetSettings"
+						:loading = "updating"
+						class = "mt-2 ml-4 disabled:opacity-50 disabled:cursor-not-allowed">
+			Reset to default settings
 		</SettingsButton>
 
 	</div>
@@ -301,6 +406,19 @@ const PCA_DEFAULT_COLORS = {
 	10: "#7f7f7f"
 }
 
+const HYPERSPECTRUM_DISPLAY_MODES = new Set([
+	"mip",
+	"mip_hsv",
+	"umap",
+	"layer",
+	"pca",
+	"pca_mip",
+	"pca_rgb",
+	"rpca",
+	"rpca_mip",
+	"rpca_rgb"
+])
+
 const pcaColorEntries = Array.from({ length: 10 }, (_, index ) => {
 	const componentIndex = index + 1
 	return {
@@ -333,11 +451,18 @@ const spectrumColors = reactive({
 	queriedInterval: "#1f77b4"
 })
 
+const umapChannelColors = reactive({
+	r: "#ff0000",
+	g: "#00ff00",
+	b: "#0000ff"
+})
+
 const roiColors = reactive({
 	roiSpectrum: "#333333",
 	roiInterval: "#333333",
 	roiBox: "#ffffff",
-	roiTitle: "#ffffff"
+	roiTitle: "#ffffff",
+	selectionBox: "#9ca3af"
 })
 
 const spectrumOptions = reactive({
@@ -351,6 +476,15 @@ const roiOptions = reactive({
 	showInterval: true,
 	intervalOpacity: 0.25,
 	overlayOpacity: 0.25
+})
+
+const viewerDefaults = reactive({
+	displayMode: "umap",
+	heatmapInteraction: "select",
+	selectionConfidenceLevel: "95",
+	loadings: "hide",
+	falseColoringBasis: "measurement",
+	roiEstimateUncertainty: "show"
 })
 
 const fontSizes = reactive({
@@ -406,6 +540,41 @@ const normalizeOpacity = ( value, fallback = 0.25 ) => {
 	return Math.min( 1, Math.max( 0, numeric ))
 }
 
+const normalizeDisplayMode = ( value ) => {
+	const normalized = String( value ?? "" ).trim()
+	return HYPERSPECTRUM_DISPLAY_MODES.has( normalized ) ? normalized : "umap"
+}
+
+const normalizeHeatmapInteraction = ( value ) => {
+	return String( value ?? "" ).trim().toLowerCase() === "zoom" ? "zoom" : "select"
+}
+
+const normalizeSelectionConfidenceLevel = ( value ) => {
+
+	if( String( value ?? "" ).trim().toLowerCase() === "none" ){
+		return "none"
+	}
+
+	const numeric = Number.parseInt( value, 10 )
+	if([ 50, 75, 90, 95 ].includes( numeric )){
+		return String( numeric )
+	}
+
+	return "95"
+}
+
+const normalizeShowHide = ( value, fallback = "hide" ) => {
+	const normalized = String( value ?? "" ).trim().toLowerCase()
+	if( normalized === "show" || normalized === "hide" ){
+		return normalized
+	}
+	return fallback === "show" ? "show" : "hide"
+}
+
+const normalizeFalseColoringBasis = ( value ) => {
+	return String( value ?? "" ).trim().toLowerCase() === "raman" ? "raman" : "measurement"
+}
+
 const syncFromSettings = ( savedSettings ) => {
 
 	layout.leftPlotsReversed = savedSettings?.layout?.leftPlotsReversed === "true" ? "true" : "false"
@@ -455,6 +624,23 @@ const syncFromSettings = ( savedSettings ) => {
 					? savedSettings.hyperspectrumColors.roiOverlay
 					: "#ffffff"
 			)
+	roiColors.selectionBox =
+		typeof savedSettings?.hyperspectrumColors?.selectionBox === "string" && savedSettings.hyperspectrumColors.selectionBox.length > 0
+			? savedSettings.hyperspectrumColors.selectionBox
+			: "#9ca3af"
+
+	umapChannelColors.r =
+		typeof savedSettings?.hyperspectrumColors?.umapChannels?.r === "string" && savedSettings.hyperspectrumColors.umapChannels.r.length > 0
+			? savedSettings.hyperspectrumColors.umapChannels.r
+			: "#ff0000"
+	umapChannelColors.g =
+		typeof savedSettings?.hyperspectrumColors?.umapChannels?.g === "string" && savedSettings.hyperspectrumColors.umapChannels.g.length > 0
+			? savedSettings.hyperspectrumColors.umapChannels.g
+			: "#00ff00"
+	umapChannelColors.b =
+		typeof savedSettings?.hyperspectrumColors?.umapChannels?.b === "string" && savedSettings.hyperspectrumColors.umapChannels.b.length > 0
+			? savedSettings.hyperspectrumColors.umapChannels.b
+			: "#0000ff"
 
 	const boundRange = normalizeBoundRange(
 		savedSettings?.hyperspectrumSpectrum?.lowerBoundPercentage,
@@ -482,6 +668,27 @@ const syncFromSettings = ( savedSettings ) => {
 	roiOptions.overlayOpacity = normalizeOpacity(
 		savedSettings?.hyperspectrumRoi?.overlayOpacity,
 		0.25
+	)
+
+	viewerDefaults.displayMode = normalizeDisplayMode(
+		savedSettings?.hyperspectrumDefaults?.displayMode
+	)
+	viewerDefaults.heatmapInteraction = normalizeHeatmapInteraction(
+		savedSettings?.hyperspectrumDefaults?.heatmapInteraction
+	)
+	viewerDefaults.selectionConfidenceLevel = normalizeSelectionConfidenceLevel(
+		savedSettings?.hyperspectrumDefaults?.selectionConfidenceLevel
+	)
+	viewerDefaults.loadings = normalizeShowHide(
+		savedSettings?.hyperspectrumDefaults?.loadings,
+		"hide"
+	)
+	viewerDefaults.falseColoringBasis = normalizeFalseColoringBasis(
+		savedSettings?.hyperspectrumDefaults?.falseColoringBasis
+	)
+	viewerDefaults.roiEstimateUncertainty = normalizeShowHide(
+		savedSettings?.hyperspectrumDefaults?.roiEstimateUncertainty,
+		"show"
 	)
 
 	fontSizes.axis = Number.isFinite( Number( savedSettings?.font?.sizes?.axis ))
@@ -544,7 +751,14 @@ const updateSettings = async () => {
 		roiInterval: roiColors.roiInterval,
 		roiBox: roiColors.roiBox,
 		roiTitle: roiColors.roiTitle,
+		selectionBox: roiColors.selectionBox,
 		roiOverlay: roiColors.roiBox,
+		umapChannels: {
+			...( savedSettings.hyperspectrumColors?.umapChannels ?? {} ),
+			r: umapChannelColors.r,
+			g: umapChannelColors.g,
+			b: umapChannelColors.b
+		},
 		pcaComponents: {
 			...( savedSettings.hyperspectrumColors?.pcaComponents ?? {} )
 		}
@@ -574,6 +788,18 @@ const updateSettings = async () => {
 		overlayOpacity: normalizeOpacity( roiOptions.overlayOpacity, 0.25 )
 	}
 
+	savedSettings.hyperspectrumDefaults = {
+		...( savedSettings.hyperspectrumDefaults ?? {} ),
+		displayMode: normalizeDisplayMode( viewerDefaults.displayMode ),
+		heatmapInteraction: normalizeHeatmapInteraction( viewerDefaults.heatmapInteraction ),
+		selectionConfidenceLevel: viewerDefaults.selectionConfidenceLevel === "none"
+			? "none"
+			: Number.parseInt( normalizeSelectionConfidenceLevel( viewerDefaults.selectionConfidenceLevel ), 10 ),
+		loadings: normalizeShowHide( viewerDefaults.loadings, "hide" ),
+		falseColoringBasis: normalizeFalseColoringBasis( viewerDefaults.falseColoringBasis ),
+		roiEstimateUncertainty: normalizeShowHide( viewerDefaults.roiEstimateUncertainty, "show" )
+	}
+
 	roiOptions.intervalOpacity = normalizeOpacity( roiOptions.intervalOpacity, 0.25 )
 	roiOptions.overlayOpacity = normalizeOpacity( roiOptions.overlayOpacity, 0.25 )
 
@@ -586,6 +812,18 @@ const updateSettings = async () => {
 	}
 
 	await settingslib.set( savedSettings )
+
+	await utils.wait( 1000 )
+	updating.value = false
+}
+
+const resetSettings = async () => {
+
+	updating.value = true
+
+	const defaultSettings = await settingslib.getDefaultSettings()
+	await settingslib.set( defaultSettings )
+	syncFromSettings( defaultSettings )
 
 	await utils.wait( 1000 )
 	updating.value = false

@@ -33,10 +33,29 @@ var loadData = async function( project ){
     return await load( project, "data")
 }
 
+var set = async function( project, mode, value ){
+
+    if( project.shared ){
+        throw new Error( "Shared projects are read-only." )
+    }
+
+    const key = project.id + "/" + mode + ".json"
+    const accessSettings = {
+        level: "private",
+        contentType: "application/json"
+    }
+
+    const payload = JSON.stringify( value, null, 2 )
+    await Storage.put( key, payload, accessSettings )
+
+    return value
+}
+
 export default {
     load,
     loadData,
     loadEstimate,
+    set,
     getCalibration,
     setCalibration
 }

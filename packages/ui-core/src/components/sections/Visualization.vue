@@ -135,6 +135,12 @@
             Update visualization settings
         </SettingsButton>
 
+        <SettingsButton @click = "resetSettings"
+                        :loading = "updating"
+                        class = "mt-2 disabled:opacity-50 disabled:cursor-not-allowed">
+            Reset to default settings
+        </SettingsButton>
+
     </div>
 
 </div>
@@ -163,6 +169,31 @@ const comparisonColors = ref({})
 
 const visibility = ref([])
 const comparisonVisibility = ref([])
+
+const syncFromSettings = ( settings ) => {
+
+	font.value = settings.font
+	layout.value = settings.layout
+	labels.value = settings.labels
+	legends.value = settings.legends
+
+	colors.value = settings.colors
+	comparisonColors.value = settings.comparisonColors
+
+    visibility.value[0] = settings.visibility.plot.data
+    visibility.value[1] = settings.visibility.plot.median
+    visibility.value[2] = settings.visibility.plot.interval50
+    visibility.value[3] = settings.visibility.plot.interval75
+    visibility.value[4] = settings.visibility.plot.interval90
+    visibility.value[5] = settings.visibility.plot.interval95
+
+    comparisonVisibility.value[0] = settings.visibility.comparison.data
+    comparisonVisibility.value[1] = settings.visibility.comparison.median
+    comparisonVisibility.value[2] = settings.visibility.comparison.interval50
+    comparisonVisibility.value[3] = settings.visibility.comparison.interval75
+    comparisonVisibility.value[4] = settings.visibility.comparison.interval90
+    comparisonVisibility.value[5] = settings.visibility.comparison.interval95
+}
 
 const updateSettings = async () => {
 
@@ -198,31 +229,22 @@ const updateSettings = async () => {
     updating.value = false
 }
 
+const resetSettings = async () => {
+
+    updating.value = true
+
+    const defaultSettings = await settingslib.getDefaultSettings()
+    await settingslib.set( defaultSettings )
+    syncFromSettings( defaultSettings )
+
+    await utils.wait( 1000 )
+    updating.value = false
+}
+
 onMounted( async () => {
 
 	var settings = await settingslib.get()
-    
-	font.value = settings.font
-	layout.value = settings.layout
-	labels.value = settings.labels
-	legends.value = settings.legends
-	
-	colors.value = settings.colors
-	comparisonColors.value = settings.comparisonColors
-
-    visibility.value[0] = settings.visibility.plot.data
-    visibility.value[1] = settings.visibility.plot.median
-    visibility.value[2] = settings.visibility.plot.interval50
-    visibility.value[3] = settings.visibility.plot.interval75
-    visibility.value[4] = settings.visibility.plot.interval90
-    visibility.value[5] = settings.visibility.plot.interval95
-
-    comparisonVisibility.value[0] = settings.visibility.comparison.data
-    comparisonVisibility.value[1] = settings.visibility.comparison.median
-    comparisonVisibility.value[2] = settings.visibility.comparison.interval50
-    comparisonVisibility.value[3] = settings.visibility.comparison.interval75
-    comparisonVisibility.value[4] = settings.visibility.comparison.interval90
-    comparisonVisibility.value[5] = settings.visibility.comparison.interval95
+    syncFromSettings( settings )
 })
 
 </script>

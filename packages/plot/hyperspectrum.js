@@ -12,6 +12,11 @@ const DEFAULT_PCA_COMPONENT_COLOR_STRINGS = [
     "#f781bf",
     "#7f7f7f"
 ]
+const DEFAULT_UMAP_CHANNEL_COLOR_STRINGS = {
+    r: "#ff0000",
+    g: "#00ff00",
+    b: "#0000ff"
+}
 const SUPPORTED_HEATMAP_COLOR_SCALES = new Set([
     "Blackbody",
     "Bluered",
@@ -32,7 +37,7 @@ const SUPPORTED_HEATMAP_COLOR_SCALES = new Set([
     "YlGnBu",
     "YlOrRd"
 ])
-const TOP_LEFT_INSTRUCTION_TEXT = "Select a region of interest (ROI) from the sidebar to view its stored spectrum here.<br>Save a heatmap selection to create a new region of interest (ROI)."
+const TOP_LEFT_INSTRUCTION_TEXT = "Select a region of interest (ROI) from the sidebar to view its stored spectrum here.<br>In PCA and RPCA views, this panel can also show component loadings."
 const LOWER_LEFT_INSTRUCTION_TEXT = "Enable Select spectra in the sidebar, then drag a region or click a pixel to view a spectrum here."
 var pcaComponentColors = DEFAULT_PCA_COMPONENT_COLOR_STRINGS
     .map(( color ) => parseColorValue( color ))
@@ -136,6 +141,22 @@ var updateRgb = async function( mipRgb, graphContainer, settings = {}, options =
     await renderRgbMatrix( mipRgb, graphContainer, settings, options, true )
 }
 
+var initializeUmap = async function( umapChannels, graphContainer, settings = {}, options = {} ){
+    await renderUmapMatrix( umapChannels, graphContainer, settings, options, false )
+}
+
+var updateUmap = async function( umapChannels, graphContainer, settings = {}, options = {} ){
+    await renderUmapMatrix( umapChannels, graphContainer, settings, options, true )
+}
+
+var initializePcaMip = async function( pcaMip, graphContainer, settings = {}, options = {} ){
+    await renderPcaMipMatrix( pcaMip, graphContainer, settings, options, false )
+}
+
+var updatePcaMip = async function( pcaMip, graphContainer, settings = {}, options = {} ){
+    await renderPcaMipMatrix( pcaMip, graphContainer, settings, options, true )
+}
+
 var initializePcaClassification = async function( scoresByComponent, graphContainer, settings = {}, options = {} ){
     await renderPcaClassification( scoresByComponent, graphContainer, settings, options, false )
 }
@@ -161,9 +182,10 @@ var updateLowerSpectrum = async function( graphContainer, spectrum, options = {}
     const traceIndices = findLowerSpectrumTraceIndices( traces )
     if( traceIndices.length === 0 ) return
 
-    const lowerPlot = buildLowerSpectrumTraces( options?.settings ?? {},
-                                                spectrum,
-                                                axes.zValues )
+    const lowerPlot = buildBottomLeftTraces( options?.settings ?? {},
+                                             options?.bottomLeftSpectrum,
+                                             spectrum,
+                                             axes.zValues )
     const lowerTraceCount = Math.min( traceIndices.length, lowerPlot.traces.length )
     if( lowerTraceCount <= 0 ) return
 
@@ -174,7 +196,7 @@ var updateLowerSpectrum = async function( graphContainer, spectrum, options = {}
     const annotations = buildSidePanelInstructionAnnotations(
         graphContainer?.layout ?? {},
         TOP_LEFT_INSTRUCTION_TEXT,
-        lowerPlot.usingSpectrum ? "" : LOWER_LEFT_INSTRUCTION_TEXT
+        lowerPlot.message
     )
 
     for( var index = 0; index < lowerTraceCount; index++ ){
@@ -306,9 +328,44 @@ async function renderRgbMatrix( mipRgb, graphContainer, settings, options, prefe
     await renderFigure( graphContainer, figure, preferReact )
 }
 
+async function renderUmapMatrix( umapChannels, graphContainer, settings, options, preferReact ){
+
+    if( !graphContainer ) return
+
+    const normalizedChannels = normalizeUmapChannels( umapChannels )
+    const rgbComposite = buildUmapImage( normalizedChannels, options )
+    const figure = buildRgbFigure( rgbComposite, graphContainer, settings, options )
+
+    await renderFigure( graphContainer, figure, preferReact )
+}
+
+async function renderPcaMipMatrix( pcaMip, graphContainer, settings, options, preferReact ){
+
+    if( !graphContainer ) return
+
+    const normalizedPcaMip = normalizePcaMip( pcaMip )
+    const rgbComposite = buildPcaMipImage( normalizedPcaMip )
+    const figure = buildPcaMipFigure( rgbComposite, graphContainer, settings, options )
+
+    await renderFigure( graphContainer, figure, preferReact )
+}
+
 async function renderPcaClassification( scoresByComponent, graphContainer, settings, options, preferReact ){
 
     if( !graphContainer ) return
+
+    if( Array.isArray( scoresByComponent ) &&
+        scoresByComponent.length > 0 &&
+        Array.isArray( scoresByComponent[0] ) &&
+        Array.isArray( scoresByComponent[0][0] ) === false ){
+
+        const normalizedPcaMip = normalizePcaMip( scoresByComponent )
+        const classification = buildPcaMipImage( normalizedPcaMip, { useEncodedBrightness: false } )
+        const figure = buildPcaFigure( classification, graphContainer, settings, options )
+
+        await renderFigure( graphContainer, figure, preferReact )
+        return
+    }
 
     const componentScores = normalizePcaScores( scoresByComponent )
     const classification = buildPcaClassificationImage( componentScores )
@@ -962,13 +1019,69 @@ function buildSpectrumTraceGroup( style, spectrumPayload, spectralAxisValues = [
 }
 
 function buildLowerSpectrumTraces( settings, selectedSpectrum, spectralAxisValues = [], xaxis = "x2", yaxis = "y2" ){
-    return buildSpectrumTraceGroup( resolveQueriedSpectrumStyle( settings ), selectedSpectrum, spectralAxisValues, xaxis, yaxis )
+    const group = buildSpectrumTraceGroup( resolveQueriedSpectrumStyle( settings ), selectedSpectrum, spectralAxisValues, xaxis, yaxis )
+    return {
+        ...group,
+        message: group.usingSpectrum ? "" : LOWER_LEFT_INSTRUCTION_TEXT
+    }
+}
+
+function buildBottomLeftTraces( settings, bottomLeftSpectrum, selectedSpectrum, spectralAxisValues = [], xaxis = "x2", yaxis = "y2" ){
+
+    const roiPayload = bottomLeftSpectrum?.roi ?? null
+    const currentPayload = bottomLeftSpectrum?.current ?? null
+    const hasCompositePayload = roiPayload !== null || currentPayload !== null
+
+    if( hasCompositePayload ){
+        const roiGroup = buildSpectrumTraceGroup(
+            resolveRoiSpectrumStyle( settings ),
+            roiPayload,
+            spectralAxisValues,
+            xaxis,
+            yaxis
+        )
+        const currentGroup = buildSpectrumTraceGroup(
+            resolveQueriedSpectrumStyle( settings ),
+            currentPayload,
+            spectralAxisValues,
+            xaxis,
+            yaxis
+        )
+        const usingSpectrum = roiGroup.usingSpectrum || currentGroup.usingSpectrum
+        const axisValues = roiGroup.usingSpectrum
+            ? roiGroup.axisValues
+            : currentGroup.axisValues
+
+        return {
+            traces: [ ...roiGroup.traces, ...currentGroup.traces ],
+            axisValues,
+            usingSpectrum,
+            message: usingSpectrum
+                ? ""
+                : ( typeof bottomLeftSpectrum?.fallbackMessage === "string" && bottomLeftSpectrum.fallbackMessage.length > 0
+                    ? bottomLeftSpectrum.fallbackMessage
+                    : LOWER_LEFT_INSTRUCTION_TEXT )
+        }
+    }
+
+    if( typeof bottomLeftSpectrum?.fallbackMessage === "string" && bottomLeftSpectrum.fallbackMessage.length > 0 ){
+        const fallback = buildLowerSpectrumTraces( settings, selectedSpectrum, spectralAxisValues, xaxis, yaxis )
+        return {
+            ...fallback,
+            message: fallback.usingSpectrum ? "" : bottomLeftSpectrum.fallbackMessage
+        }
+    }
+
+    return buildLowerSpectrumTraces( settings, selectedSpectrum, spectralAxisValues, xaxis, yaxis )
 }
 
 function buildTopLeftTraces( settings, topLeftSpectrum, spectralAxisValues = [], fallbackTraces = [], fallbackLabel = "" ){
 
     const roiPayload = topLeftSpectrum?.roi ?? null
-    if( roiPayload !== null ){
+    const currentPayload = topLeftSpectrum?.current ?? null
+    const hasCompositePayload = roiPayload !== null || currentPayload !== null
+
+    if( hasCompositePayload ){
         const roiGroup = buildSpectrumTraceGroup(
             resolveRoiSpectrumStyle( settings ),
             roiPayload,
@@ -978,16 +1091,38 @@ function buildTopLeftTraces( settings, topLeftSpectrum, spectralAxisValues = [],
         )
         const currentGroup = buildSpectrumTraceGroup(
             resolveQueriedSpectrumStyle( settings ),
-            topLeftSpectrum?.current ?? null,
+            currentPayload,
             spectralAxisValues,
             "x",
             "y"
         )
+        const usingSpectrum = roiGroup.usingSpectrum || currentGroup.usingSpectrum
+        const axisValues = roiGroup.usingSpectrum
+            ? roiGroup.axisValues
+            : currentGroup.axisValues
 
         return {
             traces: [ ...roiGroup.traces, ...currentGroup.traces ],
-            axisValues: roiGroup.axisValues,
-            label: "$$\\Large I$$"
+            axisValues,
+            label: "$$\\Large I$$",
+            message: usingSpectrum
+                ? ""
+                : ( typeof topLeftSpectrum?.fallbackMessage === "string" && topLeftSpectrum.fallbackMessage.length > 0
+                    ? topLeftSpectrum.fallbackMessage
+                    : TOP_LEFT_INSTRUCTION_TEXT )
+        }
+    }
+
+    if( topLeftSpectrum?.showFallback === true && Array.isArray( fallbackTraces ) && fallbackTraces.length > 0 ){
+        const referenceTrace = fallbackTraces.find(( trace ) => Array.isArray( trace?.x ) && trace.x.length > 0 ) ?? null
+        const axisValues = Array.isArray( referenceTrace?.x ) && referenceTrace.x.length > 0
+            ? referenceTrace.x
+            : resolveSeriesXValues( spectralAxisValues, Array.isArray( spectralAxisValues ) && spectralAxisValues.length > 0 ? spectralAxisValues.length : 1 )
+
+        return {
+            traces: fallbackTraces,
+            axisValues,
+            label: fallbackLabel
         }
     }
 
@@ -1003,7 +1138,9 @@ function buildTopLeftTraces( settings, topLeftSpectrum, spectralAxisValues = [],
         traces: [ buildPlaceholderTrace( axisValues, "x", "y" ) ],
         axisValues,
         label: fallbackLabel,
-        message: TOP_LEFT_INSTRUCTION_TEXT
+        message: typeof topLeftSpectrum?.fallbackMessage === "string" && topLeftSpectrum.fallbackMessage.length > 0
+            ? topLeftSpectrum.fallbackMessage
+            : TOP_LEFT_INSTRUCTION_TEXT
     }
 }
 
@@ -1365,9 +1502,10 @@ function buildFigure( matrix, graphContainer, settings, options = {} ){
         [ buildPlaceholderTrace( defaultUpperAxisValues, "x", "y" ) ],
         ""
     )
-    const lowerPlot = buildLowerSpectrumTraces( settings,
-                                                options.selectedSpectrum,
-                                                axes.zValues )
+    const lowerPlot = buildBottomLeftTraces( settings,
+                                             options.bottomLeftSpectrum,
+                                             options.selectedSpectrum,
+                                             axes.zValues )
 
     var heatmapTrace = {}
     heatmapTrace.type = "heatmap"
@@ -1394,7 +1532,7 @@ function buildFigure( matrix, graphContainer, settings, options = {} ){
                                         upperAxisValues: topLeftPlot.axisValues,
                                         lowerAxisValues: lowerPlot.axisValues,
                                         upperPanelMessage: topLeftPlot.message,
-                                        lowerPanelMessage: lowerPlot.usingSpectrum ? "" : LOWER_LEFT_INSTRUCTION_TEXT,
+                                        lowerPanelMessage: lowerPlot.message,
                                         heatmapXValues: axes.xValues,
                                         heatmapYValues: axes.yValues,
                                         roiOverlays: options.roiOverlays
@@ -1424,20 +1562,21 @@ function buildRgbFigure( rgbComposite, graphContainer, settings, options = {} ){
         [ buildPlaceholderTrace( defaultUpperAxisValues, "x", "y" ) ],
         ""
     )
-    const lowerPlot = buildLowerSpectrumTraces( settings,
-                                                options.selectedSpectrum,
-                                                axes.zValues )
+    const lowerPlot = buildBottomLeftTraces( settings,
+                                             options.bottomLeftSpectrum,
+                                             options.selectedSpectrum,
+                                             axes.zValues )
 
     var rgbTrace = {}
     rgbTrace.type = "image"
     rgbTrace.source = rgbComposite.source
-    rgbTrace.x0 = -0.5
-    rgbTrace.y0 = -0.5
+    rgbTrace.x0 = 0
+    rgbTrace.y0 = 0
     rgbTrace.dx = 1
     rgbTrace.dy = 1
     rgbTrace.xaxis = "x3"
     rgbTrace.yaxis = "y3"
-    rgbTrace.hovertemplate = "(%{x}, %{y})<extra></extra>"
+    rgbTrace.hovertemplate = "(%{x:.0f}, %{y:.0f})<extra></extra>"
 
     const layout = buildBaseLayout( width,
                                     height,
@@ -1450,7 +1589,7 @@ function buildRgbFigure( rgbComposite, graphContainer, settings, options = {} ){
                                         upperAxisValues: topLeftPlot.axisValues,
                                         lowerAxisValues: lowerPlot.axisValues,
                                         upperPanelMessage: topLeftPlot.message,
-                                        lowerPanelMessage: lowerPlot.usingSpectrum ? "" : LOWER_LEFT_INSTRUCTION_TEXT,
+                                        lowerPanelMessage: lowerPlot.message,
                                         heatmapXValues: axes.xValues,
                                         heatmapYValues: axes.yValues,
                                         roiOverlays: options.roiOverlays
@@ -1473,32 +1612,29 @@ function buildPcaFigure( classification, graphContainer, settings, options = {} 
 
     const loadingTraces = buildLoadingTraces( options.loadings, options, "x", "y" )
 
-    const defaultUpperAxisValues = resolveSeriesXValues( axes.zValues,
-                                                         Array.isArray( axes.zValues ) && axes.zValues.length > 0 ? axes.zValues.length : 1 )
-    const defaultUpperTrace = buildPlaceholderTrace( defaultUpperAxisValues, "x", "y" )
-    const fallbackUpperTraces = loadingTraces.length > 0 ? loadingTraces : [ defaultUpperTrace ]
     const topLeftPlot = buildTopLeftTraces(
         settings,
         options.topLeftSpectrum,
         axes.zValues,
-        fallbackUpperTraces,
-        loadingTraces.length > 0 ? "$$\\Large p_{k}$$" : ""
+        loadingTraces,
+        "$$\\Large p_{k}$$"
     )
 
-    const lowerPlot = buildLowerSpectrumTraces( settings,
-                                                options.selectedSpectrum,
-                                                axes.zValues )
+    const lowerPlot = buildBottomLeftTraces( settings,
+                                             options.bottomLeftSpectrum,
+                                             options.selectedSpectrum,
+                                             axes.zValues )
 
     var classificationTrace = {}
     classificationTrace.type = "image"
     classificationTrace.source = classification.source
-    classificationTrace.x0 = -0.5
-    classificationTrace.y0 = -0.5
+    classificationTrace.x0 = 0
+    classificationTrace.y0 = 0
     classificationTrace.dx = 1
     classificationTrace.dy = 1
     classificationTrace.xaxis = "x3"
     classificationTrace.yaxis = "y3"
-    classificationTrace.hovertemplate = "(%{x}, %{y})<extra></extra>"
+    classificationTrace.hovertemplate = "(%{x:.0f}, %{y:.0f})<extra></extra>"
 
     const layout = buildBaseLayout( width,
                                     height,
@@ -1511,7 +1647,7 @@ function buildPcaFigure( classification, graphContainer, settings, options = {} 
                                         upperAxisValues: topLeftPlot.axisValues,
                                         lowerAxisValues: lowerPlot.axisValues,
                                         upperPanelMessage: topLeftPlot.message,
-                                        lowerPanelMessage: lowerPlot.usingSpectrum ? "" : LOWER_LEFT_INSTRUCTION_TEXT,
+                                        lowerPanelMessage: lowerPlot.message,
                                         heatmapXValues: axes.xValues,
                                         heatmapYValues: axes.yValues,
                                         roiOverlays: options.roiOverlays
@@ -1519,6 +1655,61 @@ function buildPcaFigure( classification, graphContainer, settings, options = {} 
 
     return {
         traces: [ ...topLeftPlot.traces, ...lowerPlot.traces, classificationTrace ],
+        layout
+    }
+}
+
+function buildPcaMipFigure( rgbComposite, graphContainer, settings, options = {} ){
+
+    const width = rgbComposite.width
+    const height = rgbComposite.height
+    const axes = normalizeAxisMetadata( options?.axes )
+
+    const loadingTraces = buildLoadingTraces( options.loadings, options, "x", "y" )
+
+    const topLeftPlot = buildTopLeftTraces(
+        settings,
+        options.topLeftSpectrum,
+        axes.zValues,
+        loadingTraces,
+        "$$\\Large p_{k}$$"
+    )
+
+    const lowerPlot = buildBottomLeftTraces( settings,
+                                             options.bottomLeftSpectrum,
+                                             options.selectedSpectrum,
+                                             axes.zValues )
+
+    var rgbTrace = {}
+    rgbTrace.type = "image"
+    rgbTrace.source = rgbComposite.source
+    rgbTrace.x0 = 0
+    rgbTrace.y0 = 0
+    rgbTrace.dx = 1
+    rgbTrace.dy = 1
+    rgbTrace.xaxis = "x3"
+    rgbTrace.yaxis = "y3"
+    rgbTrace.hovertemplate = "(%{x:.0f}, %{y:.0f})<extra></extra>"
+
+    const layout = buildBaseLayout( width,
+                                    height,
+                                    graphContainer,
+                                    settings,
+                                    topLeftPlot.label,
+                                    "$$\\Large I$$",
+                                    {
+                                        axes,
+                                        upperAxisValues: topLeftPlot.axisValues,
+                                        lowerAxisValues: lowerPlot.axisValues,
+                                        upperPanelMessage: topLeftPlot.message,
+                                        lowerPanelMessage: lowerPlot.message,
+                                        heatmapXValues: axes.xValues,
+                                        heatmapYValues: axes.yValues,
+                                        roiOverlays: options.roiOverlays
+                                    } )
+
+    return {
+        traces: [ ...topLeftPlot.traces, ...lowerPlot.traces, rgbTrace ],
         layout
     }
 }
@@ -1534,32 +1725,29 @@ function buildPcaRgbFigure( rgbComposite, graphContainer, settings, options = {}
 
     const loadingTraces = buildLoadingTraces( options.loadings, options, "x", "y" )
 
-    const defaultUpperAxisValues = resolveSeriesXValues( axes.zValues,
-                                                         Array.isArray( axes.zValues ) && axes.zValues.length > 0 ? axes.zValues.length : 1 )
-    const defaultUpperTrace = buildPlaceholderTrace( defaultUpperAxisValues, "x", "y" )
-    const fallbackUpperTraces = loadingTraces.length > 0 ? loadingTraces : [ defaultUpperTrace ]
     const topLeftPlot = buildTopLeftTraces(
         settings,
         options.topLeftSpectrum,
         axes.zValues,
-        fallbackUpperTraces,
-        loadingTraces.length > 0 ? "$$\\Large p_{k}$$" : ""
+        loadingTraces,
+        "$$\\Large p_{k}$$"
     )
 
-    const lowerPlot = buildLowerSpectrumTraces( settings,
-                                                options.selectedSpectrum,
-                                                axes.zValues )
+    const lowerPlot = buildBottomLeftTraces( settings,
+                                             options.bottomLeftSpectrum,
+                                             options.selectedSpectrum,
+                                             axes.zValues )
 
     var rgbTrace = {}
     rgbTrace.type = "image"
     rgbTrace.source = rgbComposite.source
-    rgbTrace.x0 = -0.5
-    rgbTrace.y0 = -0.5
+    rgbTrace.x0 = 0
+    rgbTrace.y0 = 0
     rgbTrace.dx = 1
     rgbTrace.dy = 1
     rgbTrace.xaxis = "x3"
     rgbTrace.yaxis = "y3"
-    rgbTrace.hovertemplate = "(%{x}, %{y})<extra></extra>"
+    rgbTrace.hovertemplate = "(%{x:.0f}, %{y:.0f})<extra></extra>"
 
     const layout = buildBaseLayout( width,
                                     height,
@@ -1572,7 +1760,7 @@ function buildPcaRgbFigure( rgbComposite, graphContainer, settings, options = {}
                                         upperAxisValues: topLeftPlot.axisValues,
                                         lowerAxisValues: lowerPlot.axisValues,
                                         upperPanelMessage: topLeftPlot.message,
-                                        lowerPanelMessage: lowerPlot.usingSpectrum ? "" : LOWER_LEFT_INSTRUCTION_TEXT,
+                                        lowerPanelMessage: lowerPlot.message,
                                         heatmapXValues: axes.xValues,
                                         heatmapYValues: axes.yValues,
                                         roiOverlays: options.roiOverlays
@@ -1742,6 +1930,8 @@ function buildBaseLayout( width, height, graphContainer, settings, upperLeftLabe
         })
 
         for( const roiOverlay of roiOverlays ){
+            if( roiOverlay.showTitle !== true ) continue
+
             const annotationY = heatmapOrigin === "top-left"
                 ? Math.min( roiOverlay.y0, roiOverlay.y1 )
                 : Math.max( roiOverlay.y0, roiOverlay.y1 )
@@ -1842,6 +2032,7 @@ function normalizeRoiOverlay( roiOverlay ){
 
     return {
         name: typeof roiOverlay.name === "string" && roiOverlay.name.length > 0 ? roiOverlay.name : "ROI",
+        showTitle: roiOverlay.showTitle !== false,
         x0,
         x1,
         y0,
@@ -2034,8 +2225,8 @@ function formatAxisUnitSuffix( unit ){
         latexUnit = "cm"
     } else if([ "meter", "meters", "metre", "metres", "m" ].includes( canonical )){
         latexUnit = "m"
-    } else if([ "cm^-1", "cm-1", "cm^{-1}", "1/cm" ].includes( canonical )){
-        latexUnit = "cm^{-1}"
+    } else if([ "cm^-1", "cm-1", "cm^{-1}", "cm⁻¹", "1/cm" ].includes( canonical )){
+        latexUnit = "\\mathrm{cm}^{-1}"
     } else if([ "index", "indices" ].includes( canonical )){
         latexUnit = "\\mathrm{index}"
     } else if([ "pixel", "pixels" ].includes( canonical )){
@@ -2130,6 +2321,73 @@ function normalizeRgbMip( mipRgb ){
     })
 }
 
+function normalizeUmapChannels( umapChannels ){
+
+    if( umapChannels === null || typeof umapChannels !== "object" ){
+        throw new Error( "UMAP channels must be an object with r, g, and b matrices." )
+    }
+
+    const redMatrix = normalizeMip( umapChannels.r )
+    const greenMatrix = normalizeMip( umapChannels.g )
+    const blueMatrix = normalizeMip( umapChannels.b )
+
+    const width = redMatrix[0].length
+    const height = redMatrix.length
+
+    if( greenMatrix.length !== height || blueMatrix.length !== height ){
+        throw new Error( "All UMAP channel matrices must have the same dimensions." )
+    }
+
+    if( greenMatrix[0].length !== width || blueMatrix[0].length !== width ){
+        throw new Error( "All UMAP channel matrices must have the same dimensions." )
+    }
+
+    return {
+        r: redMatrix,
+        g: greenMatrix,
+        b: blueMatrix
+    }
+}
+
+function normalizePcaMip( pcaMip ){
+
+    if( Array.isArray( pcaMip ) === false || pcaMip.length === 0 ){
+        throw new Error( "PCA MIP must be a non-empty 2D array." )
+    }
+
+    const width = Array.isArray( pcaMip[0] ) ? pcaMip[0].length : 0
+    if( width === 0 ){
+        throw new Error( "PCA MIP must be a non-empty 2D array." )
+    }
+
+    var matrix = []
+
+    for( const row of pcaMip ){
+
+        if( Array.isArray( row ) === false || row.length !== width ){
+            throw new Error( "PCA MIP must be a rectangular 2D array." )
+        }
+
+        matrix.push( row.map(( value ) => {
+            const numeric = Number( value )
+            if( Number.isFinite( numeric ) === false ) return null
+
+            const componentIndex = Math.floor( numeric )
+            if( Number.isInteger( componentIndex ) === false ) return null
+            if( componentIndex < 0 || componentIndex > 9 ) return null
+
+            const brightness = clampUnit( numeric - componentIndex )
+
+            return {
+                componentIndex: componentIndex + 1,
+                brightness
+            }
+        }) )
+    }
+
+    return matrix
+}
+
 function normalizePcaScores( scoresByComponent ){
 
     var entries = []
@@ -2219,6 +2477,133 @@ function buildRgbMipImage( rgbMatrix ){
             imageData.data[offset++] = 255
 
             intensityMatrix[row][col] = ( red + green + blue ) / ( 3 * 255 )
+        }
+    }
+
+    context.putImageData( imageData, 0, 0 )
+
+    return {
+        source: canvas.toDataURL( "image/png" ),
+        width,
+        height,
+        intensityMatrix
+    }
+}
+
+function buildUmapImage( umapChannels, options = {} ){
+
+    const redMatrix = umapChannels.r
+    const greenMatrix = umapChannels.g
+    const blueMatrix = umapChannels.b
+
+    const height = redMatrix.length
+    const width = redMatrix[0].length
+
+    if( typeof document === "undefined" ){
+        throw new Error( "UMAP rendering requires a browser environment." )
+    }
+
+    const channelColors = resolveUmapChannelColors( options.channelColors )
+
+    const canvas = document.createElement( "canvas" )
+    canvas.width = width
+    canvas.height = height
+
+    const context = canvas.getContext( "2d" )
+    if( context === null ){
+        throw new Error( "Unable to create canvas context for UMAP rendering." )
+    }
+
+    const imageData = context.createImageData( width, height )
+    var intensityMatrix = Array.from({ length: height }, () => Array( width ).fill( 0 ))
+
+    var offset = 0
+    for( var row = 0; row < height; row++ ){
+        for( var col = 0; col < width; col++ ){
+
+            const redWeight = clampUnit( redMatrix[row][col] )
+            const greenWeight = clampUnit( greenMatrix[row][col] )
+            const blueWeight = clampUnit( blueMatrix[row][col] )
+
+            const redValue = Math.max( 0,
+                                       Math.min( 255,
+                                                 Math.round(
+                                                     ( redWeight * channelColors.r[0] ) +
+                                                     ( greenWeight * channelColors.g[0] ) +
+                                                     ( blueWeight * channelColors.b[0] )
+                                                 ) ) )
+            const greenValue = Math.max( 0,
+                                         Math.min( 255,
+                                                   Math.round(
+                                                       ( redWeight * channelColors.r[1] ) +
+                                                       ( greenWeight * channelColors.g[1] ) +
+                                                       ( blueWeight * channelColors.b[1] )
+                                                   ) ) )
+            const blueValue = Math.max( 0,
+                                        Math.min( 255,
+                                                  Math.round(
+                                                      ( redWeight * channelColors.r[2] ) +
+                                                      ( greenWeight * channelColors.g[2] ) +
+                                                      ( blueWeight * channelColors.b[2] )
+                                                  ) ) )
+
+            imageData.data[offset++] = redValue
+            imageData.data[offset++] = greenValue
+            imageData.data[offset++] = blueValue
+            imageData.data[offset++] = 255
+
+            intensityMatrix[row][col] = ( redWeight + greenWeight + blueWeight ) / 3
+        }
+    }
+
+    context.putImageData( imageData, 0, 0 )
+
+    return {
+        source: canvas.toDataURL( "image/png" ),
+        width,
+        height,
+        intensityMatrix
+    }
+}
+
+function buildPcaMipImage( pcaMipMatrix, options = {} ){
+
+    const height = pcaMipMatrix.length
+    const width = pcaMipMatrix[0].length
+    const useEncodedBrightness = options.useEncodedBrightness !== false
+
+    if( typeof document === "undefined" ){
+        throw new Error( "PCA MIP rendering requires a browser environment." )
+    }
+
+    const canvas = document.createElement( "canvas" )
+    canvas.width = width
+    canvas.height = height
+
+    const context = canvas.getContext( "2d" )
+    if( context === null ){
+        throw new Error( "Unable to create canvas context for PCA MIP rendering." )
+    }
+
+    const imageData = context.createImageData( width, height )
+    var intensityMatrix = Array.from({ length: height }, () => Array( width ).fill( 0 ))
+
+    var offset = 0
+    for( var row = 0; row < height; row++ ){
+        for( var col = 0; col < width; col++ ){
+
+            const encodedPixel = pcaMipMatrix[row][col]
+            const baseColor = encodedPixel === null ? [ 0, 0, 0 ] : componentColor( encodedPixel.componentIndex )
+            const brightness = encodedPixel === null
+                ? 0
+                : ( useEncodedBrightness ? clampUnit( encodedPixel.brightness ) : 1 )
+
+            imageData.data[offset++] = Math.max( 0, Math.min( 255, Math.round( baseColor[0] * brightness )))
+            imageData.data[offset++] = Math.max( 0, Math.min( 255, Math.round( baseColor[1] * brightness )))
+            imageData.data[offset++] = Math.max( 0, Math.min( 255, Math.round( baseColor[2] * brightness )))
+            imageData.data[offset++] = 255
+
+            intensityMatrix[row][col] = brightness
         }
     }
 
@@ -2384,6 +2769,15 @@ function resolveRgbChannels( componentScores, requestedChannels ){
         r: resolveSingleRgbChannel( requestedChannels?.r, 1, available, availableSet, 0 ),
         g: resolveSingleRgbChannel( requestedChannels?.g, 2, available, availableSet, 1 ),
         b: resolveSingleRgbChannel( requestedChannels?.b, 3, available, availableSet, 2 )
+    }
+}
+
+function resolveUmapChannelColors( channelColors ){
+
+    return {
+        r: parseColorValue( channelColors?.r ) ?? parseColorValue( DEFAULT_UMAP_CHANNEL_COLOR_STRINGS.r ) ?? [ 255, 0, 0 ],
+        g: parseColorValue( channelColors?.g ) ?? parseColorValue( DEFAULT_UMAP_CHANNEL_COLOR_STRINGS.g ) ?? [ 0, 255, 0 ],
+        b: parseColorValue( channelColors?.b ) ?? parseColorValue( DEFAULT_UMAP_CHANNEL_COLOR_STRINGS.b ) ?? [ 0, 0, 255 ]
     }
 }
 
@@ -2598,6 +2992,10 @@ export default {
     update,
     initializeRgb,
     updateRgb,
+    initializeUmap,
+    updateUmap,
+    initializePcaMip,
+    updatePcaMip,
     initializePcaClassification,
     updatePcaClassification,
     initializePcaRgb,

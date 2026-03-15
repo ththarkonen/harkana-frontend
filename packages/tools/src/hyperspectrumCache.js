@@ -33,14 +33,60 @@ var getMip = async function( project, options = {} ){
     return await getOrLoad( project, "mip", { ...options, priority })
 }
 
+var getArtifact = async function( project, mode, options = {} ){
+
+    const normalizedMode = typeof mode === "string" ? mode.trim() : ""
+    if( normalizedMode.length === 0 ){
+        throw new Error( "Artifact mode must be a non-empty string." )
+    }
+
+    const priority = options.priority === "low" ? "low" : "high"
+    return await getOrLoad( project, normalizedMode, { ...options, priority })
+}
+
 var getMipHsv = async function( project, options = {} ){
     const priority = options.priority === "low" ? "low" : "high"
     return await getOrLoad( project, "mip_hsv", { ...options, priority })
 }
 
+var getUmap = async function( project, options = {} ){
+
+    const priority = options.priority === "low" ? "low" : "high"
+
+    const [ redChannel, greenChannel, blueChannel ] = await Promise.all([
+        getOrLoad( project, "umap/r", { ...options, priority }),
+        getOrLoad( project, "umap/g", { ...options, priority }),
+        getOrLoad( project, "umap/b", { ...options, priority })
+    ])
+
+    return {
+        r: redChannel,
+        g: greenChannel,
+        b: blueChannel
+    }
+}
+
 var getXyz = async function( project, options = {} ){
     const priority = options.priority === "low" ? "low" : "high"
     return await getOrLoad( project, "xyz", { ...options, priority })
+}
+
+var setXyz = async function( project, xyz, options = {} ){
+
+    const state = ensureProjectState( project, options )
+    const mode = "xyz"
+    const key = cacheKey( state.projectID, mode )
+
+    setMemoryValue( state, key, xyz )
+
+    try{
+        await writePersistentValue( key, state.projectID, mode, xyz, state.ttlMs )
+        state.stats.persistentWrites += 1
+    } catch( error ){
+        state.stats.persistentErrors += 1
+    }
+
+    return xyz
 }
 
 var getRois = async function( project, options = {} ){
@@ -80,17 +126,29 @@ var getLayer = async function( project, layerIndex, options = {} ){
 
 var getPcaScore = async function( project, componentIndex, options = {} ){
 
-    const normalizedComponent = normalizePcaIndex( componentIndex )
-    const mode = pcaModeFromIndex( normalizedComponent )
-    const priority = options.priority === "low" ? "low" : "high"
+    return await getDecompositionScore( project, "pca", componentIndex, options )
+}
 
-    return await getOrLoad( project, mode, { ...options, priority })
+var getRpcaScore = async function( project, componentIndex, options = {} ){
+    return await getDecompositionScore( project, "rpca", componentIndex, options )
 }
 
 var getLoadings = async function( project, options = {} ){
 
-    const priority = options.priority === "low" ? "low" : "high"
-    return await getOrLoad( project, "pca/loadings", { ...options, priority })
+    return await getDecompositionLoadings( project, "pca", options )
+}
+
+var getRpcaLoadings = async function( project, options = {} ){
+    return await getDecompositionLoadings( project, "rpca", options )
+}
+
+var getPcaMip = async function( project, options = {} ){
+
+    return await getDecompositionMip( project, "pca", options )
+}
+
+var getRpcaMip = async function( project, options = {} ){
+    return await getDecompositionMip( project, "rpca", options )
 }
 
 var setActiveLayer = function( project, layerIndex, options = {} ){
@@ -106,13 +164,11 @@ var setActiveLayer = function( project, layerIndex, options = {} ){
 
 var setActivePca = function( project, componentIndex, options = {} ){
 
-    const state = ensureProjectState( project, options )
-    state.activePca = normalizePcaIndex( componentIndex )
+    setActiveDecomposition( project, "pca", componentIndex, options )
+}
 
-    pruneLowQueue( state )
-    updatePins( state )
-    enforceMemoryBudget( state )
-    pumpLowQueue( state )
+var setActiveRpca = function( project, componentIndex, options = {} ){
+    setActiveDecomposition( project, "rpca", componentIndex, options )
 }
 
 var prefetchWindow = async function( project, centerIndex, radius = null, options = {} ){
@@ -176,6 +232,62 @@ var prefetchPcaScores = async function( project, options = {} ){
     }
 }
 
+async function getDecompositionScore( project, family, componentIndex, options = {} ){
+
+    const normalizedComponent = normalizePcaIndex( componentIndex )
+    const mode = decompositionScoreModeFromIndex( family, normalizedComponent )
+    const priority = options.priority === "low" ? "low" : "high"
+
+    return await getOrLoad( project, mode, { ...options, priority })
+}
+
+async function getDecompositionLoadings( project, family, options = {} ){
+
+    const normalizedFamily = normalizeDecompositionFamily( family )
+    const priority = options.priority === "low" ? "low" : "high"
+
+    return await getOrLoad( project, normalizedFamily + "/loadings", { ...options, priority })
+}
+
+async function getDecompositionMip( project, family, options = {} ){
+
+    const normalizedFamily = normalizeDecompositionFamily( family )
+    const normalizedComponentCount = normalizePcaIndex( options.componentCount ?? options.count ?? DEFAULT_PCA_MAX_COMPONENT )
+    const state = ensureProjectState( project, options )
+
+    if( normalizedFamily === "pca" ){
+        state.activePcaMip = normalizedComponentCount
+    } else {
+        state.activeRpcaMip = normalizedComponentCount
+    }
+
+    updatePins( state )
+    enforceMemoryBudget( state )
+
+    const mode = decompositionMipModeFromCount( normalizedFamily, normalizedComponentCount )
+    const priority = options.priority === "low" ? "low" : "high"
+
+    return await getOrLoad( project, mode, { ...options, priority })
+}
+
+function setActiveDecomposition( project, family, componentIndex, options = {} ){
+
+    const normalizedFamily = normalizeDecompositionFamily( family )
+    const state = ensureProjectState( project, options )
+    const normalizedComponent = normalizePcaIndex( componentIndex )
+
+    if( normalizedFamily === "pca" ){
+        state.activePca = normalizedComponent
+    } else {
+        state.activeRpca = normalizedComponent
+    }
+
+    pruneLowQueue( state )
+    updatePins( state )
+    enforceMemoryBudget( state )
+    pumpLowQueue( state )
+}
+
 var clearProjectCache = async function( project ){
 
     const projectID = readProjectID( project )
@@ -192,6 +304,56 @@ var clearProjectCache = async function( project ){
     }
 
     await deletePersistentProjectEntries( projectID )
+}
+
+var clearProjectModePrefixes = async function( project, prefixes = [] ){
+
+    const normalizedPrefixes = normalizeModePrefixes( prefixes )
+    if( normalizedPrefixes.length === 0 ) return
+
+    const projectID = readProjectID( project )
+    const state = projectCaches.get( projectID )
+
+    if( state ){
+
+        const removedQueuedKeys = new Set()
+
+        state.lowQueue = state.lowQueue.filter(( task ) => {
+
+            const shouldRemove = matchesModePrefixes( task?.mode, normalizedPrefixes )
+            if( shouldRemove ){
+                removedQueuedKeys.add( task.key )
+            }
+
+            return !shouldRemove
+        })
+
+        for( const [ key, inflightEntry ] of state.inFlight.entries() ){
+
+            const mode = modeFromCacheKey( projectID, key )
+            if( matchesModePrefixes( mode, normalizedPrefixes ) === false ){
+                continue
+            }
+
+            if( inflightEntry?.status === "queued" ||
+                inflightEntry?.status === "running" ||
+                removedQueuedKeys.has( key ) ){
+                inflightEntry.deferred.resolve( null )
+                state.inFlight.delete( key )
+            }
+        }
+
+        for( const key of [ ...state.memory.keys() ] ){
+            const mode = modeFromCacheKey( projectID, key )
+            if( matchesModePrefixes( mode, normalizedPrefixes ) === false ){
+                continue
+            }
+
+            removeMemoryEntry( state, key )
+        }
+    }
+
+    await deletePersistentProjectEntriesByModePrefixes( projectID, normalizedPrefixes )
 }
 
 var clearAllHyperspectrumCache = async function(){
@@ -218,6 +380,9 @@ var getCacheStats = function( project ){
             queuedPrefetch: 0,
             activeLayer: 0,
             activePca: 1,
+            activePcaMip: DEFAULT_PCA_MAX_COMPONENT,
+            activeRpca: 1,
+            activeRpcaMip: DEFAULT_PCA_MAX_COMPONENT,
             budgetBytes: DEFAULT_MEMORY_BUDGET_BYTES,
             ttlMs: DEFAULT_TTL_MS,
             stats: defaultStats()
@@ -232,6 +397,9 @@ var getCacheStats = function( project ){
         queuedPrefetch: state.lowQueue.length,
         activeLayer: state.activeLayer,
         activePca: state.activePca,
+        activePcaMip: state.activePcaMip,
+        activeRpca: state.activeRpca,
+        activeRpcaMip: state.activeRpcaMip,
         budgetBytes: state.budgetBytes,
         ttlMs: state.ttlMs,
         stats: { ...state.stats }
@@ -372,6 +540,10 @@ function executeRequest( state, project, mode, key, inflightEntry, fromLowQueue 
         try{
             const value = await loadFromNetwork( project, mode )
 
+            if( state.inFlight.get( key ) !== inflightEntry ){
+                return
+            }
+
             state.stats.networkHits += 1
 
             setMemoryValue( state, key, value )
@@ -387,11 +559,16 @@ function executeRequest( state, project, mode, key, inflightEntry, fromLowQueue 
             inflightEntry.deferred.resolve( value )
 
         } catch( error ){
+            if( state.inFlight.get( key ) !== inflightEntry ){
+                return
+            }
             inflightEntry.deferred.reject( error )
 
         } finally {
 
-            state.inFlight.delete( key )
+            if( state.inFlight.get( key ) === inflightEntry ){
+                state.inFlight.delete( key )
+            }
 
             if( fromLowQueue ){
                 state.runningLow = Math.max( 0, state.runningLow - 1 )
@@ -545,6 +722,9 @@ function createProjectState( projectID ){
         lowConcurrency: DEFAULT_LOW_CONCURRENCY,
         activeLayer: 0,
         activePca: 1,
+        activePcaMip: DEFAULT_PCA_MAX_COMPONENT,
+        activeRpca: 1,
+        activeRpcaMip: DEFAULT_PCA_MAX_COMPONENT,
         accessCounter: 0,
         memory: new Map(),
         memoryBytes: 0,
@@ -586,14 +766,23 @@ function updatePins( state ){
     const pinnedKeys = new Set([
         cacheKey( state.projectID, "mip" ),
         cacheKey( state.projectID, "mip_hsv" ),
+        cacheKey( state.projectID, "umap/r" ),
+        cacheKey( state.projectID, "umap/g" ),
+        cacheKey( state.projectID, "umap/b" ),
         cacheKey( state.projectID, "xyz" ),
         cacheKey( state.projectID, "pca/loadings" ),
+        cacheKey( state.projectID, "rpca/loadings" ),
+        cacheKey( state.projectID, pcaMipModeFromCount( state.activePcaMip ) ),
+        cacheKey( state.projectID, rpcaMipModeFromCount( state.activeRpcaMip ) ),
         cacheKey( state.projectID, "layers/" + state.activeLayer ),
         cacheKey( state.projectID, "layers/" + ( state.activeLayer - 1 )),
         cacheKey( state.projectID, "layers/" + ( state.activeLayer + 1 )),
         cacheKey( state.projectID, pcaModeFromIndex( state.activePca )),
         cacheKey( state.projectID, pcaModeFromIndex( Math.max( 1, state.activePca - 1 ))),
-        cacheKey( state.projectID, pcaModeFromIndex( Math.min( DEFAULT_PCA_MAX_COMPONENT, state.activePca + 1 )))
+        cacheKey( state.projectID, pcaModeFromIndex( Math.min( DEFAULT_PCA_MAX_COMPONENT, state.activePca + 1 ))),
+        cacheKey( state.projectID, rpcaModeFromIndex( state.activeRpca )),
+        cacheKey( state.projectID, rpcaModeFromIndex( Math.max( 1, state.activeRpca - 1 ))),
+        cacheKey( state.projectID, rpcaModeFromIndex( Math.min( DEFAULT_PCA_MAX_COMPONENT, state.activeRpca + 1 )))
     ])
 
     for( const [ key, entry ] of state.memory.entries() ){
@@ -685,6 +874,18 @@ function cacheKey( projectID, mode ){
     return projectID + "::" + mode
 }
 
+function modeFromCacheKey( projectID, key ){
+
+    if( typeof key !== "string" ) return ""
+
+    const prefix = projectID + "::"
+    if( key.startsWith( prefix ) === false ){
+        return ""
+    }
+
+    return key.slice( prefix.length )
+}
+
 function layerIndexFromMode( mode ){
 
     if( typeof mode !== "string" ) return null
@@ -735,11 +936,49 @@ function normalizePcaIndex( value ){
     return index
 }
 
+function normalizeDecompositionFamily( value ){
+
+    if( value === "rpca" ){
+        return "rpca"
+    }
+
+    return "pca"
+}
+
 function pcaModeFromIndex( componentIndex ){
 
+    return decompositionScoreModeFromIndex( "pca", componentIndex )
+}
+
+function pcaMipModeFromCount( componentCount ){
+
+    return decompositionMipModeFromCount( "pca", componentCount )
+}
+
+function rpcaModeFromIndex( componentIndex ){
+
+    return decompositionScoreModeFromIndex( "rpca", componentIndex )
+}
+
+function rpcaMipModeFromCount( componentCount ){
+
+    return decompositionMipModeFromCount( "rpca", componentCount )
+}
+
+function decompositionScoreModeFromIndex( family, componentIndex ){
+
+    const normalizedFamily = normalizeDecompositionFamily( family )
     const normalized = normalizePcaIndex( componentIndex )
     const suffix = String( normalized ).padStart( 2, "0" )
-    return "pca/scores/pc" + suffix
+    return normalizedFamily + "/scores/pc" + suffix
+}
+
+function decompositionMipModeFromCount( family, componentCount ){
+
+    const normalizedFamily = normalizeDecompositionFamily( family )
+    const normalized = normalizePcaIndex( componentCount )
+    const suffix = String( normalized ).padStart( 2, "0" )
+    return normalizedFamily + "/pca_mip/pc" + suffix
 }
 
 function normalizePositiveInteger( value ){
@@ -749,6 +988,34 @@ function normalizePositiveInteger( value ){
     if( number <= 0 ) return null
 
     return number
+}
+
+function normalizeModePrefixes( prefixes ){
+
+    if( Array.isArray( prefixes ) === false ){
+        return []
+    }
+
+    const normalized = prefixes
+        .map(( value ) => typeof value === "string" ? value.trim() : "" )
+        .filter(( value ) => value.length > 0 )
+
+    return [ ...new Set( normalized ) ]
+}
+
+function matchesModePrefixes( mode, prefixes ){
+
+    if( typeof mode !== "string" || mode.length === 0 ){
+        return false
+    }
+
+    for( const prefix of prefixes ){
+        if( mode.startsWith( prefix ) ){
+            return true
+        }
+    }
+
+    return false
 }
 
 function readProjectID( project ){
@@ -993,6 +1260,55 @@ async function deletePersistentProjectEntries( projectID ){
     })
 }
 
+async function deletePersistentProjectEntriesByModePrefixes( projectID, prefixes ){
+
+    const db = await ensureDatabase()
+    if( !db ) return
+
+    await new Promise(( resolve, reject ) => {
+
+        const transaction = db.transaction( STORE_NAME, "readwrite" )
+        const store = transaction.objectStore( STORE_NAME )
+
+        if( store.indexNames.contains( "projectID" ) === false ){
+            transaction.oncomplete = () => resolve( null )
+            transaction.onerror = () => reject( transaction.error )
+            transaction.onabort = () => reject( transaction.error )
+            return
+        }
+
+        const index = store.index( "projectID" )
+        const request = typeof IDBKeyRange === "undefined"
+            ? index.openCursor()
+            : index.openCursor( IDBKeyRange.only( projectID ))
+
+        request.onsuccess = () => {
+
+            const cursor = request.result
+            if( !cursor ) return
+
+            const value = cursor.value
+            if( value?.projectID !== projectID ){
+                cursor.continue()
+                return
+            }
+
+            const mode = typeof value?.mode === "string" ? value.mode : ""
+            if( matchesModePrefixes( mode, prefixes ) ){
+                store.delete( cursor.primaryKey )
+            }
+
+            cursor.continue()
+        }
+
+        request.onerror = () => reject( request.error )
+
+        transaction.oncomplete = () => resolve( null )
+        transaction.onerror = () => reject( transaction.error )
+        transaction.onabort = () => reject( transaction.error )
+    })
+}
+
 async function clearPersistentStore(){
 
     const db = await ensureDatabase()
@@ -1041,8 +1357,8 @@ function normalizeRoiEntry( roi ){
     const meanSpectrum = normalizeNumericSeries( roi.meanSpectrum )
     if( meanSpectrum === null ) return null
 
-    const lowerBound = normalizeOptionalNumericSeries( roi.lowerBound, meanSpectrum.length )
-    const upperBound = normalizeOptionalNumericSeries( roi.upperBound, meanSpectrum.length )
+    const lowerBound = normalizeOptionalRoiBoundsPayload( roi.lowerBound, meanSpectrum.length )
+    const upperBound = normalizeOptionalRoiBoundsPayload( roi.upperBound, meanSpectrum.length )
     const hasBounds = lowerBound !== null && upperBound !== null
 
     return {
@@ -1131,22 +1447,58 @@ function normalizeOptionalNumericSeries( values, expectedLength ){
     return normalizeNumericSeries( values )
 }
 
+function normalizeOptionalRoiBoundsPayload( values, expectedLength ){
+
+    if( Array.isArray( values ) ){
+        return normalizeOptionalNumericSeries( values, expectedLength )
+    }
+
+    if( values === null || typeof values !== "object" ){
+        return null
+    }
+
+    var normalized = {}
+    var hasAnyLevel = false
+
+    for( const [ key, payload ] of Object.entries( values ) ){
+        const numericKey = Number.parseInt( String( key ), 10 )
+        if( Number.isInteger( numericKey ) === false ) continue
+
+        const normalizedSeries = normalizeOptionalNumericSeries( payload, expectedLength )
+        if( normalizedSeries === null ) continue
+
+        normalized[String( numericKey )] = normalizedSeries
+        hasAnyLevel = true
+    }
+
+    return hasAnyLevel ? normalized : null
+}
+
 export default {
     initProjectCache,
+    getArtifact,
     getMip,
     getMipHsv,
+    getUmap,
     getXyz,
+    setXyz,
     getRois,
     refreshRois,
     getLayer,
     getPcaScore,
+    getRpcaScore,
     getLoadings,
+    getRpcaLoadings,
+    getPcaMip,
+    getRpcaMip,
     setActiveLayer,
     setActivePca,
+    setActiveRpca,
     prefetchWindow,
     prefetchPcaWindow,
     prefetchPcaScores,
     clearProjectCache,
+    clearProjectModePrefixes,
     clearAllHyperspectrumCache,
     getCacheStats
 }

@@ -94,7 +94,13 @@ var getDefaultSettings = async function() {
             roiInterval: "#333333",
             roiBox: "#ffffff",
             roiTitle: "#ffffff",
+            selectionBox: "#9ca3af",
             roiOverlay: "#ffffff",
+            umapChannels: {
+                r: "#ff0000",
+                g: "#00ff00",
+                b: "#0000ff"
+            },
             pcaComponents: {
                 1: "#0072b2",
                 2: "#e69f00",
@@ -118,6 +124,14 @@ var getDefaultSettings = async function() {
             showInterval: true,
             intervalOpacity: 0.25,
             overlayOpacity: 0.25
+        },
+        hyperspectrumDefaults: {
+            displayMode: "umap",
+            heatmapInteraction: "select",
+            selectionConfidenceLevel: 95,
+            loadings: "hide",
+            falseColoringBasis: "measurement",
+            roiEstimateUncertainty: "show"
         },
         visibility: {
             plot: {

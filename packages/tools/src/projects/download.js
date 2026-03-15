@@ -27,7 +27,7 @@ var isIgnoredDownloadKey = function( key ){
         normalized.includes( "/layers/" )
 }
 
-var download = async function( projects ){
+var download = async function( projects, options = {} ){
     
     const dataType = import.meta.env.VITE_DATA_TYPE
     const timeStamp = utils.getTimeStamp()
@@ -35,22 +35,42 @@ var download = async function( projects ){
 
     const fileStream = streamSaver.createWriteStream( fileName )
     const zipWriter = new ZipWriter( fileStream, { level: 0 })
+    const onStart = typeof options?.onStart === "function" ? options.onStart : null
+    var hasStarted = false
+
+    const markDownloadStarted = () => {
+
+        if( hasStarted ) return
+        hasStarted = true
+
+        if( onStart === null ) return
+
+        try{
+            onStart()
+        } catch( error ){
+            console.log( error )
+        }
+    }
 
     for( const project of projects ){
 
         console.log( "A single project: ", project )
 
         if( project.shared ){
-            await downloadShared( project, zipWriter)
+            await downloadShared( project, zipWriter, markDownloadStarted )
         } else {
-            await downloadOwned( project, zipWriter)
+            await downloadOwned( project, zipWriter, markDownloadStarted )
         };
+    }
+
+    if( hasStarted === false ){
+        markDownloadStarted()
     }
 
     await zipWriter.close()
 }
 
-var downloadOwned = async function( project, zipWriter){
+var downloadOwned = async function( project, zipWriter, markDownloadStarted = () => {} ){
 
     const accessSettings = { level: "private",
                                  identityId: project.owner.id,
@@ -73,12 +93,13 @@ var downloadOwned = async function( project, zipWriter){
 
         const result = await Storage.get( file.key, accessSettings);
         console.log( result.Body )
+        markDownloadStarted()
         await zipWriter.add( zipPath, result.Body.stream());
     };
 
 }
 
-var downloadShared = async function( project, zipWriter){
+var downloadShared = async function( project, zipWriter, markDownloadStarted = () => {} ){
 
     const response = await share.listSharedFiles( project );
     const info = project.shareInfo;
@@ -94,6 +115,7 @@ var downloadShared = async function( project, zipWriter){
         const zipPath = project.name.replace(/[^a-zA-Z0-9]/g,'_') + "_" + project.rawid + "/" + fileName;
 
         const result = await share.loadResponse( project.shareInfo, fileName)
+        markDownloadStarted()
         await zipWriter.add( zipPath, result.body);
     };
 };
