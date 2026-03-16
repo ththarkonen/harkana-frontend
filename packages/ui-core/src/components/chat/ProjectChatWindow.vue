@@ -57,6 +57,11 @@
 							<template v-for = "(segment, segmentIndex) in messageBodySegments( message )"
 									  :key = "`${message.messageId}-segment-${segmentIndex}`">
 								<span v-if = "segment.type === 'text'">{{ segment.content }}</span>
+								<a v-else-if = "segment.type === 'link'"
+								   :href = "segment.href"
+								   target = "_blank"
+								   rel = "noopener noreferrer"
+								   class = "underline decoration-brand/80 underline-offset-2 text-brand hover:text-brand/80 break-all">{{ segment.content }}</a>
 								<span v-else-if = "segment.type === 'inline'" v-html = "segment.html"></span>
 								<div v-else class = "overflow-x-auto" v-html = "segment.html"></div>
 							</template>
@@ -92,6 +97,11 @@
 						<template v-for = "(segment, segmentIndex) in draftPreviewSegments"
 								  :key = "`draft-preview-segment-${segmentIndex}`">
 							<span v-if = "segment.type === 'text'">{{ segment.content }}</span>
+							<a v-else-if = "segment.type === 'link'"
+							   :href = "segment.href"
+							   target = "_blank"
+							   rel = "noopener noreferrer"
+							   class = "underline decoration-brand/80 underline-offset-2 text-brand hover:text-brand/80 break-all">{{ segment.content }}</a>
 							<span v-else-if = "segment.type === 'inline'" v-html = "segment.html"></span>
 							<div v-else class = "overflow-x-auto" v-html = "segment.html"></div>
 						</template>
@@ -423,20 +433,52 @@ const parseMessageBodySegments = ( body ) => {
 	const input = String( body ?? "" )
 	const segments = []
 
-	const appendText = ( text ) => {
-		const content = String( text ?? "" )
-		if( content.length === 0 ) return
+	const appendTextPiece = ( content ) => {
+		const text = String( content ?? "" )
+		if( text.length === 0 ) return
 
 		const previousSegment = segments[ segments.length - 1 ]
 		if( previousSegment?.type === "text" ){
-			previousSegment.content += content
+			previousSegment.content += text
 			return
 		}
 
 		segments.push({
 			type: "text",
-			content
+			content: text
 		})
+	}
+
+	const appendLink = ( href ) => {
+		const url = String( href ?? "" )
+		if( url.length === 0 ) return
+
+		segments.push({
+			type: "link",
+			content: url,
+			href: url
+		})
+	}
+
+	const appendText = ( text ) => {
+		const content = String( text ?? "" )
+		if( content.length === 0 ) return
+
+		const splitParts = content.split( /(\s+)/ )
+		for( const part of splitParts ){
+			if( part.length === 0 ) continue
+			if( /\s+/.test( part )){
+				appendTextPiece( part )
+				continue
+			}
+
+			if( part.startsWith( "https://" )){
+				appendLink( part )
+				continue
+			}
+
+			appendTextPiece( part )
+		}
 	}
 
 	let index = 0
@@ -530,7 +572,9 @@ const hasDraftLatexPreview = computed(() => {
 		return false
 	}
 
-	return draftPreviewSegments.value.some(( segment ) => segment.type !== "text" )
+	return draftPreviewSegments.value.some(( segment ) => {
+		return segment.type === "inline" || segment.type === "display" || segment.type === "link"
+	})
 })
 
 const isNearBottom = () => {

@@ -425,7 +425,9 @@
 								class = "h-8 w-8 inline-flex items-center justify-center rounded-md text-white transition-colors hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-brand disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
 								title = "Reload ROIs from backend"
 								aria-label = "Reload ROIs from backend">
-							<i :class = "isRoiRefreshDisabled ? 'fas fa-sync-alt animate-spin' : 'fas fa-sync-alt'" aria-hidden = "true"></i>
+							<i class = "fas fa-sync-alt"
+							   :class = "{ 'roi-refresh-spin': isRoiRefreshDisabled }"
+							   aria-hidden = "true"></i>
 						</button>
 					</div>
 
@@ -445,35 +447,51 @@
 						<span class = "font-medium">Project</span>
 					</template>
 
-					<BaseDropdownItem v-if = "!project.shared" @select = "focusProjectNameEdit">
+					<BaseDropdownItem @select = "focusProjectNameEdit"
+									  :disabled = "project.shared"
+									  :tooltip = "ownedProjectActionTooltip('Renaming')">
 						Rename
 					</BaseDropdownItem>
 
-					<BaseDropdownItem v-if = "!project.shared" @select = "openXyzSettingsModal">
+					<BaseDropdownItem @select = "openXyzSettingsModal"
+									  :disabled = "project.shared"
+									  :tooltip = "ownedProjectActionTooltip('Axis value editing')">
 						Edit axis values
 					</BaseDropdownItem>
 
-					<BaseDropdownItem @select = "openMetadataModal">
-						Metadata
+					<BaseDropdownItem @select = "openGpuInferenceModal"
+									  :disabled = "project.shared"
+									  :tooltip = "ownedProjectActionTooltip('Raman inference')">
+						Raman spectrum inference
+					</BaseDropdownItem>
+
+					<hr class = "h-0.5 bg-gray border-0 ">
+
+					<BaseDropdownItem @select = "openShareModal"
+									  :disabled = "project.shared"
+									  :tooltip = "ownedProjectActionTooltip('Sharing')">
+						Share
 					</BaseDropdownItem>
 
 					<BaseDropdownItem @select = "openProjectChat">
 						Notes
 					</BaseDropdownItem>
 
-						<BaseDropdownItem v-if = "!project.shared" @select = "openShareModal">
-							Share
-						</BaseDropdownItem>
-
-						<BaseDropdownItem v-if = "!project.shared" @select = "openGpuInferenceModal">
-							Raman spectrum inference
-						</BaseDropdownItem>
-
-					<hr class = "h-0.5 bg-gray border-0 ">
+					<BaseDropdownItem @select = "openMetadataModal">
+						Metadata
+					</BaseDropdownItem>
 
 					<BaseDropdownItem @select = "download">
 						Download
 					</BaseDropdownItem>
+
+					<BaseDropdownItem @select = "openZenodoModal"
+									  :disabled = "project.shared"
+									  :tooltip = "ownedProjectActionTooltip('Zenodo exporting')">
+						Zenodo export
+					</BaseDropdownItem>
+
+					<hr class = "h-0.5 bg-gray border-0 ">
 
 					<BaseDropdownItem @select = "openVisualizationSettings">
 						Visualization settings
@@ -635,8 +653,6 @@ const DISPLAY_MODE_OPTIONS = new Set([
 	"rpca_mip",
 	"rpca_rgb"
 ])
-const ESTIMATED_ROI_FRONTEND_MODES = [ "roi/frontend", "estimate/roi/frontend", "roi/estimate/frontend" ]
-const ESTIMATED_ROI_STORAGE_MODES = [ "roi/storage", "estimate/roi/storage", "roi/estimate/storage" ]
 const selectedConfidenceLevel = ref(95)
 const roiEstimateUncertaintyMode = ref("show")
 const billingSettings = ref({ groupID: "" })
@@ -768,14 +784,24 @@ const sidebarStyle = computed(() => {
     : { left: 'calc(-16rem - 2px)' }
 })
 
+const hasProjectReference = computed(() => {
+	return typeof project.value?.id === "string" && project.value.id.length > 0
+})
+
+const isSharedProject = computed(() => {
+	const shareInfo = project.value?.shareInfo ?? {}
+	const shareInfoProjectID = String( shareInfo?.projectId ?? "" ).trim()
+	const shareInfoProjectKey = String( shareInfo?.projectKey ?? "" ).trim()
+
+	return project.value?.shared === true || ( shareInfoProjectID.length > 0 && shareInfoProjectKey.length > 0 )
+})
+
 const canMutateRois = computed(() => {
-	return typeof project.value?.id === "string" &&
-		project.value.id.length > 0 &&
-		project.value.shared !== true
+	return hasProjectReference.value
 })
 
 const canEditXyz = computed(() => {
-	return canMutateRois.value
+	return hasProjectReference.value && isSharedProject.value === false
 })
 
 const selectedRoi = computed(() => {
@@ -929,6 +955,15 @@ const openProjectChat = () => {
 const openShareModal = () => {
 	if( project.value?.shared ) return
 	shareModal.value?.open()
+}
+
+const ownedProjectActionTooltip = ( actionLabel ) => {
+	return `${actionLabel} is allowed for owned projects.`
+}
+
+const openZenodoModal = () => {
+	if( project.value?.shared ) return
+	zenodoModal.value?.open()
 }
 
 const openGpuInferenceModal = async () => {
@@ -1861,44 +1896,45 @@ const loadRoiList = async ( forceRefresh = false ) => {
 			selectedRoiId.value = ""
 		}
 	}
+
+	await loadRoiStorage( forceRefresh )
+	await loadEstimatedRoiList( forceRefresh )
+	await loadEstimatedRoiStorage( forceRefresh )
 }
 
 const loadRoiStorage = async ( forceRefresh = false ) => {
 
-	try{
-		var payload = null
-
-		if( forceRefresh ){
-			payload = await results.load( project.value, "roi/storage" )
-		} else {
-			payload = await hyperspectrumCache.getArtifact( project.value, "roi/storage", {
-				...cacheOptions,
-				priority: "high"
-			})
-		}
-
-		if( payload instanceof Error ){
-			roiStorage.value = []
-			return
-		}
-
-		const loadedRois = Array.isArray( payload?.rois ) ? payload.rois : []
-		roiStorage.value = loadedRois
-	} catch( error ){
+	if( forceRefresh ){
 		roiStorage.value = []
 	}
+
+	const nextStorage = rois.value
+		.map(( roi ) => {
+			const roiId = String( roi?.roiId ?? "" ).trim()
+			if( roiId.length === 0 ) return null
+
+			const pointsPayload =
+				Array.isArray( roi?.pixels ) ? roi.pixels :
+					( Array.isArray( roi?.points ) ? roi.points : [] )
+
+			return {
+				roiId,
+				pixels: normalizeSelectionPoints( pointsPayload )
+			}
+		})
+		.filter(( roi ) => roi !== null )
+
+	roiStorage.value = nextStorage
 }
 
 const refreshRoisFromBackend = async () => {
 
 	if( refreshingRois.value ) return
 	refreshingRois.value = true
+	await nextTick()
 
 	try{
 		await loadRoiList( true )
-		await loadRoiStorage( true )
-		await loadEstimatedRoiList( true )
-		await loadEstimatedRoiStorage( true )
 		await refreshRamanRoiSpectrum()
 
 		if( graph.value !== null && currentMatrix() !== null ){
@@ -2135,81 +2171,43 @@ const resetEstimatedRoiArtifacts = () => {
 	estimatedRoiStorageAttempted.value = false
 }
 
-const loadOptionalRoiArtifact = async ( modes, preferredMode = "", forceRefresh = false ) => {
+const syncEstimatedRoiCachesFromRois = () => {
 
-	const candidates = Array.isArray( modes ) ? modes : []
-	if( candidates.length === 0 ) return null
+	const payload = { rois: rois.value }
+	const normalized = normalizeEstimatedRoiPayload( payload, "roi/frontend" )
 
-	const orderedModes = preferredMode.length > 0
-		? [ preferredMode, ...candidates.filter(( mode ) => mode !== preferredMode ) ]
-		: [ ...candidates ]
-
-	for( const mode of orderedModes ){
-		try{
-			const payload = forceRefresh
-				? await results.load( project.value, mode )
-				: await hyperspectrumCache.getArtifact( project.value, mode, {
-					...cacheOptions,
-					priority: "high"
-				})
-
-			if( payload instanceof Error ) continue
-
-			return { mode, payload }
-		} catch( error ){
-			continue
-		}
-	}
-
-	return null
+	estimatedRoiList.value = normalized
+	estimatedRoiStorage.value = normalized
+	estimatedRoiListMode.value = normalized.length > 0 ? "roi/frontend" : ""
+	estimatedRoiStorageMode.value = normalized.length > 0 ? "roi/frontend" : ""
+	estimatedRoiListAttempted.value = true
+	estimatedRoiStorageAttempted.value = true
 }
 
 const loadEstimatedRoiList = async ( forceRefresh = false ) => {
 
-	if( forceRefresh === false && estimatedRoiListAttempted.value ){
+	if( forceRefresh ){
+		estimatedRoiListAttempted.value = false
+	}
+
+	if( estimatedRoiListAttempted.value ){
 		return
 	}
 
-	const loadedArtifact = await loadOptionalRoiArtifact(
-		ESTIMATED_ROI_FRONTEND_MODES,
-		estimatedRoiListMode.value,
-		forceRefresh
-	)
-
-	if( loadedArtifact === null ){
-		estimatedRoiList.value = []
-		estimatedRoiListMode.value = ""
-		estimatedRoiListAttempted.value = true
-		return
-	}
-
-	estimatedRoiList.value = normalizeEstimatedRoiPayload( loadedArtifact.payload, loadedArtifact.mode )
-	estimatedRoiListMode.value = loadedArtifact.mode
-	estimatedRoiListAttempted.value = true
+	syncEstimatedRoiCachesFromRois()
 }
 
 const loadEstimatedRoiStorage = async ( forceRefresh = false ) => {
 
-	if( forceRefresh === false && estimatedRoiStorageAttempted.value ){
+	if( forceRefresh ){
+		estimatedRoiStorageAttempted.value = false
+	}
+
+	if( estimatedRoiStorageAttempted.value ){
 		return
 	}
 
-	const loadedArtifact = await loadOptionalRoiArtifact(
-		ESTIMATED_ROI_STORAGE_MODES,
-		estimatedRoiStorageMode.value,
-		forceRefresh
-	)
-
-	if( loadedArtifact === null ){
-		estimatedRoiStorage.value = []
-		estimatedRoiStorageMode.value = ""
-		estimatedRoiStorageAttempted.value = true
-		return
-	}
-
-	estimatedRoiStorage.value = normalizeEstimatedRoiPayload( loadedArtifact.payload, loadedArtifact.mode )
-	estimatedRoiStorageMode.value = loadedArtifact.mode
-	estimatedRoiStorageAttempted.value = true
+	syncEstimatedRoiCachesFromRois()
 }
 
 const roiPixelsForId = ( roiId, sourceRois = roiStorage.value ) => {
@@ -2514,7 +2512,7 @@ const deleteSelectedRoi = async () => {
 	deletingRoi.value = true
 
 	try{
-		await hyperspectra.deleteRoi( project.value, roiId, activeGroupID() )
+		await hyperspectra.deleteRoi( project.value, roiId )
 		selectedRoiId.value = ""
 		await loadRoiList( true )
 		await loadRoiStorage( true )
@@ -4370,3 +4368,21 @@ onBeforeUnmount( () => {
 })
 
 </script>
+
+<style scoped>
+.roi-refresh-spin {
+	animation: roi-refresh-spin 0.9s linear infinite;
+	display: inline-block;
+	transform-origin: center center;
+}
+
+@keyframes roi-refresh-spin {
+	from {
+		transform: rotate( 0deg );
+	}
+
+	to {
+		transform: rotate( 360deg );
+	}
+}
+</style>

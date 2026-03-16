@@ -37,7 +37,12 @@
             </div>
 
             <!-- Main -->
-            <div class = "px-4 py-0  overflow-y-auto">
+            <div class = "px-4 py-0"
+                 :class = "[
+                     alwaysShowScrollbar ? 'overflow-y-scroll' : 'overflow-y-auto',
+                     hideScrollbar ? 'modal-scrollbar-hidden' : ''
+                 ]"
+                 :style = "hideScrollbar ? '' : 'scrollbar-gutter: stable;'">
                 <slot name = "main"></slot>
             </div>
 
@@ -59,6 +64,8 @@ const props = defineProps({
     title: { type: String, default: "Modal Title" },
     actionText: { type: String, default: "Apply" },
     showClose: { type: Boolean, default: true },
+    alwaysShowScrollbar: { type: Boolean, default: false },
+    hideScrollbar: { type: Boolean, default: false }
 })
 
 const isVisible = ref(false)
@@ -111,3 +118,15 @@ watch( isVisible, (visible) => {
 defineExpose({ open, close })
 </script>
 
+<style scoped>
+.modal-scrollbar-hidden {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
+.modal-scrollbar-hidden::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+}
+</style>

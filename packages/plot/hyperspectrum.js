@@ -1805,6 +1805,7 @@ function buildBaseLayout( width, height, graphContainer, settings, upperLeftLabe
     const horizontalTitle = formatAxisTitle( horizontalLabel, axes.xUnit, showUnits )
     const verticalTitle = formatAxisTitle( verticalLabel, axes.yUnit, showUnits )
     const spectralTitle = formatAxisTitle( spectralLabel, axes.zUnit, showUnits )
+    const heatmapViewport = resolveHeatmapViewport( graphContainer, width, height, heatmapOrigin )
 
     var layout = {}
     layout.autosize = true
@@ -1878,7 +1879,7 @@ function buildBaseLayout( width, height, graphContainer, settings, upperLeftLabe
     layout.xaxis3.zeroline = false
     layout.xaxis3.tickfont = { size: tickFontSize }
     layout.xaxis3.constrain = "domain"
-    layout.xaxis3.range = [ -0.5, width - 0.5 ]
+    layout.xaxis3.range = heatmapViewport.xRange
     layout.xaxis3.tickmode = "array"
     layout.xaxis3.tickvals = xTicks.tickvals
     layout.xaxis3.ticktext = xTicks.ticktext
@@ -1894,8 +1895,10 @@ function buildBaseLayout( width, height, graphContainer, settings, upperLeftLabe
     layout.yaxis3.tickfont = { size: tickFontSize }
     layout.yaxis3.constrain = "domain"
     layout.yaxis3.scaleanchor = false
-    layout.yaxis3.range = [ -0.5, height - 0.5 ]
-    layout.yaxis3.autorange = heatmapOrigin === "top-left" ? "reversed" : true
+    layout.yaxis3.range = heatmapViewport.yRange
+    layout.yaxis3.autorange = heatmapViewport.preserved
+        ? false
+        : ( heatmapOrigin === "top-left" ? "reversed" : true )
     layout.yaxis3.tickmode = "array"
     layout.yaxis3.tickvals = yTicks.tickvals
     layout.yaxis3.ticktext = yTicks.ticktext
@@ -1961,6 +1964,65 @@ function buildBaseLayout( width, height, graphContainer, settings, upperLeftLabe
     }
 
     return layout
+}
+
+function resolveHeatmapViewport( graphContainer, width, height, heatmapOrigin ){
+
+    const minimumX = -0.5
+    const maximumX = width - 0.5
+    const minimumY = -0.5
+    const maximumY = height - 0.5
+
+    const defaultYRange = heatmapOrigin === "top-left"
+        ? [ maximumY, minimumY ]
+        : [ minimumY, maximumY ]
+
+    const defaultViewport = {
+        xRange: [ minimumX, maximumX ],
+        yRange: defaultYRange,
+        preserved: false
+    }
+
+    const existingXRange = sanitizeAxisRange( graphContainer?.layout?.xaxis3?.range )
+    const existingYRange = sanitizeAxisRange( graphContainer?.layout?.yaxis3?.range )
+
+    if( existingXRange === null || existingYRange === null ){
+        return defaultViewport
+    }
+
+    return {
+        xRange: clampAxisRange( existingXRange, minimumX, maximumX ),
+        yRange: clampAxisRange( existingYRange, minimumY, maximumY ),
+        preserved: true
+    }
+}
+
+function sanitizeAxisRange( range ){
+
+    if( Array.isArray( range ) === false || range.length < 2 ){
+        return null
+    }
+
+    const start = Number( range[0] )
+    const end = Number( range[1] )
+
+    if( Number.isFinite( start ) === false || Number.isFinite( end ) === false ){
+        return null
+    }
+
+    return [ start, end ]
+}
+
+function clampAxisRange( range, minimum, maximum ){
+
+    const start = Math.max( minimum, Math.min( maximum, Number( range[0] )))
+    const end = Math.max( minimum, Math.min( maximum, Number( range[1] )))
+
+    if( Number.isFinite( start ) === false || Number.isFinite( end ) === false ){
+        return [ minimum, maximum ]
+    }
+
+    return [ start, end ]
 }
 
 function buildSidePanelInstructionAnnotations( layout, upperMessage = "", lowerMessage = "" ){

@@ -140,8 +140,117 @@ output hypercube shape = [L, Y, X]</pre>
                             multidimensional image cube, the parse job fails and no analysis artifacts are produced.
                         </li>
                     </ul>
-                    <a href="/examples/data.oir" download class="text-brand underline hover:opacity-80">
-                        Download example OIR file
+                </div>
+
+                <div v-else-if="selected === 'TIFF'" class="prose prose-gray max-w-none">
+                    <p>
+                        <strong>TIFF</strong> is a widely used <em>raster image container format</em> for
+                        scientific imaging, microscopy, and image exchange. Within this platform, TIFF files are
+                        supported as raw input for the hyperspectral workflow when the acquisition is available as a
+                        <code class="bg-gray-100 px-1 rounded">.tif</code> or
+                        <code class="bg-gray-100 px-1 rounded">.tiff</code> image stack.
+                    </p>
+                    <p>
+                        Although TIFF is broadly supported, files can vary substantially in dimensional organization,
+                        metadata richness, and axis annotations depending on how they were written. The platform
+                        therefore normalizes supported TIFF inputs into a standardized downstream artifact structure
+                        intended for visualization, quantitative analysis, and reuse.
+                    </p>
+                    <ul>
+                        <li>
+                            <strong>File extensions:</strong> The expected source files use
+                            <code class="bg-gray-100 px-1 rounded">.tif</code> or
+                            <code class="bg-gray-100 px-1 rounded">.tiff</code>.
+                        </li>
+                        <li>
+                            <strong>Analytical role:</strong> In this workflow, the TIFF file is treated as the raw
+                            image source from which standardized downstream artifacts are derived.
+                        </li>
+                        <li>
+                            <strong>Metadata handling:</strong> When available, OME-TIFF metadata and ImageJ metadata
+                            are preserved in the parsed metadata payload for downstream inspection.
+                        </li>
+                        <li>
+                            <strong>Series handling:</strong> If the TIFF contains multiple image series, the backend
+                            currently reads the first series only.
+                        </li>
+                    </ul>
+
+                    <h4 class="text-lg font-semibold mt-6 mb-3">Dimensional structure</h4>
+                    <p>
+                        TIFF does not enforce one universal axis convention, so the backend infers spatial dimensions
+                        from axis metadata when available. If valid axis labels include
+                        <code class="bg-gray-100 px-1 rounded">Y</code> and
+                        <code class="bg-gray-100 px-1 rounded">X</code>, those axes are used as spatial image axes.
+                        If axis metadata is missing or ambiguous, the backend falls back to interpreting the last two
+                        dimensions as
+                        <code class="bg-gray-100 px-1 rounded">Y</code> and
+                        <code class="bg-gray-100 px-1 rounded">X</code>.
+                    </p>
+                    <p>
+                        For numerical analysis, all non-spatial dimensions are consolidated into a single layer axis.
+                        Internally, the normalized representation is treated as
+                        <code class="bg-gray-100 px-1 rounded">TCZYX</code>, while TIFF inputs are effectively mapped into:
+                    </p>
+                    <pre class="bg-gray-900 text-gray-100 rounded p-4 text-sm overflow-x-auto whitespace-pre-wrap">L = product of all non-spatial dimensions
+output hypercube shape = [L, Y, X]</pre>
+                    <p>Examples:</p>
+                    <ul>
+                        <li>A 2D TIFF becomes a single-layer cube with shape <code class="bg-gray-100 px-1 rounded">[1, Y, X]</code>.</li>
+                        <li>A multi-page or multidimensional TIFF becomes a cube where every non-spatial slice is flattened into the layer axis.</li>
+                    </ul>
+
+                    <h4 class="text-lg font-semibold mt-6 mb-3">Additional backend expectations and behavior</h4>
+                    <ul>
+                        <li>
+                            <strong>Minimum dimensionality:</strong> The TIFF input must have at least two dimensions.
+                            Files with fewer than two dimensions are rejected.
+                        </li>
+                        <li>
+                            <strong>Normalization:</strong> The exported hypercube is converted to
+                            <code class="bg-gray-100 px-1 rounded">float32</code> and normalized by the global maximum
+                            so that the maximum of the flattened dataset is
+                            <code class="bg-gray-100 px-1 rounded">1.0</code>.
+                        </li>
+                        <li>
+                            <strong>Axis vectors:</strong> X and Y axis vectors are derived from physical calibration
+                            metadata when possible. If calibration metadata is unavailable, the backend falls back to
+                            integer index coordinates.
+                        </li>
+                        <li>
+                            <strong>XY calibration source:</strong> Physical pixel spacing is derived from TIFF
+                            resolution tags when possible. Resolution units of inches or centimeters are converted
+                            into micrometers.
+                        </li>
+                        <li>
+                            <strong>Z calibration:</strong> The TIFF reader does not currently recover a physical Z
+                            spacing, so the third axis defaults to index-based coordinates unless other downstream
+                            logic overrides it.
+                        </li>
+                        <li>
+                            <strong>Units:</strong> If usable physical calibration is available, X and Y units are
+                            exported as physical units. Otherwise the exported units default to
+                            <code class="bg-gray-100 px-1 rounded">index</code>.
+                        </li>
+                        <li>
+                            <strong>Channel naming:</strong> The TIFF reader currently generates placeholder layer
+                            names such as
+                            <code class="bg-gray-100 px-1 rounded">channel_000</code>,
+                            <code class="bg-gray-100 px-1 rounded">channel_001</code>, and so on, rather than
+                            preserving semantic channel labels.
+                        </li>
+                        <li>
+                            <strong>Failure mode:</strong> If the TIFF cannot be interpreted as at least a
+                            two-dimensional image with valid spatial axes, the parse job fails and no analysis
+                            artifacts are produced.
+                        </li>
+                    </ul>
+                    <p>
+                        This organization standardizes TIFF inputs into a consistent hyperspectral representation while
+                        preserving usable structural and calibration metadata when available.
+                    </p>
+                    <a href="/examples/data/example_data.tif" download class="text-brand underline hover:opacity-80">
+                        Download example TIFF file (example_data.tif)
                     </a>
                 </div>
 
@@ -294,8 +403,12 @@ const sidebarStyle = computed(() => {
         : { left: 'calc(-16rem - 2px)' }
 })
 
-const sections = ['OIR']
-const selected = ref(route.query.section || 'OIR')
+const sections = ['OIR', 'TIFF']
+const selected = ref(
+    sections.includes(String(route.query.section ?? ''))
+        ? String(route.query.section)
+        : 'OIR'
+)
 
 const selectSection = (section) => {
     selected.value = section

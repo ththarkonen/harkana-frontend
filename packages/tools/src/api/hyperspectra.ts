@@ -26,16 +26,6 @@ var resolveProjectReference = ( project: any ) => {
     }
 }
 
-var requireOwnedProjectReference = ( project: any ) => {
-
-    const projectReference = resolveProjectReference( project )
-    if( projectReference.isShared ){
-        throw new Error( "ROI creation and deletion are only available for owned projects." )
-    }
-
-    return projectReference
-}
-
 var apiParameters = ( project: any ) => {
 
     var parameters: Record<string, string> = {}
@@ -58,6 +48,16 @@ var resolveDataType = ( dataType: string = "" ) => {
     }
 
     return String((import.meta as any).env.VITE_DATA_TYPE ?? "" ).trim()
+}
+
+var resolveRoiDataType = ( dataType: string = "" ) => {
+
+    const normalized = resolveDataType( dataType ).toLowerCase()
+    if( normalized === "raman" ){
+        return "raman"
+    }
+
+    return "hypercars"
 }
 
 var resolveDataSource = ( dataSource: string = "" ) => {
@@ -229,6 +229,34 @@ var status = async ( projectOrJobID: any ) => {
     return await apiFetch<{ status: string }>( url )
 }
 
+var listRois = async (
+    project: any,
+    dataType: string = ""
+) => {
+
+    const projectReference = resolveProjectReference( project )
+    if( projectReference.projectID.length === 0 ){
+        throw new Error( "Missing projectID for ROI list request." )
+    }
+
+    var parameters: Record<string, string> = {}
+    parameters.projectID = projectReference.projectID
+    parameters.dataType = resolveRoiDataType( dataType )
+
+    if( projectReference.isShared || projectReference.projectKey.length > 0 ){
+        parameters.projectKey = projectReference.projectKey
+    }
+
+    const route = projectReference.isShared
+        ? "/hyperspectrum/shared/roi"
+        : "/hyperspectrum/roi"
+
+    const base = (import.meta as any).env.VITE_BASE_URL + route
+    const url = base + "?" + buildQueryString( parameters )
+
+    return await apiFetch<any>( url )
+}
+
 var createRoi = async (
     project: any,
     payload: {
@@ -246,7 +274,10 @@ var createRoi = async (
     confidenceLevels: Array<number | string> = []
 ) => {
 
-    const projectReference = requireOwnedProjectReference( project )
+    const projectReference = resolveProjectReference( project )
+    if( projectReference.projectID.length === 0 ){
+        throw new Error( "Missing projectID for ROI create request." )
+    }
     const name = String( payload?.name ?? "" ).trim()
     if( name.length === 0 ){
         throw new Error( "ROI name is required." )
@@ -259,7 +290,6 @@ var createRoi = async (
 
     const body: Record<string, any> = {
         projectID: projectReference.projectID,
-        dataType: (import.meta as any).env.VITE_DATA_TYPE,
         name,
         description: String( payload?.description ?? "" ),
         shapeType: "pixel-list",
@@ -274,7 +304,13 @@ var createRoi = async (
     }
 
     var parameters: Record<string, string> = {}
-    parameters.groupID = groupID ?? ""
+    parameters.dataType = resolveRoiDataType()
+
+    if( projectReference.isShared || projectReference.projectKey.length > 0 ){
+        parameters.projectKey = projectReference.projectKey
+    } else {
+        parameters.groupID = groupID ?? ""
+    }
 
     const hasMultiplePoints = points.length > 1
     const normalizedLowerPercentage = Number( lowerPercentage )
@@ -293,7 +329,11 @@ var createRoi = async (
         parameters.confidenceLevels = resolvedConfidenceLevels
     }
 
-    const base = (import.meta as any).env.VITE_BASE_URL + "/hyperspectrum/roi"
+    const route = projectReference.isShared
+        ? "/hyperspectrum/shared/roi"
+        : "/hyperspectrum/roi"
+
+    const base = (import.meta as any).env.VITE_BASE_URL + route
     const url = base + "?" + buildQueryString( parameters )
 
     await apiFetch<void>( url, {
@@ -302,9 +342,12 @@ var createRoi = async (
     })
 }
 
-var deleteRoi = async ( project: any, roiId: string, groupID: string = "" ) => {
+var deleteRoi = async ( project: any, roiId: string ) => {
 
-    const projectReference = requireOwnedProjectReference( project )
+    const projectReference = resolveProjectReference( project )
+    if( projectReference.projectID.length === 0 ){
+        throw new Error( "Missing projectID for ROI delete request." )
+    }
     const normalizedRoiId = String( roiId ?? "" ).trim()
 
     if( normalizedRoiId.length === 0 ){
@@ -314,10 +357,16 @@ var deleteRoi = async ( project: any, roiId: string, groupID: string = "" ) => {
     var parameters: Record<string, string> = {}
     parameters.projectID = projectReference.projectID
     parameters.roiId = normalizedRoiId
-    parameters.dataType = (import.meta as any).env.VITE_DATA_TYPE
-    parameters.groupID = groupID ?? ""
+    parameters.dataType = resolveRoiDataType()
+    if( projectReference.isShared || projectReference.projectKey.length > 0 ){
+        parameters.projectKey = projectReference.projectKey
+    }
 
-    const base = (import.meta as any).env.VITE_BASE_URL + "/hyperspectrum/roi"
+    const route = projectReference.isShared
+        ? "/hyperspectrum/shared/roi"
+        : "/hyperspectrum/roi"
+
+    const base = (import.meta as any).env.VITE_BASE_URL + route
     const url = base + "?" + buildQueryString( parameters )
 
     await apiFetch<void>( url, {
@@ -325,4 +374,4 @@ var deleteRoi = async ( project: any, roiId: string, groupID: string = "" ) => {
     })
 }
 
-export default { parse, estimate, spectrum, meanSpectrum, status, createRoi, deleteRoi }
+export default { parse, estimate, spectrum, meanSpectrum, status, listRois, createRoi, deleteRoi }

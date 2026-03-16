@@ -1,4 +1,5 @@
 import results from "./results.js"
+import hyperspectra from "./api/hyperspectra.ts"
 
 const DEFAULT_MEMORY_BUDGET_BYTES = 600 * 1024 * 1024
 const DEFAULT_TTL_MS = 7 * 24 * 60 * 60 * 1000
@@ -661,6 +662,10 @@ function taskScore( state, task ){
 }
 
 async function loadFromNetwork( project, mode ){
+
+    if( mode === "roi/frontend" ){
+        return await hyperspectra.listRois( project )
+    }
 
     const loaded = await results.load( project, mode )
 
@@ -1355,30 +1360,146 @@ function normalizeRoiEntry( roi ){
     if( boundingBox === null ) return null
 
     const meanSpectrum = normalizeNumericSeries( roi.meanSpectrum )
-    if( meanSpectrum === null ) return null
+    const spectrumLength = resolveSpectrumLength( roi.spectrumLength, meanSpectrum )
+    const confidenceLevels = normalizeConfidenceLevelsPayload(
+        roi.confidenceLevels ??
+        roi?.source?.confidence?.levels ??
+        roi?.confidence?.levels
+    )
 
-    const lowerBound = normalizeOptionalRoiBoundsPayload( roi.lowerBound, meanSpectrum.length )
-    const upperBound = normalizeOptionalRoiBoundsPayload( roi.upperBound, meanSpectrum.length )
+    const estimate = normalizeRoiEstimatePayload( roi.estimate )
+    const expectedLength = spectrumLength > 0
+        ? spectrumLength
+        : ( estimate?.spectrumLength ?? 0 )
+
+    const confidenceLower = normalizeOptionalRoiBoundsPayload( roi?.confidence?.lowerBound, expectedLength )
+    const confidenceUpper = normalizeOptionalRoiBoundsPayload( roi?.confidence?.upperBound, expectedLength )
+
+    const lowerBound = normalizeOptionalRoiBoundsPayload( roi.lowerBound, expectedLength ) ?? confidenceLower
+    const upperBound = normalizeOptionalRoiBoundsPayload( roi.upperBound, expectedLength ) ?? confidenceUpper
     const hasBounds = lowerBound !== null && upperBound !== null
+    const source = roi.source !== null && typeof roi.source === "object"
+        ? normalizeRoiSource( roi.source, expectedLength )
+        : null
 
     return {
         roiId,
         name: String( roi.name ?? "" ).trim() || "Untitled ROI",
         description: String( roi.description ?? "" ),
         createdAt: typeof roi.createdAt === "string" ? roi.createdAt : "",
+        createdBy: typeof roi.createdBy === "string" ? roi.createdBy : "",
         shapeType: "pixel-list",
         pixelCount: Number.isInteger( Number( roi.pixelCount )) ? Number( roi.pixelCount ) : ( boundingBox.width * boundingBox.height ),
         boundingBox,
         meanSpectrum,
-        spectrumLength: meanSpectrum.length,
+        spectrumLength,
         lowerPercentage: Number.isFinite( Number( roi.lowerPercentage )) ? Number( roi.lowerPercentage ) : null,
         lowerBound: hasBounds ? lowerBound : null,
         upperPercentage: Number.isFinite( Number( roi.upperPercentage )) ? Number( roi.upperPercentage ) : null,
         upperBound: hasBounds ? upperBound : null,
         xy: roi.xy !== null && typeof roi.xy === "object" ? roi.xy : null,
         normalization: roi.normalization !== null && typeof roi.normalization === "object" ? roi.normalization : null,
-        source: roi.source !== null && typeof roi.source === "object" ? roi.source : null
+        source,
+        confidence: hasBounds
+            ? {
+                lowerBound,
+                upperBound
+            }
+            : null,
+        confidenceLevels,
+        estimate,
+        pixels: Array.isArray( roi.pixels ) ? roi.pixels : [],
+        points: Array.isArray( roi.points ) ? roi.points : []
     }
+}
+
+function normalizeRoiEstimatePayload( estimate ){
+
+    if( estimate === null || typeof estimate !== "object" ){
+        return null
+    }
+
+    const meanSpectrum = normalizeNumericSeries( estimate.meanSpectrum ?? estimate.spectrum ?? estimate.values )
+    const spectrumLength = resolveSpectrumLength( estimate.spectrumLength, meanSpectrum )
+    const confidenceLevels = normalizeConfidenceLevelsPayload(
+        estimate.confidenceLevels ?? estimate?.source?.confidence?.levels ?? estimate?.confidence?.levels
+    )
+    const confidenceLower = normalizeOptionalRoiBoundsPayload( estimate?.confidence?.lowerBound, spectrumLength )
+    const confidenceUpper = normalizeOptionalRoiBoundsPayload( estimate?.confidence?.upperBound, spectrumLength )
+    const lowerBound = normalizeOptionalRoiBoundsPayload( estimate.lowerBound, spectrumLength ) ?? confidenceLower
+    const upperBound = normalizeOptionalRoiBoundsPayload( estimate.upperBound, spectrumLength ) ?? confidenceUpper
+
+    return {
+        meanSpectrum,
+        spectrumLength,
+        xy: estimate.xy !== null && typeof estimate.xy === "object" ? estimate.xy : null,
+        normalization: estimate.normalization !== null && typeof estimate.normalization === "object"
+            ? estimate.normalization
+            : null,
+        source: estimate.source !== null && typeof estimate.source === "object"
+            ? normalizeRoiSource( estimate.source, spectrumLength )
+            : null,
+        confidence: lowerBound !== null && upperBound !== null
+            ? {
+                lowerBound,
+                upperBound
+            }
+            : null,
+        confidenceLevels,
+        lowerBound,
+        upperBound
+    }
+}
+
+function resolveSpectrumLength( explicitLength, series ){
+
+    const normalizedLength = Number.parseInt( explicitLength, 10 )
+    if( Number.isInteger( normalizedLength ) && normalizedLength > 0 ){
+        return normalizedLength
+    }
+
+    if( Array.isArray( series ) ){
+        return series.length
+    }
+
+    return 0
+}
+
+function normalizeConfidenceLevelsPayload( confidenceLevels ){
+
+    if( Array.isArray( confidenceLevels ) === false ){
+        return []
+    }
+
+    const normalized = confidenceLevels
+        .map(( value ) => Number.parseInt( String( value ), 10 ))
+        .filter(( value ) => Number.isInteger( value ) && value > 0 && value <= 100 )
+        .map(( value ) => String( value ))
+
+    return [ ...new Set( normalized ) ]
+}
+
+function normalizeRoiSource( source, expectedLength ){
+
+    if( source === null || typeof source !== "object" ){
+        return null
+    }
+
+    const normalized = { ...source }
+
+    if( source?.confidence !== null && typeof source?.confidence === "object" ){
+        const confidenceLower = normalizeOptionalRoiBoundsPayload( source.confidence.lowerBound, expectedLength )
+        const confidenceUpper = normalizeOptionalRoiBoundsPayload( source.confidence.upperBound, expectedLength )
+
+        normalized.confidence = {
+            ...source.confidence,
+            lowerBound: confidenceLower,
+            upperBound: confidenceUpper,
+            levels: normalizeConfidenceLevelsPayload( source?.confidence?.levels )
+        }
+    }
+
+    return normalized
 }
 
 function normalizeRoiBoundingBox( boundingBox ){
@@ -1440,7 +1561,11 @@ function normalizeNumericSeries( values ){
 
 function normalizeOptionalNumericSeries( values, expectedLength ){
 
-    if( Array.isArray( values ) === false || values.length !== expectedLength ){
+    if( Array.isArray( values ) === false ){
+        return null
+    }
+
+    if( Number.isInteger( expectedLength ) && expectedLength > 0 && values.length !== expectedLength ){
         return null
     }
 

@@ -24,7 +24,33 @@ export async function apiFetch<T>( url: string, options?: RequestInit): Promise<
     const response: Response = await fetch( url, fetchParameters )
 
     if( !response.ok ){
-        throw new Error(`API error ${response.status}: ${response.statusText}`)
+        var detail = ""
+
+        try{
+            const jsonPayload = await response.clone().json() as Record<string, unknown>
+            const detailCandidate = typeof jsonPayload?.detail === "string"
+                ? jsonPayload.detail
+                : ( typeof jsonPayload?.errorMessage === "string"
+                    ? jsonPayload.errorMessage
+                    : "" )
+
+            detail = String( detailCandidate ?? "" ).trim()
+        } catch{
+            try{
+                const textPayload = await response.clone().text()
+                detail = String( textPayload ?? "" ).trim()
+            } catch{
+                detail = ""
+            }
+        }
+
+        const message = detail.length > 0
+            ? `API error ${response.status}: ${response.statusText} - ${detail}`
+            : `API error ${response.status}: ${response.statusText}`
+        const error = new Error( message ) as Error & { status?: number, detail?: string }
+        error.status = response.status
+        error.detail = detail
+        throw error
     }
 
     if( response.status === 204 ){

@@ -53,7 +53,9 @@
 const dataType = import.meta.env.VITE_DATA_TYPE
 const isHyperspectrum = dataType === "hypercars"
 
-const exampleDatasetPath = "/examples/data/example_data.txt"
+const exampleDatasetPath = isHyperspectrum
+	? "/examples/data/example_data.tif"
+	: "/examples/data/example_data.txt"
 const dataFormatsPath = isHyperspectrum
 	? "/formats?section=OIR"
 	: "/formats?section=Plain+text"

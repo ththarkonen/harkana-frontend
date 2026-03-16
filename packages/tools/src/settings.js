@@ -210,19 +210,20 @@ var getZenodo = async function(){
 
     const key = "zenodo.json"
     const accessSettings = { level: "private", download: true}
+    const defaultZenodoSettings = await getDefaultZenodo()
 
     var result
 
     try {
         result = await Storage.get( key, accessSettings)
     } catch (error) {
-        return await getDefaultSettings()
+        return defaultZenodoSettings
     }
 
     const settingsString = await new Response( result.Body ).text()
     const settings = JSON.parse( settingsString )
 
-    return settings
+    return mergeSettings( defaultZenodoSettings, settings )
 }
 
 var setBilling = async function( settings ){
@@ -269,13 +270,22 @@ var getBilling = async function(){
 
 var getDefaultZenodo = async function() {
 
-    const dataType = import.meta.env.VITE_APP_NAME
+    const dataType = String( import.meta.env.VITE_DATA_TYPE ?? "" ).toLowerCase()
+    const labelsByDataType = {
+        cars: "CARS",
+        raman: "Raman",
+        hypercars: "Hyperspectral CARS",
+        hyperraman: "Hyperspectral Raman"
+    }
+    const datasetLabel = labelsByDataType.hasOwnProperty( dataType )
+        ? labelsByDataType[dataType]
+        : "Raman"
 
     return {
-        title: dataType + " dataset for [SAMPLE]. These are default values which you can edit and save.",
-        description: "This is a " + dataType + " measurement of [SAMPLE]. The dataset contains the measurement data, estimated spectrum with uncertainty estimates, and metadata.",
-        keywords: dataType + ", measurement",
-        token: "123456789"
+        title: datasetLabel + " dataset for [Sample name]",
+        description: "This dataset contains " + datasetLabel + " measurements, analysis outputs, and metadata.",
+        keywords: [ datasetLabel, "spectroscopy", "microscopy" ],
+        token: ""
     };
 }
 
