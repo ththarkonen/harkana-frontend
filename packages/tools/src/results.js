@@ -4,10 +4,13 @@ Amplify.configure( awsconfig );
 
 import { get as getCalibration, set as setCalibration} from './projects/calibration.js';
 import share from "./sharing.js"
+import { parseJsonBytes, parseJsonString } from "./jsonParseWorkerClient.js"
 
-var load = async function( project, mode){
+var load = async function( project, mode, options = {} ){
 
-    if( project.shared ) return await share.load( project.shareInfo, mode + ".json")
+    if( project.shared ){
+        return await share.load( project.shareInfo, mode + ".json", options )
+    }
 
     var result;
     const key = project.id + "/" + mode + ".json";
@@ -19,18 +22,27 @@ var load = async function( project, mode){
         return error
     };
 
-    result = await new Response( result.Body ).text();
-    result = JSON.parse( result )
+    if( options?.priority === "low" ){
+        result = await new Response( result.Body ).arrayBuffer()
+        result = await parseJsonBytes( result, {
+            useWorker: true
+        })
+    } else {
+        result = await new Response( result.Body ).text();
+        result = await parseJsonString( result, {
+            useWorker: false
+        })
+    }
 
     return result;
 };
 
-var loadEstimate = async function( project ){
-    return await load( project, "estimate")
+var loadEstimate = async function( project, options = {} ){
+    return await load( project, "estimate", options )
 }
 
-var loadData = async function( project ){
-    return await load( project, "data")
+var loadData = async function( project, options = {} ){
+    return await load( project, "data", options )
 }
 
 var set = async function( project, mode, value ){

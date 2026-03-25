@@ -1,4 +1,5 @@
 import Plotly from "plotly.js-dist"
+import { prepareVisualizationPayloadInWorker } from "./visualizationWorkerClient.js"
 
 const DEFAULT_PCA_COMPONENT_COLOR_STRINGS = [
     "#0072b2",
@@ -17,6 +18,18 @@ const DEFAULT_UMAP_CHANNEL_COLOR_STRINGS = {
     g: "#00ff00",
     b: "#0000ff"
 }
+const DEFAULT_Z_BLEND_PALETTE_COLOR_STRINGS = [
+    "#0000ff",
+    "#00ff00",
+    "#ff00ff",
+    "#ffff00",
+    "#00ffff",
+    "#ff0000",
+    "#0000ff",
+    "#00ff00",
+    "#ff00ff",
+    "#ffff00"
+]
 const SUPPORTED_HEATMAP_COLOR_SCALES = new Set([
     "Blackbody",
     "Bluered",
@@ -37,11 +50,54 @@ const SUPPORTED_HEATMAP_COLOR_SCALES = new Set([
     "YlGnBu",
     "YlOrRd"
 ])
+const EXTERNAL_HEATMAP_COLOR_SCALES = {
+    Greys: [[ 0, "rgb(0,0,0)" ], [ 1, "rgb(255,255,255)" ]],
+    YlGnBu: [[ 0, "rgb(8,29,88)" ], [ 0.125, "rgb(37,52,148)" ], [ 0.25, "rgb(34,94,168)" ], [ 0.375, "rgb(29,145,192)" ], [ 0.5, "rgb(65,182,196)" ], [ 0.625, "rgb(127,205,187)" ], [ 0.75, "rgb(199,233,180)" ], [ 0.875, "rgb(237,248,217)" ], [ 1, "rgb(255,255,217)" ]],
+    Greens: [[ 0, "rgb(0,68,27)" ], [ 0.125, "rgb(0,109,44)" ], [ 0.25, "rgb(35,139,69)" ], [ 0.375, "rgb(65,171,93)" ], [ 0.5, "rgb(116,196,118)" ], [ 0.625, "rgb(161,217,155)" ], [ 0.75, "rgb(199,233,192)" ], [ 0.875, "rgb(229,245,224)" ], [ 1, "rgb(247,252,245)" ]],
+    YlOrRd: [[ 0, "rgb(128,0,38)" ], [ 0.125, "rgb(189,0,38)" ], [ 0.25, "rgb(227,26,28)" ], [ 0.375, "rgb(252,78,42)" ], [ 0.5, "rgb(253,141,60)" ], [ 0.625, "rgb(254,178,76)" ], [ 0.75, "rgb(254,217,118)" ], [ 0.875, "rgb(255,237,160)" ], [ 1, "rgb(255,255,204)" ]],
+    Bluered: [[ 0, "rgb(0,0,255)" ], [ 1, "rgb(255,0,0)" ]],
+    RdBu: [[ 0, "rgb(5,10,172)" ], [ 0.35, "rgb(106,137,247)" ], [ 0.5, "rgb(190,190,190)" ], [ 0.6, "rgb(220,170,132)" ], [ 0.7, "rgb(230,145,90)" ], [ 1, "rgb(178,10,28)" ]],
+    Reds: [[ 0, "rgb(220,220,220)" ], [ 0.2, "rgb(245,195,157)" ], [ 0.4, "rgb(245,160,105)" ], [ 1, "rgb(178,10,28)" ]],
+    Blues: [[ 0, "rgb(5,10,172)" ], [ 0.35, "rgb(40,60,190)" ], [ 0.5, "rgb(70,100,245)" ], [ 0.6, "rgb(90,120,245)" ], [ 0.7, "rgb(106,137,247)" ], [ 1, "rgb(220,220,220)" ]],
+    Picnic: [[ 0, "rgb(0,0,255)" ], [ 0.1, "rgb(51,153,255)" ], [ 0.2, "rgb(102,204,255)" ], [ 0.3, "rgb(153,204,255)" ], [ 0.4, "rgb(204,204,255)" ], [ 0.5, "rgb(255,255,255)" ], [ 0.6, "rgb(255,204,255)" ], [ 0.7, "rgb(255,153,255)" ], [ 0.8, "rgb(255,102,204)" ], [ 0.9, "rgb(255,102,102)" ], [ 1, "rgb(255,0,0)" ]],
+    Rainbow: [[ 0, "rgb(150,0,90)" ], [ 0.125, "rgb(0,0,200)" ], [ 0.25, "rgb(0,25,255)" ], [ 0.375, "rgb(0,152,255)" ], [ 0.5, "rgb(44,255,150)" ], [ 0.625, "rgb(151,255,0)" ], [ 0.75, "rgb(255,234,0)" ], [ 0.875, "rgb(255,111,0)" ], [ 1, "rgb(255,0,0)" ]],
+    Portland: [[ 0, "rgb(12,51,131)" ], [ 0.25, "rgb(10,136,186)" ], [ 0.5, "rgb(242,211,56)" ], [ 0.75, "rgb(242,143,56)" ], [ 1, "rgb(217,30,30)" ]],
+    Jet: [[ 0, "rgb(0,0,131)" ], [ 0.125, "rgb(0,60,170)" ], [ 0.375, "rgb(5,255,255)" ], [ 0.625, "rgb(255,255,0)" ], [ 0.875, "rgb(250,0,0)" ], [ 1, "rgb(128,0,0)" ]],
+    Hot: [[ 0, "rgb(0,0,0)" ], [ 0.3, "rgb(230,0,0)" ], [ 0.6, "rgb(255,210,0)" ], [ 1, "rgb(255,255,255)" ]],
+    Blackbody: [[ 0, "rgb(0,0,0)" ], [ 0.2, "rgb(230,0,0)" ], [ 0.4, "rgb(230,210,0)" ], [ 0.7, "rgb(255,255,255)" ], [ 1, "rgb(160,200,255)" ]],
+    Earth: [[ 0, "rgb(0,0,130)" ], [ 0.1, "rgb(0,180,180)" ], [ 0.2, "rgb(40,210,40)" ], [ 0.4, "rgb(230,230,50)" ], [ 0.6, "rgb(120,70,20)" ], [ 1, "rgb(255,255,255)" ]],
+    Electric: [[ 0, "rgb(0,0,0)" ], [ 0.15, "rgb(30,0,100)" ], [ 0.4, "rgb(120,0,100)" ], [ 0.6, "rgb(160,90,0)" ], [ 0.8, "rgb(230,200,0)" ], [ 1, "rgb(255,250,220)" ]],
+    Viridis: [[ 0, "#440154" ], [ 0.06274509803921569, "#48186a" ], [ 0.12549019607843137, "#472d7b" ], [ 0.18823529411764706, "#424086" ], [ 0.25098039215686274, "#3b528b" ], [ 0.3137254901960784, "#33638d" ], [ 0.3764705882352941, "#2c728e" ], [ 0.4392156862745098, "#26828e" ], [ 0.5019607843137255, "#21918c" ], [ 0.5647058823529412, "#1fa088" ], [ 0.6274509803921569, "#28ae80" ], [ 0.6901960784313725, "#3fbc73" ], [ 0.7529411764705882, "#5ec962" ], [ 0.8156862745098039, "#84d44b" ], [ 0.8784313725490196, "#addc30" ], [ 0.9411764705882353, "#d8e219" ], [ 1, "#fde725" ]],
+    Cividis: [[ 0, "rgb(0,32,76)" ], [ 0.058824, "rgb(0,42,102)" ], [ 0.117647, "rgb(0,52,110)" ], [ 0.176471, "rgb(39,63,108)" ], [ 0.235294, "rgb(60,74,107)" ], [ 0.294118, "rgb(76,85,107)" ], [ 0.352941, "rgb(91,95,109)" ], [ 0.411765, "rgb(104,106,112)" ], [ 0.470588, "rgb(117,117,117)" ], [ 0.529412, "rgb(131,129,120)" ], [ 0.588235, "rgb(146,140,120)" ], [ 0.647059, "rgb(161,152,118)" ], [ 0.705882, "rgb(176,165,114)" ], [ 0.764706, "rgb(192,177,109)" ], [ 0.823529, "rgb(209,191,102)" ], [ 0.882353, "rgb(225,204,92)" ], [ 0.941176, "rgb(243,219,79)" ], [ 1, "rgb(255,233,69)" ]]
+}
 const TOP_LEFT_INSTRUCTION_TEXT = "Select a region of interest (ROI) from the sidebar to view its stored spectrum here.<br>In PCA and RPCA views, this panel can also show component loadings."
 const LOWER_LEFT_INSTRUCTION_TEXT = "Enable Select spectra in the sidebar, then drag a region or click a pixel to view a spectrum here."
+const FULL_HEATMAP_AXIS_CONFIG = {
+    xaxisKey: "xaxis3",
+    yaxisKey: "yaxis3",
+    traceXaxis: "x3",
+    traceYaxis: "y3"
+}
+const STANDALONE_HEATMAP_AXIS_CONFIG = {
+    xaxisKey: "xaxis",
+    yaxisKey: "yaxis",
+    traceXaxis: "x",
+    traceYaxis: "y"
+}
 var pcaComponentColors = DEFAULT_PCA_COMPONENT_COLOR_STRINGS
     .map(( color ) => parseColorValue( color ))
     .filter(( color ) => color !== null )
+const EXTERNAL_HEATMAP_PAYLOAD_CACHE_LIMIT = 40
+const SCALAR_COLOR_MAP_TEXTURE_SIZE = 1024
+const heatmapPayloadObjectIDs = new WeakMap()
+let nextHeatmapPayloadObjectID = 1
+const scalarColorMapTextureSources = new Map()
+const scalarIntensityTextureSources = new WeakMap()
+const normalizedMipCache = new WeakMap()
+const normalizedPcaScoresCache = new WeakMap()
+const robustScaleCache = new WeakMap()
+const pcaRgbNormalizedChannelsCache = new WeakMap()
+const zBlendIntensityTextureCache = new WeakMap()
 
 var setPcaComponentColors = function( pcaLegend = [] ){
 
@@ -79,6 +135,21 @@ function defaultPcaComponentColors(){
     return DEFAULT_PCA_COMPONENT_COLOR_STRINGS
         .map(( color ) => parseColorValue( color ))
         .filter(( color ) => color !== null )
+}
+
+function resolveHeatmapAxisConfig( graphContainer ){
+
+    const customConfig = graphContainer?.__harkanaHeatmapAxisConfig
+    if( customConfig &&
+        typeof customConfig === "object" &&
+        typeof customConfig.xaxisKey === "string" &&
+        typeof customConfig.yaxisKey === "string" &&
+        typeof customConfig.traceXaxis === "string" &&
+        typeof customConfig.traceYaxis === "string" ){
+        return customConfig
+    }
+
+    return FULL_HEATMAP_AXIS_CONFIG
 }
 
 function parseColorValue( color ){
@@ -173,6 +244,30 @@ var updatePcaRgb = async function( scoresByComponent, graphContainer, settings =
     await renderPcaRgb( scoresByComponent, graphContainer, settings, options, true )
 }
 
+var initializeZBlend = async function( zBlendSource, graphContainer, settings = {}, options = {} ){
+    await renderZBlendMatrix( zBlendSource, graphContainer, settings, options, false )
+}
+
+var updateZBlend = async function( zBlendSource, graphContainer, settings = {}, options = {} ){
+    await renderZBlendMatrix( zBlendSource, graphContainer, settings, options, true )
+}
+
+var initializeUpperPanel = async function( graphContainer, settings = {}, options = {} ){
+    await renderUpperPanel( graphContainer, settings, options, false )
+}
+
+var updateUpperPanel = async function( graphContainer, settings = {}, options = {} ){
+    await renderUpperPanel( graphContainer, settings, options, true )
+}
+
+var initializeLowerPanel = async function( graphContainer, settings = {}, options = {} ){
+    await renderLowerPanel( graphContainer, settings, options, false )
+}
+
+var updateLowerPanel = async function( graphContainer, settings = {}, options = {} ){
+    await renderLowerPanel( graphContainer, settings, options, true )
+}
+
 var updateLowerSpectrum = async function( graphContainer, spectrum, options = {} ){
 
     if( !graphContainer ) return
@@ -240,11 +335,20 @@ var updateLowerSpectrum = async function( graphContainer, spectrum, options = {}
                            } )
 }
 
+var resizeGraph = async function( graphContainer ){
+
+    if( !graphContainer ) return
+    if( typeof Plotly?.Plots?.resize !== "function" ) return
+
+    await Plotly.Plots.resize( graphContainer )
+}
+
 var configureHeatmapInteraction = async function( graphContainer, options = {} ){
 
     if( !graphContainer ) return
 
     const mode = normalizeHeatmapInteractionMode( options.mode )
+    const rendererMode = normalizeExternalHeatmapRendererMode( options.rendererMode )
     const width = Number.isInteger( Number( options.width )) ? Math.max( 1, Number( options.width )) : inferHeatmapWidth( graphContainer )
     const height = Number.isInteger( Number( options.height )) ? Math.max( 1, Number( options.height )) : inferHeatmapHeight( graphContainer )
     graphContainer.__harkanaHeatmapInteractionMode = mode
@@ -254,6 +358,13 @@ var configureHeatmapInteraction = async function( graphContainer, options = {} )
     if( typeof graphContainer.removeAllListeners === "function" ){
         graphContainer.removeAllListeners( "plotly_click" )
         graphContainer.removeAllListeners( "plotly_relayout" )
+    }
+
+    if( rendererMode === "deckgl" ){
+        if( mode === "zoom" ){
+            await Plotly.relayout( graphContainer, { dragmode: "zoom" })
+        }
+        return
     }
 
     if( mode === "select" && typeof graphContainer.on === "function" ){
@@ -307,81 +418,779 @@ var configureHeatmapInteraction = async function( graphContainer, options = {} )
     await Plotly.relayout( graphContainer, { dragmode: mode === "select" ? "drawrect" : "zoom" })
 }
 
-async function renderMatrix( mip, graphContainer, settings, options, preferReact ){
+function normalizeExternalHeatmapRendererMode( renderer ){
+    return renderer === "deckgl" ? "deckgl" : "plotly"
+}
 
-    if( !graphContainer ) return
+function shouldUseExternalHeatmapRenderer( options ){
+    return normalizeExternalHeatmapRendererMode( options?.heatmapRenderer ) === "deckgl"
+}
+
+function normalizeExternalHeatmapPayloadCache( graphContainer ){
+
+    if( !graphContainer ) return null
+
+    if( graphContainer.__harkanaExternalHeatmapPayloadCache instanceof Map ){
+        return graphContainer.__harkanaExternalHeatmapPayloadCache
+    }
+
+    const cache = new Map()
+    graphContainer.__harkanaExternalHeatmapPayloadCache = cache
+    return cache
+}
+
+function heatmapPayloadObjectKey( value ){
+
+    if( value !== null && typeof value === "object" ){
+
+        if( heatmapPayloadObjectIDs.has( value ) === false ){
+            heatmapPayloadObjectIDs.set( value, nextHeatmapPayloadObjectID )
+            nextHeatmapPayloadObjectID += 1
+        }
+
+        return "object:" + heatmapPayloadObjectIDs.get( value )
+    }
+
+    return "primitive:" + String( value )
+}
+
+function stringifyHeatmapPayloadKeyPart( value ){
+
+    if( Array.isArray( value ) ){
+        return "[" + value.map(( entry ) => stringifyHeatmapPayloadKeyPart( entry )).join( "," ) + "]"
+    }
+
+    if( value !== null && typeof value === "object" ){
+        const keys = Object.keys( value ).sort()
+        return "{" + keys.map(( key ) => key + ":" + stringifyHeatmapPayloadKeyPart( value[key] )).join( "," ) + "}"
+    }
+
+    return String( value )
+}
+
+function buildExternalHeatmapPayloadCacheKey( kind, source, options = {} ){
+
+    const entries = Object.entries( options )
+        .filter(([, value ]) => value !== undefined )
+        .sort(([ left ], [ right ]) => left.localeCompare( right ))
+        .map(([ key, value ]) => key + "=" + stringifyHeatmapPayloadKeyPart( value ))
+
+    return kind + "|" + heatmapPayloadSourceKey( kind, source ) + "|" + entries.join( "|" )
+}
+
+function heatmapPayloadSourceKey( kind, source ){
+
+    if( kind === "umap" || kind === "pca-classification" || kind === "pca-rgb" ){
+        return structuredHeatmapPayloadObjectKey( source )
+    }
+
+    return heatmapPayloadObjectKey( source )
+}
+
+function structuredHeatmapPayloadObjectKey( value ){
+
+    if( value === null || typeof value !== "object" ){
+        return heatmapPayloadObjectKey( value )
+    }
+
+    if( Array.isArray( value ) ){
+        if( value.length > 0 &&
+            Array.isArray( value[0] ) &&
+            value[0].length > 0 &&
+            Array.isArray( value[0][0] ) ){
+            return "array:[" + value.map(( entry, index ) => {
+                return index + ":" + heatmapPayloadObjectKey( entry )
+            }).join( "|" ) + "]"
+        }
+
+        return heatmapPayloadObjectKey( value )
+    }
+
+    const keys = Object.keys( value ).sort()
+    return "object:{" + keys.map(( key ) => {
+        return key + ":" + heatmapPayloadObjectKey( value[key] )
+    }).join( "|" ) + "}"
+}
+
+function getCachedExternalHeatmapPayload( graphContainer, cacheKey ){
+
+    if( typeof cacheKey !== "string" || cacheKey.length === 0 ) return null
+
+    const cache = normalizeExternalHeatmapPayloadCache( graphContainer )
+    if( cache === null ) return null
+
+    const payload = cache.get( cacheKey ) ?? null
+    if( payload !== null ){
+        cache.delete( cacheKey )
+        cache.set( cacheKey, payload )
+    }
+
+    return payload
+}
+
+function setCachedExternalHeatmapPayload( graphContainer, cacheKey, payload ){
+
+    if( typeof cacheKey !== "string" || cacheKey.length === 0 ) return
+    if( payload === null || typeof payload !== "object" ) return
+
+    const cache = normalizeExternalHeatmapPayloadCache( graphContainer )
+    if( cache === null ) return
+
+    if( cache.has( cacheKey ) ){
+        cache.delete( cacheKey )
+    }
+
+    cache.set( cacheKey, payload )
+
+    while( cache.size > EXTERNAL_HEATMAP_PAYLOAD_CACHE_LIMIT ){
+        const oldestKey = cache.keys().next().value
+        cache.delete( oldestKey )
+    }
+}
+
+function prewarmScalarHeatmapRendererPayload( graphContainer, mip, options = {} ){
+
+    if( !graphContainer ) return null
+
+    const cacheKey = buildExternalHeatmapPayloadCacheKey( "scalar", mip, { colorscale: options?.colorscale } )
+    const cachedPayload = getCachedExternalHeatmapPayload( graphContainer, cacheKey )
+    if( cachedPayload !== null ){
+        return cachedPayload
+    }
 
     const matrix = normalizeMip( mip )
-    const figure = buildFigure( matrix, graphContainer, settings, options )
+    const payload = buildScalarHeatmapPayload( matrix, options?.colorscale )
+    setCachedExternalHeatmapPayload( graphContainer, cacheKey, payload )
 
-    await renderFigure( graphContainer, figure, preferReact )
+    return payload
 }
 
-async function renderRgbMatrix( mipRgb, graphContainer, settings, options, preferReact ){
+function prewarmRgbHeatmapRendererPayload( graphContainer, mipRgb ){
 
-    if( !graphContainer ) return
+    if( !graphContainer ) return null
+
+    const cacheKey = buildExternalHeatmapPayloadCacheKey( "rgb", mipRgb )
+    const cachedPayload = getCachedExternalHeatmapPayload( graphContainer, cacheKey )
+    if( cachedPayload !== null ){
+        return cachedPayload
+    }
 
     const rgbMatrix = normalizeRgbMip( mipRgb )
-    const rgbComposite = buildRgbMipImage( rgbMatrix )
-    const figure = buildRgbFigure( rgbComposite, graphContainer, settings, options )
+    const payload = buildRgbMipImage( rgbMatrix, {
+        includeSource: false,
+        includePixelMetrics: false
+    } )
+    setCachedExternalHeatmapPayload( graphContainer, cacheKey, payload )
 
-    await renderFigure( graphContainer, figure, preferReact )
+    return payload
 }
 
-async function renderUmapMatrix( umapChannels, graphContainer, settings, options, preferReact ){
+async function prewarmRgbHeatmapRendererPayloadAsync( graphContainer, mipRgb ){
 
-    if( !graphContainer ) return
+    if( !graphContainer ) return null
+
+    const cacheKey = buildExternalHeatmapPayloadCacheKey( "rgb", mipRgb )
+    const cachedPayload = getCachedExternalHeatmapPayload( graphContainer, cacheKey )
+    if( cachedPayload !== null ){
+        return cachedPayload
+    }
+
+    try{
+        const result = await prepareVisualizationPayloadInWorker( "rgb-mip", {
+            rgbMatrix: mipRgb
+        } )
+        const payload = await buildBitmapPayloadFromRgbaPayloadAsync( result, {}, {
+            includeSource: false
+        } )
+        setCachedExternalHeatmapPayload( graphContainer, cacheKey, payload )
+        return payload
+    } catch( error ){
+        console.log( error )
+        return prewarmRgbHeatmapRendererPayload( graphContainer, mipRgb )
+    }
+}
+
+function prewarmUmapHeatmapRendererPayload( graphContainer, umapChannels, options = {} ){
+
+    if( !graphContainer ) return null
+
+    const cacheKey = buildExternalHeatmapPayloadCacheKey( "umap", umapChannels, { channelColors: options?.channelColors } )
+    const cachedPayload = getCachedExternalHeatmapPayload( graphContainer, cacheKey )
+    if( cachedPayload !== null ){
+        return cachedPayload
+    }
 
     const normalizedChannels = normalizeUmapChannels( umapChannels )
-    const rgbComposite = buildUmapImage( normalizedChannels, options )
-    const figure = buildRgbFigure( rgbComposite, graphContainer, settings, options )
+    const payload = buildUmapImage( normalizedChannels, {
+        ...options,
+        includeSource: false,
+        includePixelMetrics: false
+    } )
+    setCachedExternalHeatmapPayload( graphContainer, cacheKey, payload )
 
-    await renderFigure( graphContainer, figure, preferReact )
+    return payload
 }
 
-async function renderPcaMipMatrix( pcaMip, graphContainer, settings, options, preferReact ){
+async function prewarmUmapHeatmapRendererPayloadAsync( graphContainer, umapChannels, options = {} ){
 
-    if( !graphContainer ) return
+    if( !graphContainer ) return null
+
+    const cacheKey = buildExternalHeatmapPayloadCacheKey( "umap", umapChannels, { channelColors: options?.channelColors } )
+    const cachedPayload = getCachedExternalHeatmapPayload( graphContainer, cacheKey )
+    if( cachedPayload !== null ){
+        return cachedPayload
+    }
+
+    try{
+        const result = await prepareVisualizationPayloadInWorker( "umap", {
+            umapChannels,
+            channelColors: options?.channelColors
+        } )
+        const payload = await buildBitmapPayloadFromRgbaPayloadAsync( result, {}, {
+            includeSource: false
+        } )
+        setCachedExternalHeatmapPayload( graphContainer, cacheKey, payload )
+        return payload
+    } catch( error ){
+        console.log( error )
+        return prewarmUmapHeatmapRendererPayload( graphContainer, umapChannels, options )
+    }
+}
+
+function prewarmPcaMipHeatmapRendererPayload( graphContainer, pcaMip ){
+
+    if( !graphContainer ) return null
+
+    const cacheKey = buildExternalHeatmapPayloadCacheKey( "pca-mip", pcaMip )
+    const cachedPayload = getCachedExternalHeatmapPayload( graphContainer, cacheKey )
+    if( cachedPayload !== null ){
+        return cachedPayload
+    }
 
     const normalizedPcaMip = normalizePcaMip( pcaMip )
-    const rgbComposite = buildPcaMipImage( normalizedPcaMip )
-    const figure = buildPcaMipFigure( rgbComposite, graphContainer, settings, options )
+    const payload = buildPcaMipImage( normalizedPcaMip, {
+        includeSource: false,
+        includePixelMetrics: false
+    } )
+    setCachedExternalHeatmapPayload( graphContainer, cacheKey, payload )
 
-    await renderFigure( graphContainer, figure, preferReact )
+    return payload
 }
 
-async function renderPcaClassification( scoresByComponent, graphContainer, settings, options, preferReact ){
+async function prewarmPcaMipHeatmapRendererPayloadAsync( graphContainer, pcaMip ){
 
-    if( !graphContainer ) return
+    if( !graphContainer ) return null
+
+    const cacheKey = buildExternalHeatmapPayloadCacheKey( "pca-mip", pcaMip )
+    const cachedPayload = getCachedExternalHeatmapPayload( graphContainer, cacheKey )
+    if( cachedPayload !== null ){
+        return cachedPayload
+    }
+
+    try{
+        const result = await prepareVisualizationPayloadInWorker( "pca-mip", {
+            pcaMip,
+            componentColors: pcaComponentColors,
+            useEncodedBrightness: true
+        } )
+        const payload = await buildBitmapPayloadFromRgbaPayloadAsync( result, {}, {
+            includeSource: false
+        } )
+        setCachedExternalHeatmapPayload( graphContainer, cacheKey, payload )
+        return payload
+    } catch( error ){
+        console.log( error )
+        return prewarmPcaMipHeatmapRendererPayload( graphContainer, pcaMip )
+    }
+}
+
+function prewarmPcaClassificationHeatmapRendererPayload( graphContainer, scoresByComponent ){
+
+    if( !graphContainer ) return null
 
     if( Array.isArray( scoresByComponent ) &&
         scoresByComponent.length > 0 &&
         Array.isArray( scoresByComponent[0] ) &&
         Array.isArray( scoresByComponent[0][0] ) === false ){
 
-        const normalizedPcaMip = normalizePcaMip( scoresByComponent )
-        const classification = buildPcaMipImage( normalizedPcaMip, { useEncodedBrightness: false } )
-        const figure = buildPcaFigure( classification, graphContainer, settings, options )
+        const mipCacheKey = buildExternalHeatmapPayloadCacheKey( "pca-classification-mip", scoresByComponent )
+        const cachedMipPayload = getCachedExternalHeatmapPayload( graphContainer, mipCacheKey )
+        if( cachedMipPayload !== null ){
+            return cachedMipPayload
+        }
 
+        const normalizedPcaMip = normalizePcaMip( scoresByComponent )
+        const mipPayload = buildPcaMipImage( normalizedPcaMip, {
+            useEncodedBrightness: false,
+            includeSource: false,
+            includePixelMetrics: false
+        } )
+        setCachedExternalHeatmapPayload( graphContainer, mipCacheKey, mipPayload )
+
+        return mipPayload
+    }
+
+    const cacheKey = buildExternalHeatmapPayloadCacheKey( "pca-classification", scoresByComponent )
+    const cachedPayload = getCachedExternalHeatmapPayload( graphContainer, cacheKey )
+    if( cachedPayload !== null ){
+        return cachedPayload
+    }
+
+    const componentScores = normalizePcaScores( scoresByComponent )
+    const payload = buildPcaClassificationImage( componentScores, {
+        includeSource: false,
+        includePixelMetrics: false
+    } )
+    setCachedExternalHeatmapPayload( graphContainer, cacheKey, payload )
+
+    return payload
+}
+
+async function prewarmPcaClassificationHeatmapRendererPayloadAsync( graphContainer, scoresByComponent ){
+
+    if( !graphContainer ) return null
+
+    if( Array.isArray( scoresByComponent ) &&
+        scoresByComponent.length > 0 &&
+        Array.isArray( scoresByComponent[0] ) &&
+        Array.isArray( scoresByComponent[0][0] ) === false ){
+
+        const mipCacheKey = buildExternalHeatmapPayloadCacheKey( "pca-classification-mip", scoresByComponent )
+        const cachedMipPayload = getCachedExternalHeatmapPayload( graphContainer, mipCacheKey )
+        if( cachedMipPayload !== null ){
+            return cachedMipPayload
+        }
+
+        try{
+            const result = await prepareVisualizationPayloadInWorker( "pca-mip", {
+                pcaMip: scoresByComponent,
+                componentColors: pcaComponentColors,
+                useEncodedBrightness: false
+            } )
+            const mipPayload = await buildBitmapPayloadFromRgbaPayloadAsync( result, {}, {
+                includeSource: false
+            } )
+            setCachedExternalHeatmapPayload( graphContainer, mipCacheKey, mipPayload )
+            return mipPayload
+        } catch( error ){
+            console.log( error )
+            return prewarmPcaClassificationHeatmapRendererPayload( graphContainer, scoresByComponent )
+        }
+    }
+
+    const cacheKey = buildExternalHeatmapPayloadCacheKey( "pca-classification", scoresByComponent )
+    const cachedPayload = getCachedExternalHeatmapPayload( graphContainer, cacheKey )
+    if( cachedPayload !== null ){
+        return cachedPayload
+    }
+
+    try{
+        const result = await prepareVisualizationPayloadInWorker( "pca-classification", {
+            scoresByComponent,
+            componentColors: pcaComponentColors
+        } )
+        const payload = await buildBitmapPayloadFromRgbaPayloadAsync( result, {}, {
+            includeSource: false
+        } )
+        setCachedExternalHeatmapPayload( graphContainer, cacheKey, payload )
+        return payload
+    } catch( error ){
+        console.log( error )
+        return prewarmPcaClassificationHeatmapRendererPayload( graphContainer, scoresByComponent )
+    }
+}
+
+function prewarmPcaRgbHeatmapRendererPayload( graphContainer, scoresByComponent, options = {} ){
+
+    if( !graphContainer ) return null
+
+    const cacheKey = buildExternalHeatmapPayloadCacheKey( "pca-rgb", scoresByComponent, { channels: options?.channels } )
+    const cachedPayload = getCachedExternalHeatmapPayload( graphContainer, cacheKey )
+    if( cachedPayload !== null ){
+        return cachedPayload
+    }
+
+    const componentScores = normalizePcaScores( scoresByComponent )
+    const payload = buildPcaRgbImage( componentScores, {
+        ...options,
+        includeSource: false,
+        includePixelMetrics: false
+    } )
+    setCachedExternalHeatmapPayload( graphContainer, cacheKey, payload )
+
+    return payload
+}
+
+async function prewarmPcaRgbHeatmapRendererPayloadAsync( graphContainer, scoresByComponent, options = {} ){
+
+    if( !graphContainer ) return null
+
+    const cacheKey = buildExternalHeatmapPayloadCacheKey( "pca-rgb", scoresByComponent, { channels: options?.channels } )
+    const cachedPayload = getCachedExternalHeatmapPayload( graphContainer, cacheKey )
+    if( cachedPayload !== null ){
+        return cachedPayload
+    }
+
+    try{
+        const result = await prepareVisualizationPayloadInWorker( "pca-rgb", {
+            scoresByComponent,
+            channels: options?.channels,
+            componentColors: pcaComponentColors
+        } )
+        const payload = await buildBitmapPayloadFromRgbaPayloadAsync( result, {}, {
+            includeSource: false
+        } )
+        setCachedExternalHeatmapPayload( graphContainer, cacheKey, payload )
+        return payload
+    } catch( error ){
+        console.log( error )
+        return prewarmPcaRgbHeatmapRendererPayload( graphContainer, scoresByComponent, options )
+    }
+}
+
+function prewarmZBlendHeatmapRendererPayload( graphContainer, zBlendSource ){
+
+    if( !graphContainer ) return null
+
+    const cacheKey = buildExternalHeatmapPayloadCacheKey( "z-blend", zBlendPayloadSignature( zBlendSource ) )
+    const cachedPayload = getCachedExternalHeatmapPayload( graphContainer, cacheKey )
+    if( cachedPayload !== null ){
+        return cachedPayload
+    }
+
+    const normalizedSource = normalizeZBlendSource( zBlendSource )
+    const payload = buildZBlendRendererPayload( normalizedSource )
+    setCachedExternalHeatmapPayload( graphContainer, cacheKey, payload )
+
+    return payload
+}
+
+function updateZBlendHeatmapPayload( zBlendSource, graphContainer, options = {} ){
+
+    if( !graphContainer ) return null
+
+    const normalizedSource = normalizeZBlendSource( zBlendSource )
+    const payload = buildZBlendRendererPayload( normalizedSource )
+
+    cacheHeatmapRendererPayload(
+        graphContainer,
+        payload,
+        normalizeExternalHeatmapRendererMode( options?.heatmapRenderer )
+    )
+
+    return payload
+}
+
+function cacheHeatmapRendererPayload( graphContainer, payload, mode ){
+
+    if( !graphContainer ) return
+
+    graphContainer.__harkanaHeatmapRendererPayload = payload ?? null
+    graphContainer.__harkanaHeatmapRendererMode = mode
+}
+
+function normalizeHeatmapOrigin( origin ){
+    return origin === "bottom-left" ? "bottom-left" : "top-left"
+}
+
+function resolveStoredHeatmapOrigin( graphContainer, fallback = "top-left" ){
+
+    const storedOrigin = graphContainer?.__harkanaHeatmapOrigin
+    if( storedOrigin === "bottom-left" || storedOrigin === "top-left" ){
+        return storedOrigin
+    }
+
+    return normalizeHeatmapOrigin( fallback )
+}
+
+function cacheHeatmapOrigin( graphContainer, settings ){
+
+    if( !graphContainer ) return
+    graphContainer.__harkanaHeatmapOrigin = normalizeHeatmapOrigin( settings?.layout?.heatmapOrigin )
+}
+
+async function renderMatrix( mip, graphContainer, settings, options, preferReact ){
+
+    if( !graphContainer ) return
+    cacheHeatmapOrigin( graphContainer, settings )
+
+    const externalRenderer = shouldUseExternalHeatmapRenderer( options )
+    const cacheKey = externalRenderer
+        ? buildExternalHeatmapPayloadCacheKey( "scalar", mip, { colorscale: options?.colorscale } )
+        : ""
+    let heatmapPayload = externalRenderer
+        ? getCachedExternalHeatmapPayload( graphContainer, cacheKey )
+        : null
+    const matrix = ( externalRenderer && heatmapPayload !== null )
+        ? dimensionStubMatrix( heatmapPayload.width, heatmapPayload.height )
+        : normalizeMip( mip )
+
+    if( externalRenderer && heatmapPayload === null ){
+        heatmapPayload = buildScalarHeatmapPayload( matrix, options.colorscale )
+        setCachedExternalHeatmapPayload( graphContainer, cacheKey, heatmapPayload )
+    }
+
+    cacheHeatmapRendererPayload( graphContainer, heatmapPayload, normalizeExternalHeatmapRendererMode( options?.heatmapRenderer ) )
+    if( options?.skipFigureRender === true && externalRenderer ){
+        return
+    }
+
+    const figure = buildFigure( matrix, graphContainer, settings, options )
+    await renderFigure( graphContainer, figure, preferReact )
+}
+
+async function renderRgbMatrix( mipRgb, graphContainer, settings, options, preferReact ){
+
+    if( !graphContainer ) return
+    cacheHeatmapOrigin( graphContainer, settings )
+
+    const externalRenderer = shouldUseExternalHeatmapRenderer( options )
+    const cacheKey = externalRenderer
+        ? buildExternalHeatmapPayloadCacheKey( "rgb", mipRgb )
+        : ""
+    let rgbComposite = externalRenderer
+        ? getCachedExternalHeatmapPayload( graphContainer, cacheKey )
+        : null
+
+    if( rgbComposite === null ){
+        const rgbMatrix = normalizeRgbMip( mipRgb )
+        rgbComposite = buildRgbMipImage( rgbMatrix, {
+            includeSource: externalRenderer === false,
+            includePixelMetrics: false
+        } )
+
+        if( externalRenderer ){
+            setCachedExternalHeatmapPayload( graphContainer, cacheKey, rgbComposite )
+        }
+    }
+
+    cacheHeatmapRendererPayload( graphContainer,
+                                 externalRenderer ? rgbComposite : null,
+                                 normalizeExternalHeatmapRendererMode( options?.heatmapRenderer ) )
+    if( options?.skipFigureRender === true && externalRenderer ){
+        return
+    }
+    const figure = buildRgbFigure( rgbComposite, graphContainer, settings, options )
+    await renderFigure( graphContainer, figure, preferReact )
+}
+
+async function renderUmapMatrix( umapChannels, graphContainer, settings, options, preferReact ){
+
+    if( !graphContainer ) return
+    cacheHeatmapOrigin( graphContainer, settings )
+
+    const externalRenderer = shouldUseExternalHeatmapRenderer( options )
+    const cacheKey = externalRenderer
+        ? buildExternalHeatmapPayloadCacheKey( "umap", umapChannels, { channelColors: options?.channelColors } )
+        : ""
+    let rgbComposite = externalRenderer
+        ? getCachedExternalHeatmapPayload( graphContainer, cacheKey )
+        : null
+
+    if( rgbComposite === null ){
+        const normalizedChannels = normalizeUmapChannels( umapChannels )
+        rgbComposite = buildUmapImage( normalizedChannels, {
+            ...options,
+            includeSource: externalRenderer === false,
+            includePixelMetrics: false
+        } )
+
+        if( externalRenderer ){
+            setCachedExternalHeatmapPayload( graphContainer, cacheKey, rgbComposite )
+        }
+    }
+
+    cacheHeatmapRendererPayload( graphContainer,
+                                 externalRenderer ? rgbComposite : null,
+                                 normalizeExternalHeatmapRendererMode( options?.heatmapRenderer ) )
+    if( options?.skipFigureRender === true && externalRenderer ){
+        return
+    }
+    const figure = buildRgbFigure( rgbComposite, graphContainer, settings, options )
+    await renderFigure( graphContainer, figure, preferReact )
+}
+
+async function renderPcaMipMatrix( pcaMip, graphContainer, settings, options, preferReact ){
+
+    if( !graphContainer ) return
+    cacheHeatmapOrigin( graphContainer, settings )
+
+    const externalRenderer = shouldUseExternalHeatmapRenderer( options )
+    const cacheKey = externalRenderer
+        ? buildExternalHeatmapPayloadCacheKey( "pca-mip", pcaMip )
+        : ""
+    let rgbComposite = externalRenderer
+        ? getCachedExternalHeatmapPayload( graphContainer, cacheKey )
+        : null
+
+    if( rgbComposite === null ){
+        const normalizedPcaMip = normalizePcaMip( pcaMip )
+        rgbComposite = buildPcaMipImage( normalizedPcaMip, {
+            includeSource: externalRenderer === false,
+            includePixelMetrics: false
+        } )
+
+        if( externalRenderer ){
+            setCachedExternalHeatmapPayload( graphContainer, cacheKey, rgbComposite )
+        }
+    }
+
+    cacheHeatmapRendererPayload( graphContainer,
+                                 externalRenderer ? rgbComposite : null,
+                                 normalizeExternalHeatmapRendererMode( options?.heatmapRenderer ) )
+    if( options?.skipFigureRender === true && externalRenderer ){
+        return
+    }
+    const figure = buildPcaMipFigure( rgbComposite, graphContainer, settings, options )
+    await renderFigure( graphContainer, figure, preferReact )
+}
+
+async function renderPcaClassification( scoresByComponent, graphContainer, settings, options, preferReact ){
+
+    if( !graphContainer ) return
+    cacheHeatmapOrigin( graphContainer, settings )
+
+    const externalRenderer = shouldUseExternalHeatmapRenderer( options )
+
+    if( Array.isArray( scoresByComponent ) &&
+        scoresByComponent.length > 0 &&
+        Array.isArray( scoresByComponent[0] ) &&
+        Array.isArray( scoresByComponent[0][0] ) === false ){
+
+        const cacheKey = externalRenderer
+            ? buildExternalHeatmapPayloadCacheKey( "pca-classification-mip", scoresByComponent )
+            : ""
+        let classification = externalRenderer
+            ? getCachedExternalHeatmapPayload( graphContainer, cacheKey )
+            : null
+
+        if( classification === null ){
+            const normalizedPcaMip = normalizePcaMip( scoresByComponent )
+            classification = buildPcaMipImage( normalizedPcaMip, {
+                useEncodedBrightness: false,
+                includeSource: externalRenderer === false,
+                includePixelMetrics: false
+            } )
+
+            if( externalRenderer ){
+                setCachedExternalHeatmapPayload( graphContainer, cacheKey, classification )
+            }
+        }
+
+        cacheHeatmapRendererPayload( graphContainer,
+                                     externalRenderer ? classification : null,
+                                     normalizeExternalHeatmapRendererMode( options?.heatmapRenderer ) )
+        if( options?.skipFigureRender === true && externalRenderer ){
+            return
+        }
+        const figure = buildPcaFigure( classification, graphContainer, settings, options )
         await renderFigure( graphContainer, figure, preferReact )
         return
     }
 
-    const componentScores = normalizePcaScores( scoresByComponent )
-    const classification = buildPcaClassificationImage( componentScores )
-    const figure = buildPcaFigure( classification, graphContainer, settings, options )
+    const cacheKey = externalRenderer
+        ? buildExternalHeatmapPayloadCacheKey( "pca-classification", scoresByComponent )
+        : ""
+    let classification = externalRenderer
+        ? getCachedExternalHeatmapPayload( graphContainer, cacheKey )
+        : null
 
+    if( classification === null ){
+        const componentScores = normalizePcaScores( scoresByComponent )
+        classification = buildPcaClassificationImage( componentScores, {
+            includeSource: externalRenderer === false,
+            includePixelMetrics: false
+        } )
+
+        if( externalRenderer ){
+            setCachedExternalHeatmapPayload( graphContainer, cacheKey, classification )
+        }
+    }
+
+    cacheHeatmapRendererPayload( graphContainer,
+                                 externalRenderer ? classification : null,
+                                 normalizeExternalHeatmapRendererMode( options?.heatmapRenderer ) )
+    if( options?.skipFigureRender === true && externalRenderer ){
+        return
+    }
+    const figure = buildPcaFigure( classification, graphContainer, settings, options )
     await renderFigure( graphContainer, figure, preferReact )
 }
 
 async function renderPcaRgb( scoresByComponent, graphContainer, settings, options, preferReact ){
 
     if( !graphContainer ) return
+    cacheHeatmapOrigin( graphContainer, settings )
 
-    const componentScores = normalizePcaScores( scoresByComponent )
-    const rgbComposite = buildPcaRgbImage( componentScores, options )
+    const externalRenderer = shouldUseExternalHeatmapRenderer( options )
+    const cacheKey = externalRenderer
+        ? buildExternalHeatmapPayloadCacheKey( "pca-rgb", scoresByComponent, { channels: options?.channels } )
+        : ""
+    let rgbComposite = externalRenderer
+        ? getCachedExternalHeatmapPayload( graphContainer, cacheKey )
+        : null
+
+    if( rgbComposite === null ){
+        const componentScores = normalizePcaScores( scoresByComponent )
+        rgbComposite = buildPcaRgbImage( componentScores, {
+            ...options,
+            includeSource: externalRenderer === false,
+            includePixelMetrics: false
+        } )
+
+        if( externalRenderer ){
+            setCachedExternalHeatmapPayload( graphContainer, cacheKey, rgbComposite )
+        }
+    }
+
+    cacheHeatmapRendererPayload( graphContainer,
+                                 externalRenderer ? rgbComposite : null,
+                                 normalizeExternalHeatmapRendererMode( options?.heatmapRenderer ) )
+    if( options?.skipFigureRender === true && externalRenderer ){
+        return
+    }
     const figure = buildPcaRgbFigure( rgbComposite, graphContainer, settings, options )
+    await renderFigure( graphContainer, figure, preferReact )
+}
 
+async function renderZBlendMatrix( zBlendSource, graphContainer, settings, options, preferReact ){
+
+    if( !graphContainer ) return
+    cacheHeatmapOrigin( graphContainer, settings )
+
+    const externalRenderer = shouldUseExternalHeatmapRenderer( options )
+    const normalizedSource = normalizeZBlendSource( zBlendSource )
+    const rgbComposite = externalRenderer
+        ? updateZBlendHeatmapPayload( normalizedSource, graphContainer, { heatmapRenderer: options?.heatmapRenderer } )
+        : buildZBlendImage( normalizedSource, {
+            includeSource: true,
+            includePixelMetrics: false
+        } )
+
+    if( options?.skipFigureRender === true ){
+        return
+    }
+
+    const figure = buildRgbFigure( rgbComposite, graphContainer, settings, options )
+    cacheHeatmapRendererPayload( graphContainer,
+                                 externalRenderer ? rgbComposite : null,
+                                 normalizeExternalHeatmapRendererMode( options?.heatmapRenderer ) )
+    await renderFigure( graphContainer, figure, preferReact )
+}
+
+async function renderUpperPanel( graphContainer, settings, options, preferReact ){
+
+    if( !graphContainer ) return
+
+    const figure = buildUpperPanelFigure( graphContainer, settings, options )
+    await renderFigure( graphContainer, figure, preferReact )
+}
+
+async function renderLowerPanel( graphContainer, settings, options, preferReact ){
+
+    if( !graphContainer ) return
+
+    const figure = buildLowerPanelFigure( graphContainer, settings, options )
     await renderFigure( graphContainer, figure, preferReact )
 }
 
@@ -428,8 +1237,9 @@ function detachHeatmapPointerSelection( graphContainer ){
 function pointFromPointerEvent( event, graphContainer, width, height ){
 
     const fullLayout = graphContainer?._fullLayout
-    const xaxis = fullLayout?.xaxis3
-    const yaxis = fullLayout?.yaxis3
+    const axisConfig = resolveHeatmapAxisConfig( graphContainer )
+    const xaxis = fullLayout?.[ axisConfig.xaxisKey ]
+    const yaxis = fullLayout?.[ axisConfig.yaxisKey ]
 
     const bounds = graphContainer.getBoundingClientRect()
     const pixelX = Number( event.clientX ) - bounds.left
@@ -459,8 +1269,13 @@ function pointFromPointerEvent( event, graphContainer, width, height ){
 
     const relativeX = clampUnit(( pixelX - xOffset ) / xLength )
     const relativeY = clampUnit(( pixelY - yOffset ) / yLength )
-    const yAxisAutoRange = yaxis?.autorange ?? fullLayout?.yaxis3?.autorange
-    const isTopLeftOrigin = yAxisAutoRange === "reversed"
+    const yAxisRange = sanitizeAxisRange( yaxis?.range ?? fullLayout?.[ axisConfig.yaxisKey ]?.range )
+    const yAxisAutoRange = yaxis?.autorange ?? fullLayout?.[ axisConfig.yaxisKey ]?.autorange
+    const cachedHeatmapOrigin = resolveStoredHeatmapOrigin(
+        graphContainer,
+        yAxisRange !== null && Number( yAxisRange[0] ) > Number( yAxisRange[1] ) ? "top-left" : ( yAxisAutoRange === "reversed" ? "top-left" : "bottom-left" )
+    )
+    const isTopLeftOrigin = cachedHeatmapOrigin === "top-left"
 
     const x = clampIndex( relativeX * ( width - 1 ), width )
     const y = clampIndex(( isTopLeftOrigin ? relativeY : ( 1 - relativeY )) * ( height - 1 ), height )
@@ -489,8 +1304,13 @@ function resolveHeatmapPixelWindow( graphContainer, fullLayout, xaxis, yaxis ){
         return { xOffset, yOffset, xLength, yLength }
     }
 
-    const xDomain = Array.isArray( fullLayout?.xaxis3?.domain ) ? fullLayout.xaxis3.domain : null
-    const yDomain = Array.isArray( fullLayout?.yaxis3?.domain ) ? fullLayout.yaxis3.domain : null
+    const axisConfig = resolveHeatmapAxisConfig( graphContainer )
+    const xDomain = Array.isArray( fullLayout?.[ axisConfig.xaxisKey ]?.domain )
+        ? fullLayout[ axisConfig.xaxisKey ].domain
+        : null
+    const yDomain = Array.isArray( fullLayout?.[ axisConfig.yaxisKey ]?.domain )
+        ? fullLayout[ axisConfig.yaxisKey ].domain
+        : null
 
     if( xDomain === null || yDomain === null || xDomain.length !== 2 || yDomain.length !== 2 ){
         return null
@@ -573,7 +1393,8 @@ async function clearHeatmapSelectionShape( graphContainer, shapeIndex ){
 
 function inferHeatmapWidth( graphContainer ){
 
-    const range = graphContainer?.layout?.xaxis3?.range
+    const axisConfig = resolveHeatmapAxisConfig( graphContainer )
+    const range = graphContainer?.layout?.[ axisConfig.xaxisKey ]?.range
     if( Array.isArray( range ) && range.length === 2 ){
         const width = Math.round( Number( range[1] ) - Number( range[0] ))
         if( Number.isFinite( width ) && width > 0 ){
@@ -586,7 +1407,8 @@ function inferHeatmapWidth( graphContainer ){
 
 function inferHeatmapHeight( graphContainer ){
 
-    const range = graphContainer?.layout?.yaxis3?.range
+    const axisConfig = resolveHeatmapAxisConfig( graphContainer )
+    const range = graphContainer?.layout?.[ axisConfig.yaxisKey ]?.range
     if( Array.isArray( range ) && range.length === 2 ){
         const height = Math.round( Number( range[1] ) - Number( range[0] ))
         if( Number.isFinite( height ) && height > 0 ){
@@ -617,6 +1439,7 @@ function extractHeatmapClickPoint( eventData, graphContainer, width, height ){
 function isHeatmapPoint( point, graphContainer ){
 
     const trace = graphContainer?.data?.[ point?.curveNumber ] ?? {}
+    const axisConfig = resolveHeatmapAxisConfig( graphContainer )
 
     const xaxisID = normalizeAxisID(
         point?.xaxis?._id ??
@@ -632,7 +1455,8 @@ function isHeatmapPoint( point, graphContainer ){
         trace?.yaxis
     )
 
-    return xaxisID === "x3" && yaxisID === "y3"
+    return xaxisID === normalizeAxisID( axisConfig.traceXaxis ) &&
+        yaxisID === normalizeAxisID( axisConfig.traceYaxis )
 }
 
 function normalizeAxisID( axisID ){
@@ -652,6 +1476,23 @@ function findLowerSpectrumTraceIndices( traces ){
 
         if( xaxisID === "x2" && yaxisID === "y2" ){
             traceIndices.push( ii )
+        }
+    }
+
+    return traceIndices
+}
+
+function findTraceIndicesForAxes( traces, expectedXaxisID, expectedYaxisID ){
+
+    var traceIndices = []
+
+    for( var index = 0; index < traces.length; index++ ){
+        const trace = traces[index] ?? {}
+        const xaxisID = normalizeAxisID( trace.xaxis )
+        const yaxisID = normalizeAxisID( trace.yaxis )
+
+        if( xaxisID === expectedXaxisID && yaxisID === expectedYaxisID ){
+            traceIndices.push( index )
         }
     }
 
@@ -779,17 +1620,17 @@ function selectionFromRanges( ranges, width, height ){
     const xIndices = integerRange( xMin, xMax )
     const yIndices = integerRange( yMin, yMax )
 
-    var points = []
-    for( const y of yIndices ){
-        for( const x of xIndices ){
-            points.push([ x, y ])
-        }
-    }
-
     return {
         xIndices,
         yIndices,
-        points
+        boundingBox: {
+            minX: xMin,
+            maxX: xMax,
+            minY: yMin,
+            maxY: yMax,
+            width: xMax - xMin + 1,
+            height: yMax - yMin + 1
+        }
     }
 }
 
@@ -822,7 +1663,32 @@ async function renderFigure( graphContainer, figure, preferReact ){
         displaylogo: false
     }
 
+    if( figure?.heatmapPanelOnly === true ){
+        config.displayModeBar = false
+    }
+
     const hasExistingFigure = Array.isArray( graphContainer.data ) && graphContainer.data.length > 0
+
+    graphContainer.__harkanaHeatmapAxisConfig = figure?.heatmapPanelOnly === true
+        ? STANDALONE_HEATMAP_AXIS_CONFIG
+        : FULL_HEATMAP_AXIS_CONFIG
+
+    if( figure?.heatmapPanelOnly === true ){
+        if( preferReact || hasExistingFigure ){
+            await Plotly.react( graphContainer, figure.traces, figure.layout, config )
+            return
+        }
+
+        await Plotly.newPlot( graphContainer, figure.traces, figure.layout, config )
+        return
+    }
+
+    if( figure?.externalHeatmap === true && hasExistingFigure ){
+        const incrementallyUpdated = await updateExternalHeatmapFigure( graphContainer, figure )
+        if( incrementallyUpdated ){
+            return
+        }
+    }
 
     if( preferReact || hasExistingFigure ){
         await Plotly.react( graphContainer, figure.traces, figure.layout, config )
@@ -830,6 +1696,116 @@ async function renderFigure( graphContainer, figure, preferReact ){
     }
 
     await Plotly.newPlot( graphContainer, figure.traces, figure.layout, config )
+}
+
+async function updateExternalHeatmapFigure( graphContainer, figure ){
+
+    if( !graphContainer ) return false
+
+    const existingTraces = Array.isArray( graphContainer.data ) ? graphContainer.data : []
+    const nextTraces = Array.isArray( figure?.traces ) ? figure.traces : []
+
+    if( existingTraces.length !== nextTraces.length ){
+        return false
+    }
+
+    for( var index = 0; index < nextTraces.length; index++ ){
+
+        const existingTrace = existingTraces[index] ?? {}
+        const nextTrace = nextTraces[index] ?? {}
+
+        if(( existingTrace.type ?? "" ) !== ( nextTrace.type ?? "" )){
+            return false
+        }
+
+        if( normalizeAxisID( existingTrace.xaxis ) !== normalizeAxisID( nextTrace.xaxis ) ){
+            return false
+        }
+
+        if( normalizeAxisID( existingTrace.yaxis ) !== normalizeAxisID( nextTrace.yaxis ) ){
+            return false
+        }
+    }
+
+    const traceIndices = nextTraces.map(( _, index ) => index )
+    if( traceIndices.length > 0 ){
+        await restyleScatterTraces( graphContainer, nextTraces, traceIndices )
+    }
+
+    await Plotly.relayout( graphContainer, externalHeatmapLayoutUpdate( figure.layout ) )
+
+    return true
+}
+
+async function restyleScatterTraces( graphContainer, traces, traceIndices ){
+
+    await Plotly.restyle(
+        graphContainer,
+        {
+            x: traces.map(( trace ) => Array.isArray( trace?.x ) ? trace.x : [] ),
+            y: traces.map(( trace ) => Array.isArray( trace?.y ) ? trace.y : [] ),
+            mode: traces.map(( trace ) => typeof trace?.mode === "string" ? trace.mode : "lines" ),
+            fill: traces.map(( trace ) => typeof trace?.fill === "string" ? trace.fill : "none" ),
+            fillcolor: traces.map(( trace ) => typeof trace?.fillcolor === "string" ? trace.fillcolor : "rgba(0, 0, 0, 0)" ),
+            hovertemplate: traces.map(( trace ) => typeof trace?.hovertemplate === "string" ? trace.hovertemplate : "(%{x}, %{y})<extra></extra>" ),
+            hoverinfo: traces.map(( trace ) => typeof trace?.hoverinfo === "string" ? trace.hoverinfo : "all" ),
+            showlegend: traces.map(( trace ) => trace?.showlegend === true )
+        },
+        traceIndices
+    )
+
+    await Plotly.restyle(
+        graphContainer,
+        {
+            "line.color": traces.map(( trace ) => typeof trace?.line?.color === "string" ? trace.line.color : "rgba(0, 0, 0, 0)" ),
+            "line.width": traces.map(( trace ) => Number.isFinite( Number( trace?.line?.width )) ? Number( trace.line.width ) : 1 )
+        },
+        traceIndices
+    )
+}
+
+function externalHeatmapLayoutUpdate( layout ){
+
+    return {
+        annotations: Array.isArray( layout?.annotations ) ? layout.annotations : [],
+        shapes: Array.isArray( layout?.shapes ) ? layout.shapes : [],
+        "margin.t": Number( layout?.margin?.t ) || 0,
+        "margin.r": Number( layout?.margin?.r ) || 0,
+        "margin.b": Number( layout?.margin?.b ) || 0,
+        "margin.l": Number( layout?.margin?.l ) || 0,
+        "xaxis.domain": Array.isArray( layout?.xaxis?.domain ) ? layout.xaxis.domain : [ 0, 0.4 ],
+        "xaxis.autorange": layout?.xaxis?.autorange ?? false,
+        "xaxis.tickmode": layout?.xaxis?.tickmode ?? "array",
+        "xaxis.tickvals": Array.isArray( layout?.xaxis?.tickvals ) ? layout.xaxis.tickvals : [],
+        "xaxis.ticktext": Array.isArray( layout?.xaxis?.ticktext ) ? layout.xaxis.ticktext : [],
+        "xaxis.showticklabels": layout?.xaxis?.showticklabels !== false,
+        "yaxis.domain": Array.isArray( layout?.yaxis?.domain ) ? layout.yaxis.domain : [ 0.56, 1 ],
+        "yaxis.showticklabels": layout?.yaxis?.showticklabels !== false,
+        "yaxis.title.text": layout?.yaxis?.title?.text ?? "",
+        "xaxis2.domain": Array.isArray( layout?.xaxis2?.domain ) ? layout.xaxis2.domain : [ 0, 0.4 ],
+        "xaxis2.autorange": layout?.xaxis2?.autorange ?? true,
+        "xaxis2.tickmode": layout?.xaxis2?.tickmode ?? "array",
+        "xaxis2.tickvals": Array.isArray( layout?.xaxis2?.tickvals ) ? layout.xaxis2.tickvals : [],
+        "xaxis2.ticktext": Array.isArray( layout?.xaxis2?.ticktext ) ? layout.xaxis2.ticktext : [],
+        "xaxis2.showticklabels": layout?.xaxis2?.showticklabels !== false,
+        "xaxis2.title.text": layout?.xaxis2?.title?.text ?? "",
+        "yaxis2.domain": Array.isArray( layout?.yaxis2?.domain ) ? layout.yaxis2.domain : [ 0, 0.44 ],
+        "yaxis2.showticklabels": layout?.yaxis2?.showticklabels !== false,
+        "yaxis2.title.text": layout?.yaxis2?.title?.text ?? "",
+        "xaxis3.domain": Array.isArray( layout?.xaxis3?.domain ) ? layout.xaxis3.domain : [ 0.6, 1 ],
+        "xaxis3.range": Array.isArray( layout?.xaxis3?.range ) ? layout.xaxis3.range : [ -0.5, 0.5 ],
+        "xaxis3.tickmode": layout?.xaxis3?.tickmode ?? "array",
+        "xaxis3.tickvals": Array.isArray( layout?.xaxis3?.tickvals ) ? layout.xaxis3.tickvals : [],
+        "xaxis3.ticktext": Array.isArray( layout?.xaxis3?.ticktext ) ? layout.xaxis3.ticktext : [],
+        "xaxis3.title.text": layout?.xaxis3?.title?.text ?? "",
+        "yaxis3.domain": Array.isArray( layout?.yaxis3?.domain ) ? layout.yaxis3.domain : [ 0, 1 ],
+        "yaxis3.range": Array.isArray( layout?.yaxis3?.range ) ? layout.yaxis3.range : [ -0.5, 0.5 ],
+        "yaxis3.autorange": layout?.yaxis3?.autorange ?? true,
+        "yaxis3.tickmode": layout?.yaxis3?.tickmode ?? "array",
+        "yaxis3.tickvals": Array.isArray( layout?.yaxis3?.tickvals ) ? layout.yaxis3.tickvals : [],
+        "yaxis3.ticktext": Array.isArray( layout?.yaxis3?.ticktext ) ? layout.yaxis3.ticktext : [],
+        "yaxis3.title.text": layout?.yaxis3?.title?.text ?? ""
+    }
 }
 
 function buildMeanTrace( x, y, xaxis, yaxis, color ){
@@ -1485,13 +2461,337 @@ function upperAxisLength( traces ){
     return maximum
 }
 
+function buildHeatmapPlaceholderTrace( width, height, xaxis = "x3", yaxis = "y3" ){
+
+    return {
+        type: "scatter",
+        mode: "lines",
+        x: [ -0.5, width - 0.5 ],
+        y: [ -0.5, height - 0.5 ],
+        xaxis,
+        yaxis,
+        line: {
+            color: "rgba(0, 0, 0, 0)",
+            width: 1
+        },
+        hoverinfo: "skip",
+        showlegend: false
+    }
+}
+
+function buildScalarHeatmapTrace( matrix, colorscale, xaxis = "x3", yaxis = "y3" ){
+
+    const height = matrix.length
+    const width = matrix[0].length
+    const x = Array.from({ length: width }, (_, index ) => index )
+    const y = Array.from({ length: height }, (_, index ) => index )
+
+    return {
+        type: "heatmap",
+        z: matrix,
+        x,
+        y,
+        xaxis,
+        yaxis,
+        colorscale: resolveHeatmapColorscale( colorscale ),
+        xgap: 0,
+        ygap: 0,
+        zsmooth: false,
+        showscale: false,
+        hovertemplate: "(%{x}, %{y})<br>Intensity: %{z}<extra></extra>"
+    }
+}
+
+function buildImageHeatmapTrace( imagePayload, xaxis = "x3", yaxis = "y3" ){
+
+    return {
+        type: "image",
+        source: imagePayload.source,
+        x0: 0,
+        y0: 0,
+        dx: 1,
+        dy: 1,
+        xaxis,
+        yaxis,
+        hovertemplate: "(%{x:.0f}, %{y:.0f})<extra></extra>"
+    }
+}
+
+function buildPanelMessageAnnotation( message ){
+
+    if( typeof message !== "string" || message.length === 0 ){
+        return []
+    }
+
+    return [ {
+        xref: "paper",
+        yref: "paper",
+        x: 0.5,
+        y: 0.5,
+        text: message,
+        showarrow: false,
+        align: "center",
+        font: {
+            color: "#4b5563",
+            size: 13
+        }
+    } ]
+}
+
+function buildStandaloneUpperPanelLayout( graphContainer, settings, topLeftPlot ){
+
+    const tickFontSize = settings?.font?.sizes?.axis ?? 14
+    const labelFontSize = settings?.font?.sizes?.label ?? 16
+    const leftPlotsReversed = settings?.layout?.leftPlotsReversed === "true"
+    const upperAxisTicks = valueLatexTicks( topLeftPlot.axisValues )
+    const showSpectrum = typeof topLeftPlot.message !== "string" || topLeftPlot.message.length === 0
+
+    var layout = {}
+    layout.autosize = true
+    layout.paper_bgcolor = "white"
+    layout.plot_bgcolor = "white"
+    layout.showlegend = false
+    layout.margin = {
+        t: 20,
+        r: 32,
+        b: 32,
+        l: 56
+    }
+    layout.xaxis = {
+        anchor: "y",
+        tickfont: { size: tickFontSize },
+        showgrid: false,
+        zeroline: false,
+        autorange: leftPlotsReversed ? "reversed" : true,
+        tickmode: "array",
+        tickvals: upperAxisTicks.tickvals,
+        ticktext: upperAxisTicks.ticktext,
+        showticklabels: showSpectrum
+    }
+    layout.yaxis = {
+        anchor: "x",
+        tickfont: { size: tickFontSize },
+        showgrid: false,
+        zeroline: false,
+        title: {
+            text: showSpectrum ? ( topLeftPlot.label ?? "" ) : "",
+            font: { size: labelFontSize }
+        },
+        showticklabels: showSpectrum
+    }
+
+    const annotations = buildPanelMessageAnnotation( topLeftPlot.message )
+    if( annotations.length > 0 ){
+        layout.annotations = annotations
+    }
+
+    return layout
+}
+
+function buildStandaloneLowerPanelLayout( graphContainer, settings, lowerPlot, axes ){
+
+    const tickFontSize = settings?.font?.sizes?.axis ?? 14
+    const labelFontSize = settings?.font?.sizes?.label ?? 16
+    const leftPlotsReversed = settings?.layout?.leftPlotsReversed === "true"
+    const spectralLabel = sanitizeLatexLabel( settings?.labels?.spectral, "\\nu" )
+    const showUnits = settings?.labels?.showUnits !== false && settings?.labels?.showUnits !== "false"
+    const spectralTitle = formatAxisTitle( spectralLabel, axes.zUnit, showUnits )
+    const lowerAxisTicks = valueLatexTicks( lowerPlot.axisValues )
+    const showSpectrum = typeof lowerPlot.message !== "string" || lowerPlot.message.length === 0
+
+    var layout = {}
+    layout.autosize = true
+    layout.paper_bgcolor = "white"
+    layout.plot_bgcolor = "white"
+    layout.showlegend = false
+    layout.margin = {
+        t: 20,
+        r: 32,
+        b: 52,
+        l: 56
+    }
+    layout.xaxis = {
+        anchor: "y",
+        tickfont: { size: tickFontSize },
+        showgrid: false,
+        zeroline: false,
+        autorange: leftPlotsReversed ? "reversed" : true,
+        tickmode: "array",
+        tickvals: lowerAxisTicks.tickvals,
+        ticktext: lowerAxisTicks.ticktext,
+        showticklabels: showSpectrum,
+        title: {
+            text: showSpectrum ? spectralTitle : "",
+            font: { size: labelFontSize }
+        }
+    }
+    layout.yaxis = {
+        anchor: "x",
+        tickfont: { size: tickFontSize },
+        showgrid: false,
+        zeroline: false,
+        title: {
+            text: showSpectrum ? "$$\\Large I$$" : "",
+            font: { size: labelFontSize }
+        },
+        showticklabels: showSpectrum
+    }
+
+    const annotations = buildPanelMessageAnnotation( lowerPlot.message )
+    if( annotations.length > 0 ){
+        layout.annotations = annotations
+    }
+
+    return layout
+}
+
+function buildHeatmapPaneLayout( width, height, graphContainer, settings, options = {} ){
+
+    const tickFontSize = settings?.font?.sizes?.axis ?? 14
+    const labelFontSize = settings?.font?.sizes?.label ?? 16
+    const showUnits = settings?.labels?.showUnits !== false && settings?.labels?.showUnits !== "false"
+    const heatmapOrigin = settings?.layout?.heatmapOrigin === "bottom-left" ? "bottom-left" : "top-left"
+    const axes = normalizeAxisMetadata( options?.axes )
+    const xTicks = indexedLatexTicks( width, options.heatmapXValues )
+    const yTicks = indexedLatexTicks( height, options.heatmapYValues )
+    const horizontalTitle = formatAxisTitle( sanitizeLatexLabel( settings?.labels?.horizontal, "x" ), axes.xUnit, showUnits )
+    const verticalTitle = formatAxisTitle( sanitizeLatexLabel( settings?.labels?.vertical, "y" ), axes.yUnit, showUnits )
+    const heatmapViewport = resolveHeatmapViewport( graphContainer,
+                                                    width,
+                                                    height,
+                                                    heatmapOrigin,
+                                                    STANDALONE_HEATMAP_AXIS_CONFIG )
+
+    var layout = {}
+    layout.autosize = true
+    layout.paper_bgcolor = "white"
+    layout.plot_bgcolor = "white"
+    layout.showlegend = false
+    layout.margin = {
+        t: 8,
+        r: 8,
+        b: 8,
+        l: 8
+    }
+    layout.xaxis = {
+        domain: [ 0, 1 ],
+        anchor: "y",
+        showgrid: false,
+        zeroline: false,
+        tickfont: { size: tickFontSize },
+        automargin: true,
+        ticks: "outside",
+        ticklen: 2,
+        ticklabelposition: "outside",
+        constrain: "domain",
+        constraintoward: "center",
+        autorange: false,
+        range: heatmapViewport.xRange,
+        tickmode: "array",
+        tickvals: xTicks.tickvals,
+        ticktext: xTicks.ticktext,
+        title: {
+            text: horizontalTitle,
+            font: { size: labelFontSize },
+            standoff: 2
+        }
+    }
+    layout.yaxis = {
+        domain: [ 0, 1 ],
+        anchor: "x",
+        showgrid: false,
+        zeroline: false,
+        tickfont: { size: tickFontSize },
+        automargin: true,
+        ticks: "outside",
+        ticklen: 2,
+        ticklabelposition: "outside",
+        constrain: "domain",
+        constraintoward: "middle",
+        scaleanchor: "x",
+        scaleratio: 1,
+        range: heatmapViewport.yRange,
+        tickmode: "array",
+        tickvals: yTicks.tickvals,
+        ticktext: yTicks.ticktext,
+        title: {
+            text: verticalTitle,
+            font: { size: labelFontSize },
+            standoff: 12
+        }
+    }
+
+    return layout
+}
+
+function buildUpperPanelFigure( graphContainer, settings, options = {} ){
+
+    const axes = normalizeAxisMetadata( options?.axes )
+    const defaultUpperAxisValues = resolveSeriesXValues(
+        axes.zValues,
+        Array.isArray( axes.zValues ) && axes.zValues.length > 0 ? axes.zValues.length : 1
+    )
+    const loadingTraces = buildLoadingTraces( options.loadings, options, "x", "y" )
+    const fallbackTraces = loadingTraces.length > 0
+        ? loadingTraces
+        : [ buildPlaceholderTrace( defaultUpperAxisValues, "x", "y" ) ]
+    const fallbackLabel = loadingTraces.length > 0 ? "$$\\Large p_{k}$$" : ""
+    const topLeftPlot = buildTopLeftTraces( settings,
+                                            options.topLeftSpectrum,
+                                            axes.zValues,
+                                            fallbackTraces,
+                                            fallbackLabel )
+
+    return {
+        traces: topLeftPlot.traces,
+        layout: buildStandaloneUpperPanelLayout( graphContainer, settings, topLeftPlot )
+    }
+}
+
+function buildLowerPanelFigure( graphContainer, settings, options = {} ){
+
+    const axes = normalizeAxisMetadata( options?.axes )
+    const lowerPlot = buildBottomLeftTraces( settings,
+                                             options.bottomLeftSpectrum,
+                                             options.selectedSpectrum,
+                                             axes.zValues,
+                                             "x",
+                                             "y" )
+
+    return {
+        traces: lowerPlot.traces,
+        layout: buildStandaloneLowerPanelLayout( graphContainer, settings, lowerPlot, axes )
+    }
+}
+
+function buildHeatmapPaneFigure( width, height, graphContainer, settings, options = {} ){
+
+    const axes = normalizeAxisMetadata( options?.axes )
+
+    return {
+        traces: [ buildHeatmapPlaceholderTrace( width, height, "x", "y" ) ],
+        layout: buildHeatmapPaneLayout( width,
+                                        height,
+                                        graphContainer,
+                                        settings,
+                                        {
+                                            axes,
+                                            heatmapXValues: axes.xValues,
+                                            heatmapYValues: axes.yValues
+                                        } ),
+        externalHeatmap: true,
+        heatmapPanelOnly: true
+    }
+}
+
 function buildFigure( matrix, graphContainer, settings, options = {} ){
 
     const height = matrix.length
     const width = matrix[0].length
+    if( options?.panelMode === "heatmap-only" ){
+        return buildHeatmapPaneFigure( width, height, graphContainer, settings, options )
+    }
     const axes = normalizeAxisMetadata( options?.axes )
-    const x = Array.from({ length: width }, (_, index ) => index )
-    const y = Array.from({ length: height }, (_, index ) => index )
 
     const defaultUpperAxisValues = resolveSeriesXValues( axes.zValues,
                                                          Array.isArray( axes.zValues ) && axes.zValues.length > 0 ? axes.zValues.length : 1 )
@@ -1506,20 +2806,10 @@ function buildFigure( matrix, graphContainer, settings, options = {} ){
                                              options.bottomLeftSpectrum,
                                              options.selectedSpectrum,
                                              axes.zValues )
-
-    var heatmapTrace = {}
-    heatmapTrace.type = "heatmap"
-    heatmapTrace.z = matrix
-    heatmapTrace.x = x
-    heatmapTrace.y = y
-    heatmapTrace.xaxis = "x3"
-    heatmapTrace.yaxis = "y3"
-    heatmapTrace.colorscale = resolveHeatmapColorscale( options.colorscale )
-    heatmapTrace.xgap = 0
-    heatmapTrace.ygap = 0
-    heatmapTrace.zsmooth = false
-    heatmapTrace.showscale = false
-    heatmapTrace.hovertemplate = "(%{x}, %{y})<br>Intensity: %{z}<extra></extra>"
+    const useExternalRenderer = shouldUseExternalHeatmapRenderer( options )
+    const heatmapTrace = useExternalRenderer
+        ? buildHeatmapPlaceholderTrace( width, height )
+        : buildScalarHeatmapTrace( matrix, options.colorscale )
 
     const layout = buildBaseLayout( width,
                                     height,
@@ -1535,12 +2825,13 @@ function buildFigure( matrix, graphContainer, settings, options = {} ){
                                         lowerPanelMessage: lowerPlot.message,
                                         heatmapXValues: axes.xValues,
                                         heatmapYValues: axes.yValues,
-                                        roiOverlays: options.roiOverlays
+                                        roiOverlays: useExternalRenderer ? [] : options.roiOverlays
                                     } )
 
     return {
         traces: [ ...topLeftPlot.traces, ...lowerPlot.traces, heatmapTrace ],
-        layout
+        layout,
+        externalHeatmap: useExternalRenderer
     }
 }
 
@@ -1548,10 +2839,10 @@ function buildRgbFigure( rgbComposite, graphContainer, settings, options = {} ){
 
     const width = rgbComposite.width
     const height = rgbComposite.height
+    if( options?.panelMode === "heatmap-only" ){
+        return buildHeatmapPaneFigure( width, height, graphContainer, settings, options )
+    }
     const axes = normalizeAxisMetadata( options?.axes )
-
-    const x = Array.from({ length: width }, (_, index ) => index )
-    const y = Array.from({ length: height }, (_, index ) => index )
 
     const defaultUpperAxisValues = resolveSeriesXValues( axes.zValues,
                                                          Array.isArray( axes.zValues ) && axes.zValues.length > 0 ? axes.zValues.length : 1 )
@@ -1566,17 +2857,10 @@ function buildRgbFigure( rgbComposite, graphContainer, settings, options = {} ){
                                              options.bottomLeftSpectrum,
                                              options.selectedSpectrum,
                                              axes.zValues )
-
-    var rgbTrace = {}
-    rgbTrace.type = "image"
-    rgbTrace.source = rgbComposite.source
-    rgbTrace.x0 = 0
-    rgbTrace.y0 = 0
-    rgbTrace.dx = 1
-    rgbTrace.dy = 1
-    rgbTrace.xaxis = "x3"
-    rgbTrace.yaxis = "y3"
-    rgbTrace.hovertemplate = "(%{x:.0f}, %{y:.0f})<extra></extra>"
+    const useExternalRenderer = shouldUseExternalHeatmapRenderer( options )
+    const rgbTrace = useExternalRenderer
+        ? buildHeatmapPlaceholderTrace( width, height )
+        : buildImageHeatmapTrace( rgbComposite )
 
     const layout = buildBaseLayout( width,
                                     height,
@@ -1592,12 +2876,13 @@ function buildRgbFigure( rgbComposite, graphContainer, settings, options = {} ){
                                         lowerPanelMessage: lowerPlot.message,
                                         heatmapXValues: axes.xValues,
                                         heatmapYValues: axes.yValues,
-                                        roiOverlays: options.roiOverlays
+                                        roiOverlays: useExternalRenderer ? [] : options.roiOverlays
                                     } )
 
     return {
         traces: [ ...topLeftPlot.traces, ...lowerPlot.traces, rgbTrace ],
-        layout
+        layout,
+        externalHeatmap: useExternalRenderer
     }
 }
 
@@ -1605,6 +2890,9 @@ function buildPcaFigure( classification, graphContainer, settings, options = {} 
 
     const width = classification.width
     const height = classification.height
+    if( options?.panelMode === "heatmap-only" ){
+        return buildHeatmapPaneFigure( width, height, graphContainer, settings, options )
+    }
     const axes = normalizeAxisMetadata( options?.axes )
 
     const x = Array.from({ length: width }, (_, index ) => index )
@@ -1624,17 +2912,10 @@ function buildPcaFigure( classification, graphContainer, settings, options = {} 
                                              options.bottomLeftSpectrum,
                                              options.selectedSpectrum,
                                              axes.zValues )
-
-    var classificationTrace = {}
-    classificationTrace.type = "image"
-    classificationTrace.source = classification.source
-    classificationTrace.x0 = 0
-    classificationTrace.y0 = 0
-    classificationTrace.dx = 1
-    classificationTrace.dy = 1
-    classificationTrace.xaxis = "x3"
-    classificationTrace.yaxis = "y3"
-    classificationTrace.hovertemplate = "(%{x:.0f}, %{y:.0f})<extra></extra>"
+    const useExternalRenderer = shouldUseExternalHeatmapRenderer( options )
+    const classificationTrace = useExternalRenderer
+        ? buildHeatmapPlaceholderTrace( width, height )
+        : buildImageHeatmapTrace( classification )
 
     const layout = buildBaseLayout( width,
                                     height,
@@ -1650,12 +2931,13 @@ function buildPcaFigure( classification, graphContainer, settings, options = {} 
                                         lowerPanelMessage: lowerPlot.message,
                                         heatmapXValues: axes.xValues,
                                         heatmapYValues: axes.yValues,
-                                        roiOverlays: options.roiOverlays
+                                        roiOverlays: useExternalRenderer ? [] : options.roiOverlays
                                     } )
 
     return {
         traces: [ ...topLeftPlot.traces, ...lowerPlot.traces, classificationTrace ],
-        layout
+        layout,
+        externalHeatmap: useExternalRenderer
     }
 }
 
@@ -1663,6 +2945,9 @@ function buildPcaMipFigure( rgbComposite, graphContainer, settings, options = {}
 
     const width = rgbComposite.width
     const height = rgbComposite.height
+    if( options?.panelMode === "heatmap-only" ){
+        return buildHeatmapPaneFigure( width, height, graphContainer, settings, options )
+    }
     const axes = normalizeAxisMetadata( options?.axes )
 
     const loadingTraces = buildLoadingTraces( options.loadings, options, "x", "y" )
@@ -1679,17 +2964,10 @@ function buildPcaMipFigure( rgbComposite, graphContainer, settings, options = {}
                                              options.bottomLeftSpectrum,
                                              options.selectedSpectrum,
                                              axes.zValues )
-
-    var rgbTrace = {}
-    rgbTrace.type = "image"
-    rgbTrace.source = rgbComposite.source
-    rgbTrace.x0 = 0
-    rgbTrace.y0 = 0
-    rgbTrace.dx = 1
-    rgbTrace.dy = 1
-    rgbTrace.xaxis = "x3"
-    rgbTrace.yaxis = "y3"
-    rgbTrace.hovertemplate = "(%{x:.0f}, %{y:.0f})<extra></extra>"
+    const useExternalRenderer = shouldUseExternalHeatmapRenderer( options )
+    const rgbTrace = useExternalRenderer
+        ? buildHeatmapPlaceholderTrace( width, height )
+        : buildImageHeatmapTrace( rgbComposite )
 
     const layout = buildBaseLayout( width,
                                     height,
@@ -1705,12 +2983,13 @@ function buildPcaMipFigure( rgbComposite, graphContainer, settings, options = {}
                                         lowerPanelMessage: lowerPlot.message,
                                         heatmapXValues: axes.xValues,
                                         heatmapYValues: axes.yValues,
-                                        roiOverlays: options.roiOverlays
+                                        roiOverlays: useExternalRenderer ? [] : options.roiOverlays
                                     } )
 
     return {
         traces: [ ...topLeftPlot.traces, ...lowerPlot.traces, rgbTrace ],
-        layout
+        layout,
+        externalHeatmap: useExternalRenderer
     }
 }
 
@@ -1718,10 +2997,10 @@ function buildPcaRgbFigure( rgbComposite, graphContainer, settings, options = {}
 
     const width = rgbComposite.width
     const height = rgbComposite.height
+    if( options?.panelMode === "heatmap-only" ){
+        return buildHeatmapPaneFigure( width, height, graphContainer, settings, options )
+    }
     const axes = normalizeAxisMetadata( options?.axes )
-
-    const x = Array.from({ length: width }, (_, index ) => index )
-    const y = Array.from({ length: height }, (_, index ) => index )
 
     const loadingTraces = buildLoadingTraces( options.loadings, options, "x", "y" )
 
@@ -1737,17 +3016,10 @@ function buildPcaRgbFigure( rgbComposite, graphContainer, settings, options = {}
                                              options.bottomLeftSpectrum,
                                              options.selectedSpectrum,
                                              axes.zValues )
-
-    var rgbTrace = {}
-    rgbTrace.type = "image"
-    rgbTrace.source = rgbComposite.source
-    rgbTrace.x0 = 0
-    rgbTrace.y0 = 0
-    rgbTrace.dx = 1
-    rgbTrace.dy = 1
-    rgbTrace.xaxis = "x3"
-    rgbTrace.yaxis = "y3"
-    rgbTrace.hovertemplate = "(%{x:.0f}, %{y:.0f})<extra></extra>"
+    const useExternalRenderer = shouldUseExternalHeatmapRenderer( options )
+    const rgbTrace = useExternalRenderer
+        ? buildHeatmapPlaceholderTrace( width, height )
+        : buildImageHeatmapTrace( rgbComposite )
 
     const layout = buildBaseLayout( width,
                                     height,
@@ -1763,12 +3035,13 @@ function buildPcaRgbFigure( rgbComposite, graphContainer, settings, options = {}
                                         lowerPanelMessage: lowerPlot.message,
                                         heatmapXValues: axes.xValues,
                                         heatmapYValues: axes.yValues,
-                                        roiOverlays: options.roiOverlays
+                                        roiOverlays: useExternalRenderer ? [] : options.roiOverlays
                                     } )
 
     return {
         traces: [ ...topLeftPlot.traces, ...lowerPlot.traces, rgbTrace ],
-        layout
+        layout,
+        externalHeatmap: useExternalRenderer
     }
 }
 
@@ -1896,9 +3169,7 @@ function buildBaseLayout( width, height, graphContainer, settings, upperLeftLabe
     layout.yaxis3.constrain = "domain"
     layout.yaxis3.scaleanchor = false
     layout.yaxis3.range = heatmapViewport.yRange
-    layout.yaxis3.autorange = heatmapViewport.preserved
-        ? false
-        : ( heatmapOrigin === "top-left" ? "reversed" : true )
+    layout.yaxis3.autorange = false
     layout.yaxis3.tickmode = "array"
     layout.yaxis3.tickvals = yTicks.tickvals
     layout.yaxis3.ticktext = yTicks.ticktext
@@ -1966,7 +3237,11 @@ function buildBaseLayout( width, height, graphContainer, settings, upperLeftLabe
     return layout
 }
 
-function resolveHeatmapViewport( graphContainer, width, height, heatmapOrigin ){
+function resolveHeatmapViewport( graphContainer,
+                                 width,
+                                 height,
+                                 heatmapOrigin,
+                                 axisConfig = FULL_HEATMAP_AXIS_CONFIG ){
 
     const minimumX = -0.5
     const maximumX = width - 0.5
@@ -1983,8 +3258,8 @@ function resolveHeatmapViewport( graphContainer, width, height, heatmapOrigin ){
         preserved: false
     }
 
-    const existingXRange = sanitizeAxisRange( graphContainer?.layout?.xaxis3?.range )
-    const existingYRange = sanitizeAxisRange( graphContainer?.layout?.yaxis3?.range )
+    const existingXRange = sanitizeAxisRange( graphContainer?.layout?.[ axisConfig.xaxisKey ]?.range )
+    const existingYRange = sanitizeAxisRange( graphContainer?.layout?.[ axisConfig.yaxisKey ]?.range )
 
     if( existingXRange === null || existingYRange === null ){
         return defaultViewport
@@ -2013,6 +3288,19 @@ function sanitizeAxisRange( range ){
     return [ start, end ]
 }
 
+function normalizeViewportRange( range ){
+
+    const sanitizedRange = sanitizeAxisRange( range )
+    if( sanitizedRange === null ){
+        return null
+    }
+
+    return [
+        Math.min( Number( sanitizedRange[0] ), Number( sanitizedRange[1] )),
+        Math.max( Number( sanitizedRange[0] ), Number( sanitizedRange[1] ))
+    ]
+}
+
 function clampAxisRange( range, minimum, maximum ){
 
     const start = Math.max( minimum, Math.min( maximum, Number( range[0] )))
@@ -2023,6 +3311,131 @@ function clampAxisRange( range, minimum, maximum ){
     }
 
     return [ start, end ]
+}
+
+function resolveExternalRendererYRange( graphContainer, axisYRange ){
+
+    const sanitizedAxisYRange = sanitizeAxisRange( axisYRange )
+    if( sanitizedAxisYRange === null ){
+        return null
+    }
+
+    const heatmapOrigin = resolveStoredHeatmapOrigin(
+        graphContainer,
+        sanitizedAxisYRange[0] > sanitizedAxisYRange[1] ? "top-left" : "bottom-left"
+    )
+
+    if( heatmapOrigin !== "top-left" ){
+        return sanitizedAxisYRange
+    }
+
+    const payloadHeight = Number( graphContainer?.__harkanaHeatmapRendererPayload?.height )
+    if( Number.isFinite( payloadHeight ) === false || payloadHeight <= 0 ){
+        return sanitizedAxisYRange
+    }
+
+    const mirroredRange = sanitizedAxisYRange.map(( value ) => {
+        return ( payloadHeight - 1 ) - Number( value )
+    })
+
+    return sanitizeAxisRange( mirroredRange ) ?? sanitizedAxisYRange
+}
+
+function getHeatmapPaneState( graphContainer ){
+
+    if( !graphContainer ) return null
+
+    const axisConfig = resolveHeatmapAxisConfig( graphContainer )
+    const fullLayout = graphContainer._fullLayout ?? graphContainer.layout
+    const xaxis = fullLayout?.[ axisConfig.xaxisKey ] ?? graphContainer?.layout?.[ axisConfig.xaxisKey ]
+    const yaxis = fullLayout?.[ axisConfig.yaxisKey ] ?? graphContainer?.layout?.[ axisConfig.yaxisKey ]
+    const pixelWindow = resolveHeatmapPixelWindow( graphContainer, fullLayout, xaxis, yaxis )
+    const xRange = sanitizeAxisRange( xaxis?.range ?? graphContainer?.layout?.[ axisConfig.xaxisKey ]?.range )
+    const yRange = sanitizeAxisRange( yaxis?.range ?? graphContainer?.layout?.[ axisConfig.yaxisKey ]?.range )
+
+    if( pixelWindow === null || xRange === null || yRange === null ){
+        return null
+    }
+
+    return {
+        pixelBounds: {
+            left: pixelWindow.xOffset,
+            top: pixelWindow.yOffset,
+            width: pixelWindow.xLength,
+            height: pixelWindow.yLength
+        },
+        xRange,
+        yRange,
+        renderYRange: resolveExternalRendererYRange( graphContainer, yRange ),
+        heatmapOrigin: resolveStoredHeatmapOrigin(
+            graphContainer,
+            yRange[0] > yRange[1] ? "top-left" : "bottom-left"
+        )
+    }
+}
+
+function getHeatmapRendererPayload( graphContainer ){
+
+    if( !graphContainer ) return null
+    return graphContainer.__harkanaHeatmapRendererPayload ?? null
+}
+
+async function relayoutHeatmapViewport( graphContainer, xRange, yRange ){
+
+    if( !graphContainer ) return
+
+    const axisConfig = resolveHeatmapAxisConfig( graphContainer )
+    const nextXRange = normalizeViewportRange( xRange )
+    const nextYRange = normalizeViewportRange( yRange )
+    const currentYRange = sanitizeAxisRange(
+        graphContainer?._fullLayout?.[ axisConfig.yaxisKey ]?.range ??
+        graphContainer?.layout?.[ axisConfig.yaxisKey ]?.range
+    )
+    const heatmapOrigin = resolveStoredHeatmapOrigin(
+        graphContainer,
+        currentYRange !== null && Number( currentYRange[0] ) > Number( currentYRange[1] ) ? "top-left" : "bottom-left"
+    )
+
+    if( nextXRange === null || nextYRange === null ){
+        return
+    }
+
+    const resolvedYRange = heatmapOrigin === "top-left"
+        ? [ nextYRange[1], nextYRange[0] ]
+        : [ nextYRange[0], nextYRange[1] ]
+
+    await Plotly.relayout( graphContainer, {
+        [ `${axisConfig.xaxisKey}.autorange` ]: false,
+        [ `${axisConfig.yaxisKey}.autorange` ]: false,
+        [ `${axisConfig.xaxisKey}.range` ]: nextXRange,
+        [ `${axisConfig.yaxisKey}.range` ]: resolvedYRange
+    } )
+}
+
+async function resetHeatmapViewport( graphContainer, width, height, heatmapOrigin = "top-left" ){
+
+    if( !graphContainer ) return
+
+    const numericWidth = Number( width )
+    const numericHeight = Number( height )
+    if( Number.isFinite( numericWidth ) === false || Number.isFinite( numericHeight ) === false ){
+        return
+    }
+
+    const minimumX = -0.5
+    const maximumX = numericWidth - 0.5
+    const minimumY = -0.5
+    const maximumY = numericHeight - 0.5
+    const normalizedHeatmapOrigin = resolveStoredHeatmapOrigin( graphContainer, heatmapOrigin )
+    const yRange = normalizedHeatmapOrigin === "top-left"
+        ? [ maximumY, minimumY ]
+        : [ minimumY, maximumY ]
+
+    await relayoutHeatmapViewport(
+        graphContainer,
+        [ minimumX, maximumX ],
+        yRange
+    )
 }
 
 function buildSidePanelInstructionAnnotations( layout, upperMessage = "", lowerMessage = "" ){
@@ -2267,6 +3680,251 @@ function resolveHeatmapColorscale( colorscale ){
     return "Viridis"
 }
 
+function resolveExternalHeatmapColorscale( colorscale ){
+
+    const scaleName = resolveHeatmapColorscale( colorscale )
+    return EXTERNAL_HEATMAP_COLOR_SCALES[scaleName] ?? EXTERNAL_HEATMAP_COLOR_SCALES.Viridis
+}
+
+function matrixFiniteRange( matrix ){
+
+    var minimum = Infinity
+    var maximum = -Infinity
+
+    for( const row of matrix ){
+        for( const value of row ){
+            const numeric = Number( value )
+            if( Number.isFinite( numeric ) === false ) continue
+            if( numeric < minimum ) minimum = numeric
+            if( numeric > maximum ) maximum = numeric
+        }
+    }
+
+    if( minimum === Infinity || maximum === -Infinity ){
+        return { minimum: 0, maximum: 1 }
+    }
+
+    if( maximum <= minimum ){
+        return { minimum, maximum: minimum + 1 }
+    }
+
+    return { minimum, maximum }
+}
+
+function interpolateColorStop( lower, upper, fraction ){
+
+    const lowerColor = parseColorValue( lower?.[1] ) ?? [ 0, 0, 0 ]
+    const upperColor = parseColorValue( upper?.[1] ) ?? lowerColor
+    const amount = clampUnit( fraction )
+
+    return [
+        Math.round( lowerColor[0] + amount * ( upperColor[0] - lowerColor[0] )),
+        Math.round( lowerColor[1] + amount * ( upperColor[1] - lowerColor[1] )),
+        Math.round( lowerColor[2] + amount * ( upperColor[2] - lowerColor[2] ))
+    ]
+}
+
+function colorFromScale( scale, normalizedValue ){
+
+    const stops = Array.isArray( scale ) && scale.length > 0 ? scale : EXTERNAL_HEATMAP_COLOR_SCALES.Viridis
+    const clampedValue = clampUnit( normalizedValue )
+
+    for( var index = 1; index < stops.length; index++ ){
+
+        const lower = stops[index - 1]
+        const upper = stops[index]
+        const lowerOffset = Number( lower?.[0] )
+        const upperOffset = Number( upper?.[0] )
+
+        if( Number.isFinite( lowerOffset ) === false || Number.isFinite( upperOffset ) === false ){
+            continue
+        }
+
+        if( clampedValue <= upperOffset || index === stops.length - 1 ){
+            const denominator = upperOffset - lowerOffset
+            const fraction = denominator > 0 ? ( clampedValue - lowerOffset ) / denominator : 0
+            return interpolateColorStop( lower, upper, fraction )
+        }
+    }
+
+    return parseColorValue( stops[stops.length - 1]?.[1] ) ?? [ 253, 231, 37 ]
+}
+
+function buildScalarColorMapTextureSource( colorscale ){
+
+    const resolvedColorscale = resolveHeatmapColorscale( colorscale )
+    const cachedTextureSource = scalarColorMapTextureSources.get( resolvedColorscale ) ?? null
+    if( cachedTextureSource !== null ){
+        return cachedTextureSource
+    }
+
+    const scale = resolveExternalHeatmapColorscale( resolvedColorscale )
+    const textureData = new Uint8Array( SCALAR_COLOR_MAP_TEXTURE_SIZE * 4 )
+
+    for( var index = 0; index < SCALAR_COLOR_MAP_TEXTURE_SIZE; index++ ){
+
+        const normalizedValue = SCALAR_COLOR_MAP_TEXTURE_SIZE <= 1
+            ? 0
+            : index / ( SCALAR_COLOR_MAP_TEXTURE_SIZE - 1 )
+        const color = colorFromScale( scale, normalizedValue )
+        const offset = index * 4
+
+        textureData[offset] = color[0]
+        textureData[offset + 1] = color[1]
+        textureData[offset + 2] = color[2]
+        textureData[offset + 3] = 255
+    }
+
+    const textureSource = {
+        width: SCALAR_COLOR_MAP_TEXTURE_SIZE,
+        height: 1,
+        format: "rgba8unorm",
+        data: textureData
+    }
+
+    scalarColorMapTextureSources.set( resolvedColorscale, textureSource )
+    return textureSource
+}
+
+function buildScalarIntensityTextureSource( matrix ){
+
+    const normalizedMatrix = normalizeMip( matrix )
+    const cachedTextureSource = scalarIntensityTextureSources.get( normalizedMatrix ) ?? null
+    if( cachedTextureSource !== null ){
+        return cachedTextureSource
+    }
+
+    const height = normalizedMatrix.length
+    const width = normalizedMatrix[0].length
+    const valueRange = matrixFiniteRange( normalizedMatrix )
+    const textureData = new Uint8Array( width * height * 2 )
+    let offset = 0
+
+    for( let row = 0; row < height; row++ ){
+        for( let col = 0; col < width; col++ ){
+
+            const value = Number( normalizedMatrix[row][col] )
+            if( Number.isFinite( value ) === false ){
+                textureData[offset++] = 0
+                textureData[offset++] = 0
+                continue
+            }
+
+            const normalizedValue = clampUnit(( value - valueRange.minimum ) / ( valueRange.maximum - valueRange.minimum ))
+            textureData[offset++] = Math.max( 0, Math.min( 255, Math.round( normalizedValue * 255 )))
+            textureData[offset++] = 255
+        }
+    }
+
+    const textureSource = {
+        width,
+        height,
+        format: "rg8unorm",
+        data: textureData
+    }
+
+    scalarIntensityTextureSources.set( normalizedMatrix, textureSource )
+    return textureSource
+}
+
+function buildCanvasImagePayload( canvas, width, height, extra = {}, options = {} ){
+
+    const payload = {
+        kind: "bitmap",
+        canvas,
+        width,
+        height,
+        ...extra
+    }
+
+    if( options.includeSource !== false ){
+        payload.source = canvas.toDataURL( "image/png" )
+    }
+
+    return payload
+}
+
+function buildCanvasFromRgbaPayload( rgbaPayload ){
+
+    const width = Math.max( 1, Number.parseInt( rgbaPayload?.width, 10 ) || 1 )
+    const height = Math.max( 1, Number.parseInt( rgbaPayload?.height, 10 ) || 1 )
+    const rgba = rgbaPayload?.rgba instanceof Uint8ClampedArray
+        ? rgbaPayload.rgba
+        : new Uint8ClampedArray( rgbaPayload?.rgba ?? [] )
+
+    if( typeof document === "undefined" ){
+        throw new Error( "Bitmap payload materialization requires a browser environment." )
+    }
+
+    const canvas = document.createElement( "canvas" )
+    canvas.width = width
+    canvas.height = height
+
+    const context = canvas.getContext( "2d" )
+    if( context === null ){
+        throw new Error( "Unable to create canvas context for bitmap payload materialization." )
+    }
+
+    const imageData = context.createImageData( width, height )
+    imageData.data.set( rgba )
+    context.putImageData( imageData, 0, 0 )
+
+	return { canvas, width, height }
+}
+
+async function buildBitmapPayloadFromRgbaPayloadAsync( rgbaPayload, extra = {}, options = {} ){
+
+	const width = Math.max( 1, Number.parseInt( rgbaPayload?.width, 10 ) || 1 )
+	const height = Math.max( 1, Number.parseInt( rgbaPayload?.height, 10 ) || 1 )
+	const rgba = rgbaPayload?.rgba instanceof Uint8ClampedArray
+		? rgbaPayload.rgba
+		: new Uint8ClampedArray( rgbaPayload?.rgba ?? [] )
+
+	if( typeof createImageBitmap === "function" && typeof ImageData !== "undefined" ){
+		try{
+			const imageData = new ImageData( rgba, width, height )
+			const image = await createImageBitmap( imageData )
+			return {
+				kind: "bitmap",
+				image,
+				width,
+				height,
+				...extra
+			}
+		} catch( error ){
+			console.log( error )
+		}
+	}
+
+	const { canvas } = buildCanvasFromRgbaPayload({ width, height, rgba })
+	return buildCanvasImagePayload( canvas, width, height, extra, options )
+}
+
+function dimensionStubMatrix( width, height ){
+
+    const normalizedWidth = Math.max( 1, Number.parseInt( width, 10 ) || 1 )
+    const normalizedHeight = Math.max( 1, Number.parseInt( height, 10 ) || 1 )
+    const rows = new Array( normalizedHeight )
+    rows[0] = { length: normalizedWidth }
+
+    return rows
+}
+
+function buildScalarHeatmapPayload( matrix, colorscale ){
+
+    const normalizedMatrix = normalizeMip( matrix )
+    const height = normalizedMatrix.length
+    const width = normalizedMatrix[0].length
+
+    return {
+        kind: "scalar-texture",
+        width,
+        height,
+        textureSource: buildScalarIntensityTextureSource( normalizedMatrix ),
+        colorMapTexture: buildScalarColorMapTextureSource( colorscale )
+    }
+}
+
 function formatAxisUnitSuffix( unit ){
 
     const normalized = String( unit ?? "" ).trim()
@@ -2304,6 +3962,12 @@ function formatAxisUnitSuffix( unit ){
 
 function normalizeMip( mip ){
 
+    if( mip !== null &&
+        typeof mip === "object" &&
+        normalizedMipCache.has( mip ) ){
+        return normalizedMipCache.get( mip )
+    }
+
     if( Array.isArray( mip ) === false || mip.length === 0 ){
         throw new Error( "MIP must be a non-empty 2D array." )
     }
@@ -2319,6 +3983,10 @@ function normalizeMip( mip ){
         }
 
         matrix.push( row.map(( value ) => Number.isFinite( Number( value )) ? Number( value ) : null ))
+    }
+
+    if( mip !== null && typeof mip === "object" ){
+        normalizedMipCache.set( mip, matrix )
     }
 
     return matrix
@@ -2452,6 +4120,12 @@ function normalizePcaMip( pcaMip ){
 
 function normalizePcaScores( scoresByComponent ){
 
+    if( scoresByComponent !== null &&
+        typeof scoresByComponent === "object" &&
+        normalizedPcaScoresCache.has( scoresByComponent ) ){
+        return normalizedPcaScoresCache.get( scoresByComponent )
+    }
+
     var entries = []
 
     if( Array.isArray( scoresByComponent ) ){
@@ -2483,7 +4157,105 @@ function normalizePcaScores( scoresByComponent ){
         }
     }
 
+    if( scoresByComponent !== null && typeof scoresByComponent === "object" ){
+        normalizedPcaScoresCache.set( scoresByComponent, entries )
+    }
+
     return entries
+}
+
+function resolveZBlendPalette( palette ){
+
+    const source = Array.isArray( palette ) && palette.length > 0
+        ? palette
+        : DEFAULT_Z_BLEND_PALETTE_COLOR_STRINGS
+
+    const resolvedPalette = source
+        .map(( color ) => parseColorValue( color ))
+        .filter(( color ) => color !== null )
+
+    if( resolvedPalette.length > 0 ){
+        return resolvedPalette
+    }
+
+    return DEFAULT_Z_BLEND_PALETTE_COLOR_STRINGS
+        .map(( color ) => parseColorValue( color ))
+        .filter(( color ) => color !== null )
+}
+
+function normalizeZBlendSource( zBlendSource ){
+
+    if( zBlendSource === null || typeof zBlendSource !== "object" ){
+        throw new Error( "Z-blend source must be an object." )
+    }
+
+    const channels = Array.isArray( zBlendSource.channels ) ? zBlendSource.channels : []
+    if( channels.length === 0 ){
+        throw new Error( "Z-blend source must include at least one channel." )
+    }
+
+    const palette = resolveZBlendPalette( zBlendSource.palette )
+    var normalizedChannels = []
+
+    for( let index = 0; index < channels.length; index++ ){
+        const channel = channels[index] ?? {}
+        const matrix = normalizeMip( channel.matrix )
+        const color = parseColorValue( channel.color ) ?? palette[index % palette.length]
+        const intensityMaximum = resolveZBlendIntensityMaximum( channel.intensityMaximum, matrix )
+        const clampMin = clampZBlendWindowValue( channel.clampMin, 0, intensityMaximum )
+        const clampMax = clampZBlendWindowValue( channel.clampMax, intensityMaximum, intensityMaximum )
+
+        normalizedChannels.push({
+            enabled: channel.enabled !== false,
+            requestedZ: Number.isFinite( Number( channel.requestedZ )) ? Number( channel.requestedZ ) : index,
+            resolvedLayerIndex: Number.isInteger( Number( channel.resolvedLayerIndex ) )
+                ? Number( channel.resolvedLayerIndex )
+                : index,
+            resolvedZ: Number.isFinite( Number( channel.resolvedZ ))
+                ? Number( channel.resolvedZ )
+                : index,
+            clampMin: Math.min( clampMin, clampMax ),
+            clampMax: Math.max( clampMin, clampMax ),
+            intensityMaximum,
+            color,
+            matrix
+        })
+    }
+
+    const width = normalizedChannels[0].matrix[0].length
+    const height = normalizedChannels[0].matrix.length
+
+    for( const channel of normalizedChannels ){
+        if( channel.matrix.length !== height || channel.matrix[0].length !== width ){
+            throw new Error( "All z-blend channel matrices must have the same dimensions." )
+        }
+    }
+
+    return {
+        kind: "z-blend-source",
+        palette,
+        channels: normalizedChannels,
+        width,
+        height
+    }
+}
+
+function zBlendPayloadSignature( zBlendSource ){
+
+    const normalizedSource = normalizeZBlendSource( zBlendSource )
+
+    return normalizedSource.channels.map(( channel ) => {
+        return [
+            "req=" + channel.requestedZ,
+            "layer=" + channel.resolvedLayerIndex,
+            "z=" + channel.resolvedZ,
+            "enabled=" + ( channel.enabled === false ? "0" : "1" ),
+            "max=" + channel.intensityMaximum.toFixed( 6 ),
+            "clamp=" + channel.clampMin.toFixed( 4 ) + ":" + channel.clampMax.toFixed( 4 ),
+            "color=" + channel.color.join( "," ),
+            "matrix=" + heatmapPayloadObjectKey( channel.matrix )
+        ].join( "," )
+    }).join( "|" )
 }
 
 function parsePcaComponentKey( key ){
@@ -2503,7 +4275,7 @@ function parsePcaComponentKey( key ){
     return parsed
 }
 
-function buildRgbMipImage( rgbMatrix ){
+function buildRgbMipImage( rgbMatrix, options = {} ){
 
     const height = rgbMatrix.length
     const width = rgbMatrix[0].length
@@ -2522,7 +4294,10 @@ function buildRgbMipImage( rgbMatrix ){
     }
 
     const imageData = context.createImageData( width, height )
-    var intensityMatrix = Array.from({ length: height }, () => Array( width ).fill( 0 ))
+    const includePixelMetrics = options?.includePixelMetrics === true
+    var intensityMatrix = includePixelMetrics
+        ? Array.from({ length: height }, () => Array( width ).fill( 0 ))
+        : null
 
     var offset = 0
     for( var row = 0; row < height; row++ ){
@@ -2538,18 +4313,16 @@ function buildRgbMipImage( rgbMatrix ){
             imageData.data[offset++] = Math.max( 0, Math.min( 255, Math.round( blue )))
             imageData.data[offset++] = 255
 
-            intensityMatrix[row][col] = ( red + green + blue ) / ( 3 * 255 )
+            if( includePixelMetrics ){
+                intensityMatrix[row][col] = ( red + green + blue ) / ( 3 * 255 )
+            }
         }
     }
 
     context.putImageData( imageData, 0, 0 )
 
-    return {
-        source: canvas.toDataURL( "image/png" ),
-        width,
-        height,
-        intensityMatrix
-    }
+    const extraPayload = includePixelMetrics ? { intensityMatrix } : {}
+    return buildCanvasImagePayload( canvas, width, height, extraPayload, options )
 }
 
 function buildUmapImage( umapChannels, options = {} ){
@@ -2577,7 +4350,10 @@ function buildUmapImage( umapChannels, options = {} ){
     }
 
     const imageData = context.createImageData( width, height )
-    var intensityMatrix = Array.from({ length: height }, () => Array( width ).fill( 0 ))
+    const includePixelMetrics = options?.includePixelMetrics === true
+    var intensityMatrix = includePixelMetrics
+        ? Array.from({ length: height }, () => Array( width ).fill( 0 ))
+        : null
 
     var offset = 0
     for( var row = 0; row < height; row++ ){
@@ -2614,18 +4390,16 @@ function buildUmapImage( umapChannels, options = {} ){
             imageData.data[offset++] = blueValue
             imageData.data[offset++] = 255
 
-            intensityMatrix[row][col] = ( redWeight + greenWeight + blueWeight ) / 3
+            if( includePixelMetrics ){
+                intensityMatrix[row][col] = ( redWeight + greenWeight + blueWeight ) / 3
+            }
         }
     }
 
     context.putImageData( imageData, 0, 0 )
 
-    return {
-        source: canvas.toDataURL( "image/png" ),
-        width,
-        height,
-        intensityMatrix
-    }
+    const extraPayload = includePixelMetrics ? { intensityMatrix } : {}
+    return buildCanvasImagePayload( canvas, width, height, extraPayload, options )
 }
 
 function buildPcaMipImage( pcaMipMatrix, options = {} ){
@@ -2648,7 +4422,10 @@ function buildPcaMipImage( pcaMipMatrix, options = {} ){
     }
 
     const imageData = context.createImageData( width, height )
-    var intensityMatrix = Array.from({ length: height }, () => Array( width ).fill( 0 ))
+    const includePixelMetrics = options?.includePixelMetrics === true
+    var intensityMatrix = includePixelMetrics
+        ? Array.from({ length: height }, () => Array( width ).fill( 0 ))
+        : null
 
     var offset = 0
     for( var row = 0; row < height; row++ ){
@@ -2665,21 +4442,19 @@ function buildPcaMipImage( pcaMipMatrix, options = {} ){
             imageData.data[offset++] = Math.max( 0, Math.min( 255, Math.round( baseColor[2] * brightness )))
             imageData.data[offset++] = 255
 
-            intensityMatrix[row][col] = brightness
+            if( includePixelMetrics ){
+                intensityMatrix[row][col] = brightness
+            }
         }
     }
 
     context.putImageData( imageData, 0, 0 )
 
-    return {
-        source: canvas.toDataURL( "image/png" ),
-        width,
-        height,
-        intensityMatrix
-    }
+    const extraPayload = includePixelMetrics ? { intensityMatrix } : {}
+    return buildCanvasImagePayload( canvas, width, height, extraPayload, options )
 }
 
-function buildPcaClassificationImage( componentScores ){
+function buildPcaClassificationImage( componentScores, options = {} ){
 
     const width = componentScores[0].matrix[0].length
     const height = componentScores[0].matrix.length
@@ -2714,7 +4489,10 @@ function buildPcaClassificationImage( componentScores ){
     }
 
     const imageData = context.createImageData( width, height )
-    var magnitudeMatrix = Array.from({ length: height }, () => Array( width ).fill( 0 ))
+    const includePixelMetrics = options?.includePixelMetrics === true
+    var magnitudeMatrix = includePixelMetrics
+        ? Array.from({ length: height }, () => Array( width ).fill( 0 ))
+        : null
 
     var offset = 0
     for( var row = 0; row < height; row++ ){
@@ -2745,43 +4523,34 @@ function buildPcaClassificationImage( componentScores ){
             imageData.data[offset++] = Math.round( baseColor[2] * brightness )
             imageData.data[offset++] = 255
 
-            magnitudeMatrix[row][col] = normalizedMagnitude
+            if( includePixelMetrics ){
+                magnitudeMatrix[row][col] = normalizedMagnitude
+            }
         }
     }
 
     context.putImageData( imageData, 0, 0 )
 
-    return {
-        source: canvas.toDataURL( "image/png" ),
-        width,
-        height,
-        magnitudeMatrix
-    }
+    const extraPayload = includePixelMetrics ? { magnitudeMatrix } : {}
+    return buildCanvasImagePayload( canvas, width, height, extraPayload, options )
 }
 
 function buildPcaRgbImage( componentScores, options = {} ){
 
-    const width = componentScores[0].matrix[0].length
-    const height = componentScores[0].matrix.length
+    const channelContext = normalizedPcaRgbChannels( componentScores )
+    const width = channelContext.width
+    const height = channelContext.height
 
     if( typeof document === "undefined" ){
         throw new Error( "PCA RGB rendering requires a browser environment." )
     }
 
     const selectedChannels = resolveRgbChannels( componentScores, options.channels )
-
-    const matrixByComponent = new Map()
-    for( const entry of componentScores ){
-        matrixByComponent.set( entry.componentIndex, entry.matrix )
-    }
-
-    const redMatrix = matrixByComponent.get( selectedChannels.r )
-    const greenMatrix = matrixByComponent.get( selectedChannels.g )
-    const blueMatrix = matrixByComponent.get( selectedChannels.b )
-
-    const redScale = buildRobustScale( redMatrix )
-    const greenScale = buildRobustScale( greenMatrix )
-    const blueScale = buildRobustScale( blueMatrix )
+    const totalPixels = width * height
+    const zeroChannel = new Uint8Array( totalPixels )
+    const redChannel = normalizedPcaRgbChannel( channelContext, selectedChannels.r ) ?? zeroChannel
+    const greenChannel = normalizedPcaRgbChannel( channelContext, selectedChannels.g ) ?? zeroChannel
+    const blueChannel = normalizedPcaRgbChannel( channelContext, selectedChannels.b ) ?? zeroChannel
 
     const canvas = document.createElement( "canvas" )
     canvas.width = width
@@ -2793,33 +4562,251 @@ function buildPcaRgbImage( componentScores, options = {} ){
     }
 
     const imageData = context.createImageData( width, height )
-    var magnitudeMatrix = Array.from({ length: height }, () => Array( width ).fill( 0 ))
+    const includePixelMetrics = options?.includePixelMetrics === true
+    var magnitudeMatrix = includePixelMetrics
+        ? Array.from({ length: height }, () => Array( width ).fill( 0 ))
+        : null
 
     var offset = 0
-    for( var row = 0; row < height; row++ ){
-        for( var col = 0; col < width; col++ ){
+    var pixelIndex = 0
 
-            const red = normalizeByScale( redMatrix[row][col], redScale )
-            const green = normalizeByScale( greenMatrix[row][col], greenScale )
-            const blue = normalizeByScale( blueMatrix[row][col], blueScale )
+    if( includePixelMetrics ){
+        for( var row = 0; row < height; row++ ){
+            for( var col = 0; col < width; col++ ){
 
-            imageData.data[offset++] = Math.round( 255 * red )
-            imageData.data[offset++] = Math.round( 255 * green )
-            imageData.data[offset++] = Math.round( 255 * blue )
+                const red = redChannel[pixelIndex]
+                const green = greenChannel[pixelIndex]
+                const blue = blueChannel[pixelIndex]
+
+                imageData.data[offset++] = red
+                imageData.data[offset++] = green
+                imageData.data[offset++] = blue
+                imageData.data[offset++] = 255
+
+                magnitudeMatrix[row][col] = ( red + green + blue ) / ( 3 * 255 )
+                pixelIndex += 1
+            }
+        }
+    } else {
+        for( ; pixelIndex < totalPixels; pixelIndex++ ){
+            imageData.data[offset++] = redChannel[pixelIndex]
+            imageData.data[offset++] = greenChannel[pixelIndex]
+            imageData.data[offset++] = blueChannel[pixelIndex]
             imageData.data[offset++] = 255
-
-            magnitudeMatrix[row][col] = ( red + green + blue ) / 3
         }
     }
 
     context.putImageData( imageData, 0, 0 )
 
-    return {
-        source: canvas.toDataURL( "image/png" ),
+    const extraPayload = includePixelMetrics ? { magnitudeMatrix } : {}
+    return buildCanvasImagePayload( canvas, width, height, extraPayload, options )
+}
+
+function clampZBlendWindowValue( value, fallback, maximum = Infinity ){
+
+    const numeric = Number( value )
+    if( Number.isFinite( numeric ) === false ){
+        return fallback
+    }
+
+    const safeMaximum = Number.isFinite( Number( maximum ) ) && Number( maximum ) > 0
+        ? Number( maximum )
+        : Infinity
+
+    return Math.max( 0, Math.min( safeMaximum, numeric ) )
+}
+
+function resolveZBlendIntensityMaximum( value, matrix ){
+
+    const numeric = Number( value )
+    if( Number.isFinite( numeric ) && numeric > 0 ){
+        return numeric
+    }
+
+    const range = matrixFiniteRange( matrix )
+    const maximum = Number( range?.maximum )
+    if( Number.isFinite( maximum ) && maximum > 0 ){
+        return maximum
+    }
+
+    return 1
+}
+
+function zBlendTextureCacheKey( intensityMaximum ){
+
+    const maximum = Number( intensityMaximum )
+    if( Number.isFinite( maximum ) === false || maximum <= 0 ){
+        return "1.000000"
+    }
+
+    return maximum.toFixed( 6 )
+}
+
+function buildZBlendChannelTexture( matrix, intensityMaximum ){
+
+    const normalizedMatrix = normalizeMip( matrix )
+    const cacheKey = zBlendTextureCacheKey( intensityMaximum )
+    let cachedTextures = zBlendIntensityTextureCache.get( normalizedMatrix ) ?? null
+
+    if( cachedTextures !== null && cachedTextures.has( cacheKey ) ){
+        return cachedTextures.get( cacheKey )
+    }
+
+    const height = normalizedMatrix.length
+    const width = normalizedMatrix[0].length
+    const safeMaximum = resolveZBlendIntensityMaximum( intensityMaximum, normalizedMatrix )
+
+    if( typeof document === "undefined" ){
+        throw new Error( "Z-blend channel textures require a browser environment." )
+    }
+
+    const canvas = document.createElement( "canvas" )
+    canvas.width = width
+    canvas.height = height
+
+    const context = canvas.getContext( "2d" )
+    if( context === null ){
+        throw new Error( "Unable to create canvas context for z-blend texture rendering." )
+    }
+
+    const imageData = context.createImageData( width, height )
+    let offset = 0
+
+    for( let row = 0; row < height; row++ ){
+        for( let col = 0; col < width; col++ ){
+            const rawValue = Math.max( 0, Number( normalizedMatrix[row][col] ) || 0 )
+            const normalizedValue = clampUnit( rawValue / safeMaximum )
+            const byteValue = Math.max( 0, Math.min( 255, Math.round( normalizedValue * 255 )))
+
+            imageData.data[offset++] = byteValue
+            imageData.data[offset++] = byteValue
+            imageData.data[offset++] = byteValue
+            imageData.data[offset++] = 255
+        }
+    }
+
+    context.putImageData( imageData, 0, 0 )
+
+    const texturePayload = {
+        kind: "z-blend-channel-texture",
+        canvas,
         width,
         height,
-        magnitudeMatrix
+        intensityMaximum: safeMaximum
     }
+
+    if( cachedTextures === null ){
+        cachedTextures = new Map()
+        zBlendIntensityTextureCache.set( normalizedMatrix, cachedTextures )
+    }
+
+    cachedTextures.set( cacheKey, texturePayload )
+    return texturePayload
+}
+
+function normalizeZBlendContrastLimit( value, intensityMaximum ){
+
+    const safeMaximum = resolveZBlendIntensityMaximum( intensityMaximum, [ [ intensityMaximum ] ] )
+    return clampUnit(( Number( value ) || 0 ) / safeMaximum )
+}
+
+function buildZBlendRendererPayload( zBlendSource ){
+
+    const normalizedSource = normalizeZBlendSource( zBlendSource )
+
+    return {
+        kind: "z-blend",
+        width: normalizedSource.width,
+        height: normalizedSource.height,
+        channels: normalizedSource.channels.map(( channel ) => {
+            const texturePayload = buildZBlendChannelTexture( channel.matrix, channel.intensityMaximum )
+            return {
+                enabled: channel.enabled !== false,
+                color: channel.color,
+                contrastLimits: [
+                    normalizeZBlendContrastLimit( channel.clampMin, channel.intensityMaximum ),
+                    normalizeZBlendContrastLimit( channel.clampMax, channel.intensityMaximum )
+                ],
+                image: texturePayload.canvas
+            }
+        })
+    }
+}
+
+function clampIntensityWindow( normalizedValue, minimum, maximum ){
+
+    const value = Math.max( 0, Number( normalizedValue ) || 0 )
+    const low = Math.max( 0, Number( minimum ) || 0 )
+    const high = Math.max( low, Number( maximum ) || low )
+
+    if( high <= low ){
+        return value >= high ? 1 : 0
+    }
+
+    return clampUnit(( value - low ) / ( high - low ))
+}
+
+function buildZBlendImage( zBlendSource, options = {} ){
+
+    const normalizedSource = normalizeZBlendSource( zBlendSource )
+    const width = normalizedSource.width
+    const height = normalizedSource.height
+
+    if( typeof document === "undefined" ){
+        throw new Error( "Z-blend rendering requires a browser environment." )
+    }
+
+    const canvas = document.createElement( "canvas" )
+    canvas.width = width
+    canvas.height = height
+
+    const context = canvas.getContext( "2d" )
+    if( context === null ){
+        throw new Error( "Unable to create canvas context for z-blend rendering." )
+    }
+
+    const imageData = context.createImageData( width, height )
+    const includePixelMetrics = options?.includePixelMetrics === true
+    const magnitudeMatrix = includePixelMetrics
+        ? Array.from({ length: height }, () => Array( width ).fill( 0 ))
+        : null
+
+    for( let row = 0; row < height; row++ ){
+        for( let col = 0; col < width; col++ ){
+
+            let red = 0
+            let green = 0
+            let blue = 0
+
+            for( let channelIndex = 0; channelIndex < normalizedSource.channels.length; channelIndex++ ){
+                const channel = normalizedSource.channels[channelIndex]
+                if( channel.enabled === false ) continue
+                const rawValue = Math.max( 0, Number( channel.matrix[row][col] ) || 0 )
+                const clampedValue = clampIntensityWindow( rawValue, channel.clampMin, channel.clampMax )
+
+                if( clampedValue <= 0 ) continue
+
+                red += channel.color[0] * clampedValue
+                green += channel.color[1] * clampedValue
+                blue += channel.color[2] * clampedValue
+            }
+
+            const pixelOffset = ( row * width + col ) * 4
+            imageData.data[pixelOffset] = Math.max( 0, Math.min( 255, Math.round( red )))
+            imageData.data[pixelOffset + 1] = Math.max( 0, Math.min( 255, Math.round( green )))
+            imageData.data[pixelOffset + 2] = Math.max( 0, Math.min( 255, Math.round( blue )))
+            imageData.data[pixelOffset + 3] = 255
+
+            if( includePixelMetrics ){
+                magnitudeMatrix[row][col] = clampUnit( Math.max( red, green, blue ) / 255 )
+            }
+        }
+    }
+
+    context.putImageData( imageData, 0, 0 )
+
+    const extraPayload = includePixelMetrics ? { magnitudeMatrix } : {}
+    return buildCanvasImagePayload( canvas, width, height, extraPayload, options )
 }
 
 function resolveRgbChannels( componentScores, requestedChannels ){
@@ -2832,6 +4819,63 @@ function resolveRgbChannels( componentScores, requestedChannels ){
         g: resolveSingleRgbChannel( requestedChannels?.g, 2, available, availableSet, 1 ),
         b: resolveSingleRgbChannel( requestedChannels?.b, 3, available, availableSet, 2 )
     }
+}
+
+function normalizedPcaRgbChannels( componentScores ){
+
+    if( pcaRgbNormalizedChannelsCache.has( componentScores ) ){
+        return pcaRgbNormalizedChannelsCache.get( componentScores )
+    }
+
+    const width = componentScores[0].matrix[0].length
+    const height = componentScores[0].matrix.length
+    const matrixByComponent = new Map()
+    for( const entry of componentScores ){
+        matrixByComponent.set( entry.componentIndex, entry.matrix )
+    }
+
+    const cached = {
+        width,
+        height,
+        matrixByComponent,
+        channels: new Map()
+    }
+    pcaRgbNormalizedChannelsCache.set( componentScores, cached )
+
+    return cached
+}
+
+function normalizedPcaRgbChannel( channelContext, componentIndex ){
+
+    if( channelContext === null || typeof channelContext !== "object" ){
+        return null
+    }
+
+    if( channelContext.channels.has( componentIndex ) ){
+        return channelContext.channels.get( componentIndex )
+    }
+
+    const matrix = channelContext.matrixByComponent.get( componentIndex )
+    if( Array.isArray( matrix ) === false ){
+        return null
+    }
+
+    const width = channelContext.width
+    const height = channelContext.height
+    const totalPixels = width * height
+    const normalized = new Uint8Array( totalPixels )
+    const scale = buildRobustScale( matrix )
+
+    var pixelIndex = 0
+    for( var row = 0; row < height; row++ ){
+        for( var col = 0; col < width; col++ ){
+            normalized[pixelIndex] = Math.round( 255 * normalizeByScale( matrix[row][col], scale ))
+            pixelIndex += 1
+        }
+    }
+
+    channelContext.channels.set( componentIndex, normalized )
+    return normalized
 }
 
 function resolveUmapChannelColors( channelColors ){
@@ -2860,9 +4904,21 @@ function resolveSingleRgbChannel( requested, preferredDefault, available, availa
 
 function buildRobustScale( matrix, lowerQuantile = 0.02, upperQuantile = 0.98 ){
 
+    const useCache = lowerQuantile === 0.02 &&
+        upperQuantile === 0.98 &&
+        matrix !== null &&
+        typeof matrix === "object"
+    if( useCache && robustScaleCache.has( matrix ) ){
+        return robustScaleCache.get( matrix )
+    }
+
     const values = sampleFiniteValues( matrix )
     if( values.length === 0 ){
-        return { low: 0, high: 1 }
+        const fallbackScale = { low: 0, high: 1 }
+        if( useCache ){
+            robustScaleCache.set( matrix, fallbackScale )
+        }
+        return fallbackScale
     }
 
     values.sort(( left, right ) => left - right )
@@ -2871,17 +4927,29 @@ function buildRobustScale( matrix, lowerQuantile = 0.02, upperQuantile = 0.98 ){
     const quantileHigh = quantileFromSorted( values, upperQuantile )
 
     if( Number.isFinite( quantileLow ) && Number.isFinite( quantileHigh ) && quantileHigh > quantileLow ){
-        return { low: quantileLow, high: quantileHigh }
+        const quantileScale = { low: quantileLow, high: quantileHigh }
+        if( useCache ){
+            robustScaleCache.set( matrix, quantileScale )
+        }
+        return quantileScale
     }
 
     const minimum = values[0]
     const maximum = values[values.length - 1]
 
     if( maximum > minimum ){
-        return { low: minimum, high: maximum }
+        const minMaxScale = { low: minimum, high: maximum }
+        if( useCache ){
+            robustScaleCache.set( matrix, minMaxScale )
+        }
+        return minMaxScale
     }
 
-    return { low: minimum, high: minimum + 1 }
+    const fallbackScale = { low: minimum, high: minimum + 1 }
+    if( useCache ){
+        robustScaleCache.set( matrix, fallbackScale )
+    }
+    return fallbackScale
 }
 
 function sampleFiniteValues( matrix, maxSamples = 200000 ){
@@ -3062,6 +5130,30 @@ export default {
     updatePcaClassification,
     initializePcaRgb,
     updatePcaRgb,
+    initializeZBlend,
+    updateZBlend,
+    initializeUpperPanel,
+    updateUpperPanel,
+    initializeLowerPanel,
+    updateLowerPanel,
+    resizeGraph,
     updateLowerSpectrum,
-    configureHeatmapInteraction
+    configureHeatmapInteraction,
+    getHeatmapPaneState,
+    getHeatmapRendererPayload,
+    relayoutHeatmapViewport,
+    resetHeatmapViewport,
+    prewarmScalarHeatmapRendererPayload,
+    prewarmRgbHeatmapRendererPayload,
+    prewarmRgbHeatmapRendererPayloadAsync,
+    prewarmUmapHeatmapRendererPayload,
+    prewarmUmapHeatmapRendererPayloadAsync,
+    prewarmPcaMipHeatmapRendererPayload,
+    prewarmPcaMipHeatmapRendererPayloadAsync,
+    prewarmPcaClassificationHeatmapRendererPayload,
+    prewarmPcaClassificationHeatmapRendererPayloadAsync,
+    prewarmPcaRgbHeatmapRendererPayload,
+    prewarmPcaRgbHeatmapRendererPayloadAsync,
+    prewarmZBlendHeatmapRendererPayload,
+    updateZBlendHeatmapPayload
 }

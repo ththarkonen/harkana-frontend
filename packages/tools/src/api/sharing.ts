@@ -1,5 +1,6 @@
 import { Amplify } from 'aws-amplify'
 import { apiFetch, buildQueryString } from './http'
+import { parseJsonBytes, parseJsonString } from "../jsonParseWorkerClient.js"
 
 type ShareInfo = {
     projectId: string
@@ -105,7 +106,7 @@ var list = async () => {
 }
 
 
-var load = async ( shareInfo: ShareInfo, fileName: string ) => {
+var load = async ( shareInfo: ShareInfo, fileName: string, options: Record<string, any> = {} ) => {
 
     var parameters = await apiParameters( { id: null } )
     parameters.projectID = shareInfo.projectId
@@ -122,10 +123,18 @@ var load = async ( shareInfo: ShareInfo, fileName: string ) => {
             throw new Error( "Shared file request failed with status " + String( result.status ))
         }
 
-        const resultText = await result.text()
-
         try{
-            return JSON.parse( resultText )
+            if( options?.priority === "low" ){
+                const resultBytes = await result.arrayBuffer()
+                return await parseJsonBytes( resultBytes, {
+                    useWorker: true
+                } )
+            }
+
+            const resultText = await result.text()
+            return await parseJsonString( resultText, {
+                useWorker: false
+            } )
         } catch( parseError ){
             console.log( parseError )
             throw new Error( "Invalid shared file response for " + fileName )

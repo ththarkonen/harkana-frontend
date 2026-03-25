@@ -1,11 +1,12 @@
 <template>
 	<div ref = "root"
-	     class = "relative inline-block text-left"
+	     :class = "rootClasses"
 	     @keydown.esc.stop.prevent = "close">
 
 		<!-- Trigger -->
 		<button ref = "triggerButton"
 		        @click = "toggle"
+		        @keydown = "handleTriggerKeydown"
 		        :class = "triggerClasses"
 		        aria-haspopup = "true"
 		        :aria-expanded = "isOpen">
@@ -33,6 +34,10 @@
 				     :class = "menuClasses"
 					 :style = "portalMenuStyles"
 					 @click = "handleMenuClick"
+					 @keydown.down.prevent = "moveFocus(1)"
+					 @keydown.up.prevent = "moveFocus(-1)"
+					 @keydown.home.prevent = "focusMenuItem('first')"
+					 @keydown.end.prevent = "focusMenuItem('last')"
 					 @keydown.esc.stop.prevent = "close"
 					 tabindex = "-1">
 					<ul :class = "listClasses">
@@ -44,7 +49,13 @@
 			<div v-else-if = "isOpen"
 			     ref = "menu"
 			     :class = "menuClasses"
-				 @click = "handleMenuClick">
+				 @click = "handleMenuClick"
+				 @keydown.down.prevent = "moveFocus(1)"
+				 @keydown.up.prevent = "moveFocus(-1)"
+				 @keydown.home.prevent = "focusMenuItem('first')"
+				 @keydown.end.prevent = "focusMenuItem('last')"
+				 @keydown.esc.stop.prevent = "close"
+				 tabindex = "-1">
 				<ul :class = "listClasses">
 					<slot></slot>
 				</ul>
@@ -58,6 +69,7 @@
 import { computed, nextTick, ref, watch, onMounted, onBeforeUnmount } from "vue"
 
 const props = withDefaults( defineProps<{
+	rootClass?: string
 	triggerClass?: string
 	menuClass?: string
 	listClass?: string
@@ -66,7 +78,11 @@ const props = withDefaults( defineProps<{
 	teleportToBody?: boolean
 	portalOffsetX?: number
 	portalOffsetY?: number
+	portalPlacement?: string
+	triggerArrowBehavior?: string
+	open?: boolean
 }>(), {
+	rootClass: "relative inline-block text-left",
 	triggerClass: "inline-flex items-center gap-2 rounded-md px-3 py-2 text-white transition hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-brand",
 	menuClass: "absolute right-0 z-50 mt-2 min-w-full w-max max-w-[50vw] origin-top-right rounded-md bg-dark-gray shadow-lg ring-1 ring-black/30",
 	listClass: "py-1",
@@ -74,21 +90,50 @@ const props = withDefaults( defineProps<{
 	closeOnSelect: false,
 	teleportToBody: false,
 	portalOffsetX: 8,
-	portalOffsetY: 0
+	portalOffsetY: 0,
+	portalPlacement: "right",
+	triggerArrowBehavior: "open",
+	open: undefined
 })
 
-const isOpen = ref(false)
+const emit = defineEmits([ "update:open", "trigger-keydown" ])
+
+const uncontrolledOpen = ref(false)
 const root = ref<HTMLElement | null>(null)
 const triggerButton = ref<HTMLElement | null>(null)
 const menu = ref<HTMLElement | null>(null)
 const portalPosition = ref({ left: 0, top: 0 })
 
+const isControlled = computed(() => {
+	return typeof props.open === "boolean"
+})
+
+const isOpen = computed({
+	get: () => {
+		return isControlled.value ? props.open === true : uncontrolledOpen.value
+	},
+	set: ( nextOpen: boolean ) => {
+		if( isControlled.value === false ){
+			uncontrolledOpen.value = nextOpen
+		}
+		emit( "update:open", nextOpen )
+	}
+})
+
 const toggle = () => {
 	isOpen.value = !isOpen.value
 }
 
+const open = () => {
+	isOpen.value = true
+}
+
 const close = () => {
 	isOpen.value = false
+}
+
+const focusTrigger = () => {
+	triggerButton.value?.focus()
 }
 
 const handleMenuClick = () => {
@@ -97,8 +142,97 @@ const handleMenuClick = () => {
 	}
 }
 
+const focusableMenuSelector = [
+	'button:not([disabled])',
+	'[href]',
+	'input:not([disabled])',
+	'select:not([disabled])',
+	'textarea:not([disabled])',
+	'[tabindex]:not([tabindex="-1"])'
+].join( ", " )
+
+const getFocusableMenuItems = () => {
+	if( menu.value === null ){
+		return []
+	}
+
+	return Array.from( menu.value.querySelectorAll<HTMLElement>( focusableMenuSelector ))
+}
+
+const focusMenuItem = ( position: "first" | "last" ) => {
+	const items = getFocusableMenuItems()
+	if( items.length === 0 ){
+		menu.value?.focus()
+		return
+	}
+
+	const nextItem = position === "last" ? items[ items.length - 1 ] : items[0]
+	nextItem?.focus()
+}
+
+const moveFocus = ( direction: number ) => {
+	const items = getFocusableMenuItems()
+	if( items.length === 0 ){
+		menu.value?.focus()
+		return
+	}
+
+	const activeElement = document.activeElement instanceof HTMLElement ? document.activeElement : null
+	const currentIndex = activeElement === null ? -1 : items.findIndex(( item ) => item === activeElement )
+
+	if( currentIndex === -1 ){
+		if( direction < 0 ){
+			items[ items.length - 1 ]?.focus()
+			return
+		}
+
+		items[0]?.focus()
+		return
+	}
+
+	const nextIndex = ( currentIndex + direction + items.length ) % items.length
+	items[ nextIndex ]?.focus()
+}
+
+const openAndFocus = async ( position: "first" | "last" ) => {
+	if( isOpen.value === false ){
+		isOpen.value = true
+		await nextTick()
+	}
+
+	focusMenuItem( position )
+}
+
+const handleTriggerKeydown = ( event: KeyboardEvent ) => {
+	const key = event.key
+	if( key !== "ArrowDown" && key !== "ArrowUp" && key !== "Home" && key !== "End" ){
+		return
+	}
+
+	if( props.triggerArrowBehavior === "emit" ){
+		event.preventDefault()
+		emit( "trigger-keydown", event )
+		return
+	}
+
+	if( key === "ArrowDown" || key === "Home" ){
+		event.preventDefault()
+		openAndFocus( "first" )
+		return
+	}
+
+	if( key === "ArrowUp" || key === "End" ){
+		event.preventDefault()
+		openAndFocus( "last" )
+	}
+}
+
 const triggerClasses = computed(() => {
 	return props.triggerClass
+})
+
+const rootClasses = computed(() => {
+	return props.rootClass
 })
 
 const menuClasses = computed(() => {
@@ -143,8 +277,17 @@ const updatePortalPosition = () => {
 	const viewportWidth = window.innerWidth
 	const viewportHeight = window.innerHeight
 
+	const placement = String( props.portalPlacement ?? "right" ).trim().toLowerCase()
 	var left = triggerRect.right + Number( props.portalOffsetX ?? 0 )
 	var top = triggerRect.top + Number( props.portalOffsetY ?? 0 )
+
+	if( placement === "bottom-start" ){
+		left = triggerRect.left + Number( props.portalOffsetX ?? 0 )
+		top = triggerRect.bottom + Number( props.portalOffsetY ?? 0 )
+	} else if( placement === "bottom-end" ){
+		left = triggerRect.right - menuWidth + Number( props.portalOffsetX ?? 0 )
+		top = triggerRect.bottom + Number( props.portalOffsetY ?? 0 )
+	}
 
 	const maxLeft = Math.max( 8, viewportWidth - menuWidth - 8 )
 	const maxTop = Math.max( 8, viewportHeight - menuHeight - 8 )
@@ -188,5 +331,5 @@ watch( isOpen, async ( nextOpen ) => {
 	removePortalListeners()
 })
 
-defineExpose({ close, toggle })
+defineExpose({ close, open, toggle, focusTrigger })
 </script>

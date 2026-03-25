@@ -10,15 +10,14 @@
 
     <div v-if = "isVisible"
         @keydown.esc = "onEsc"
-        class = "fixed inset-0 z-50
-                flex items-center justify-center
-                bg-black/50">
+        :class = "overlayClasses">
 
         <!-- Modal -->
         <div ref = "dialog"
             class = "relative w-full max-w-2xl border-2 border-brand
                     rounded-lg bg-dark-gray shadow-xl max-h-[90vh]
                     flex flex-col"
+            :class = "panelClass"
             role = "dialog"
             aria-modal = "true"
             tabindex = "-1">
@@ -65,7 +64,15 @@ const props = defineProps({
     actionText: { type: String, default: "Apply" },
     showClose: { type: Boolean, default: true },
     alwaysShowScrollbar: { type: Boolean, default: false },
-    hideScrollbar: { type: Boolean, default: false }
+    hideScrollbar: { type: Boolean, default: false },
+    overlayClass: {
+        type: String,
+        default: "fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+    },
+    panelClass: {
+        type: String,
+        default: ""
+    }
 })
 
 const isVisible = ref(false)
@@ -109,6 +116,8 @@ const trapFocus = (e: KeyboardEvent) => {
         first.focus()
     }
 }
+
+const overlayClasses = props.overlayClass
 
 watch( isVisible, (visible) => {
     if (visible) document.addEventListener('keydown', trapFocus)

@@ -8,7 +8,7 @@
         </span>
         <!-- Spinner overlay -->
         <span v-if="loading" class="absolute inset-0 flex items-center justify-center">
-            <Spinner class="w-6 h-6 text-white" />
+            <Spinner class="w-6 h-6 text-current" />
         </span>
     </div>
 </button>

@@ -9,6 +9,89 @@ type GenericApiResponse = {
     [key: string]: any
 }
 
+export type TokenHistoryEvent = {
+    PK: string
+    SK: string
+    eventId: string
+    createdAt: string
+    scopeType: "PERSONAL" | "GROUP"
+    scopeId: string
+    groupId: string
+    eventType: string
+    direction: "DEBIT" | "CREDIT"
+    deltaTokens: number
+    actorUserSub: string
+    subjectUserSub: string
+    source: string
+    operationId: string
+    status: "APPLIED"
+    projectId: string
+    projectName: string
+    fileName: string
+    dataType: string
+    jobId: string
+    purchaseId: string
+    reason: string
+    relatedEventId?: string
+}
+
+export type TokenHistoryListResponse = {
+    items: TokenHistoryEvent[]
+    nextToken: string | null
+}
+
+export type OwnedGroupHistorySummaryItem = {
+    groupId: string
+    groupName: string
+    tokenBalance: number
+    lastEvent: TokenHistoryEvent | null
+    recent?: TokenHistoryEvent[]
+}
+
+export type OwnedGroupsHistorySummaryResponse = {
+    groups: OwnedGroupHistorySummaryItem[]
+}
+
+type TokenHistoryQuery = {
+    limit?: number
+    nextToken?: string
+    from?: string
+    to?: string
+}
+
+const normalizeHistoryLimit = ( value: any ) => {
+
+    const numeric = Number.parseInt( String( value ?? "" ), 10 )
+    if( Number.isInteger( numeric ) === false ){
+        return 50
+    }
+
+    return Math.max( 1, Math.min( 200, numeric ))
+}
+
+const appendHistoryQueryParameters = (
+    parameters: Record<string, string>,
+    query: TokenHistoryQuery = {}
+) => {
+
+    parameters.limit = String( normalizeHistoryLimit( query?.limit ))
+
+    const nextToken = String( query?.nextToken ?? "" ).trim()
+    if( nextToken.length > 0 ){
+        parameters.nextToken = nextToken
+    }
+
+    const from = String( query?.from ?? "" ).trim()
+    if( from.length > 0 ){
+        parameters.from = from
+    }
+
+    const to = String( query?.to ?? "" ).trim()
+    if( to.length > 0 ){
+        parameters.to = to
+    }
+}
+
 var balance = async function( groupID ){
     
     var parameters: Record<string, string> = {}
@@ -74,9 +157,64 @@ var removeGroup = async function( groupName ){
     return await apiFetch<GenericApiResponse>( url )
 }
 
+var getPersonalHistory = async function( query: TokenHistoryQuery = {} ){
+
+    var parameters: Record<string, string> = {}
+    appendHistoryQueryParameters( parameters, query )
+
+    const base = import.meta.env.VITE_BASE_URL + "/tokens/history/personal"
+    const url = base + "?" + buildQueryString( parameters )
+
+    return await apiFetch<TokenHistoryListResponse>( url )
+}
+
+var getGroupHistory = async function( query: TokenHistoryQuery & { groupID: string } ){
+
+    const groupID = String( query?.groupID ?? "" ).trim()
+    if( groupID.length === 0 ){
+        throw new Error( "groupID is required for group token history." )
+    }
+
+    var parameters: Record<string, string> = {
+        groupID
+    }
+    appendHistoryQueryParameters( parameters, query )
+
+    const base = import.meta.env.VITE_BASE_URL + "/tokens/history/group"
+    const url = base + "?" + buildQueryString( parameters )
+
+    return await apiFetch<TokenHistoryListResponse>( url )
+}
+
+var getOwnedGroupsHistorySummary = async function(
+    query: { includeRecent?: boolean | string | number } = {}
+){
+
+    var parameters: Record<string, string> = {}
+    const includeRecent = query?.includeRecent
+
+    if(
+        includeRecent === true ||
+        includeRecent === 1 ||
+        String( includeRecent ?? "" ).trim().toLowerCase() === "true" ||
+        String( includeRecent ?? "" ).trim().toLowerCase() === "yes"
+    ){
+        parameters.includeRecent = "true"
+    }
+
+    const base = import.meta.env.VITE_BASE_URL + "/tokens/history/groups/owned"
+    const queryString = buildQueryString( parameters )
+    const url = queryString.length > 0 ? base + "?" + queryString : base
+
+    return await apiFetch<OwnedGroupsHistorySummaryResponse>( url )
+}
+
 export default { balance,
                  createGroup,
                  listGroupsAndMembers,
                  addGroupMember,
                  removeGroupMember,
-                 removeGroup}
+                 removeGroup,
+                 getPersonalHistory,
+                 getGroupHistory,
+                 getOwnedGroupsHistorySummary}

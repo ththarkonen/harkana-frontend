@@ -96,6 +96,18 @@ var getDefaultSettings = async function() {
             roiTitle: "#ffffff",
             selectionBox: "#9ca3af",
             roiOverlay: "#ffffff",
+            zBlendPalette: [
+                "#0000ff",
+                "#00ff00",
+                "#ff00ff",
+                "#ffff00",
+                "#00ffff",
+                "#ff0000",
+                "#0000ff",
+                "#00ff00",
+                "#ff00ff",
+                "#ffff00"
+            ],
             umapChannels: {
                 r: "#ff0000",
                 g: "#00ff00",
@@ -115,8 +127,6 @@ var getDefaultSettings = async function() {
             }
         },
         hyperspectrumSpectrum: {
-            lowerBoundPercentage: 7.5,
-            upperBoundPercentage: 97.5,
             showInterval: true,
             intervalOpacity: 0.25
         },
@@ -128,10 +138,25 @@ var getDefaultSettings = async function() {
         hyperspectrumDefaults: {
             displayMode: "umap",
             heatmapInteraction: "select",
+            heatmapRenderer: "deckgl",
+            heatmapZoomAspectRatio: "square",
             selectionConfidenceLevel: 95,
             loadings: "hide",
             falseColoringBasis: "measurement",
             roiEstimateUncertainty: "show"
+        },
+        hyperspectrumPrioritization: {
+            mip: true,
+            mip_hsv: true,
+            umap: true,
+            z_blend: false,
+            layer_window: true,
+            pca: false,
+            pca_mip: false,
+            pca_rgb: false,
+            rpca: false,
+            rpca_mip: false,
+            rpca_rgb: false
         },
         visibility: {
             plot: {

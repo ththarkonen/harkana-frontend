@@ -86,6 +86,22 @@
 
 		<hr class="h-0.5 bg-gray border-0 my-4">
 
+		<div class="flex flex-col gap-2 rounded-lg border-2 border-brand bg-black/5 p-4 shadow-sm">
+			<h4 class="font-semibold text-black">Z-blend channel palette</h4>
+			<p class="text-sm text-black/70 mt-1">
+				These colors are assigned automatically to z-blend channels in order.
+			</p>
+			<div class="grid grid-cols-1 gap-4 mt-2">
+				<ColorPicker v-for = "( color, index ) in zBlendPalette"
+							 :key = "'z-blend-palette-' + index"
+							 v-model = "zBlendPalette[index]"
+							 :description = "'Z-blend color ' + ( index + 1 )">
+				</ColorPicker>
+			</div>
+		</div>
+
+		<hr class="h-0.5 bg-gray border-0 my-4">
+
 		<ColorPicker v-model = "spectrumColors.queriedSpectrum"
 					 description = "Queried spectrum color">
 		</ColorPicker>
@@ -121,28 +137,6 @@
 				<label for = "show-interval" class = "font-semibold text-black cursor-pointer">
 					Show uncertainty interval
 				</label>
-			</div>
-
-			<div class="grid grid-cols-1 gap-4 mt-4 md:grid-cols-2">
-				<div class="flex flex-col gap-2">
-					<label class="font-semibold text-black">Lower bound percentile (%)</label>
-					<input v-model.number = "spectrumOptions.lowerBoundPercentage"
-						   class="flex-1 rounded-md border border-gray-300 bg-gray-50 px-3 py-2 text-sm font-mono text-gray-800 focus:outline-none focus:ring-2 focus:ring-brand"
-						   type = "number"
-						   min = "0"
-						   max = "100"
-						   step = "0.1"/>
-				</div>
-
-				<div class="flex flex-col gap-2">
-					<label class="font-semibold text-black">Upper bound percentile (%)</label>
-					<input v-model.number = "spectrumOptions.upperBoundPercentage"
-						   class="flex-1 rounded-md border border-gray-300 bg-gray-50 px-3 py-2 text-sm font-mono text-gray-800 focus:outline-none focus:ring-2 focus:ring-brand"
-						   type = "number"
-						   min = "0"
-						   max = "100"
-						   step = "0.1"/>
-				</div>
 			</div>
 
 			<div class="flex flex-col gap-2 mt-4">
@@ -251,6 +245,7 @@
 						<option value = "mip_hsv">HSV-mapped MIP</option>
 						<option value = "umap">UMAP</option>
 						<option value = "layer">Layer</option>
+						<option value = "z_blend">Z-blend</option>
 						<option value = "pca">PCA classification</option>
 						<option value = "pca_mip">PCA MIP</option>
 						<option value = "pca_rgb">PCA RGB</option>
@@ -266,6 +261,15 @@
 							class="w-full border border-gray-600 rounded px-3 py-2 bg-white text-black focus:outline-none focus:ring-2 focus:ring-brand">
 						<option value = "select">Select spectra</option>
 						<option value = "zoom">Zoom</option>
+					</select>
+				</div>
+
+				<div class="flex flex-col gap-2">
+					<label class="font-semibold text-black">Zoom aspect ratio</label>
+					<select v-model = "viewerDefaults.heatmapZoomAspectRatio"
+							class="w-full border border-gray-600 rounded px-3 py-2 bg-white text-black focus:outline-none focus:ring-2 focus:ring-brand">
+						<option value = "square">Lock square</option>
+						<option value = "free">Free</option>
 					</select>
 				</div>
 
@@ -309,6 +313,24 @@
 						<option value = "show">Show</option>
 						<option value = "hide">Hide</option>
 					</select>
+				</div>
+			</div>
+
+			<div class="mt-6 rounded-lg border border-brand/60 bg-white/40 p-4">
+				<h5 class="font-semibold text-black">Prioritization</h5>
+				<p class="text-sm text-black/70 mt-1">
+					Choose which visualizations should be prepared earlier after the starting view.
+				</p>
+
+				<div class="grid grid-cols-1 gap-3 mt-4 md:grid-cols-2">
+					<label v-for = "entry in prioritizationEntries"
+						   :key = "'prioritization-' + entry.key"
+						   class = "flex items-center gap-3 rounded-lg border border-brand/40 bg-black/5 px-3 py-2 text-sm text-black shadow-sm">
+						<input v-model = "prioritization[entry.key]"
+							   type = "checkbox"
+							   class = "h-4 w-4 rounded border-gray-300 accent-brand focus:ring-brand"/>
+						<span>{{ entry.label }}</span>
+					</label>
 				</div>
 			</div>
 		</div>
@@ -411,6 +433,7 @@ const HYPERSPECTRUM_DISPLAY_MODES = new Set([
 	"mip_hsv",
 	"umap",
 	"layer",
+	"z_blend",
 	"pca",
 	"pca_mip",
 	"pca_rgb",
@@ -457,6 +480,47 @@ const umapChannelColors = reactive({
 	b: "#0000ff"
 })
 
+const DEFAULT_Z_BLEND_PALETTE = [
+	"#0000ff",
+	"#00ff00",
+	"#ff00ff",
+	"#ffff00",
+	"#00ffff",
+	"#ff0000",
+	"#0000ff",
+	"#00ff00",
+	"#ff00ff",
+	"#ffff00"
+]
+const DEFAULT_HYPERSPECTRUM_PRIORITIZATION = {
+	mip: true,
+	mip_hsv: true,
+	umap: true,
+	z_blend: false,
+	layer_window: true,
+	pca: false,
+	pca_mip: false,
+	pca_rgb: false,
+	rpca: false,
+	rpca_mip: false,
+	rpca_rgb: false
+}
+const prioritizationEntries = [
+	{ key: "mip", label: "MIP" },
+	{ key: "mip_hsv", label: "HSV-mapped MIP" },
+	{ key: "umap", label: "UMAP" },
+	{ key: "z_blend", label: "Z-blend" },
+	{ key: "layer_window", label: "Layer neighborhood" },
+	{ key: "pca", label: "PCA classification" },
+	{ key: "pca_mip", label: "PCA MIP" },
+	{ key: "pca_rgb", label: "PCA RGB" },
+	{ key: "rpca", label: "RPCA classification" },
+	{ key: "rpca_mip", label: "RPCA MIP" },
+	{ key: "rpca_rgb", label: "RPCA RGB" }
+]
+
+const zBlendPalette = reactive([ ...DEFAULT_Z_BLEND_PALETTE ])
+
 const roiColors = reactive({
 	roiSpectrum: "#333333",
 	roiInterval: "#333333",
@@ -466,8 +530,6 @@ const roiColors = reactive({
 })
 
 const spectrumOptions = reactive({
-	lowerBoundPercentage: 7.5,
-	upperBoundPercentage: 97.5,
 	intervalOpacity: 0.25,
 	showInterval: true
 })
@@ -481,11 +543,14 @@ const roiOptions = reactive({
 const viewerDefaults = reactive({
 	displayMode: "umap",
 	heatmapInteraction: "select",
+	heatmapRenderer: "deckgl",
+	heatmapZoomAspectRatio: "square",
 	selectionConfidenceLevel: "95",
 	loadings: "hide",
 	falseColoringBasis: "measurement",
 	roiEstimateUncertainty: "show"
 })
+const prioritization = reactive({ ...DEFAULT_HYPERSPECTRUM_PRIORITIZATION })
 
 const fontSizes = reactive({
 	axis: 16,
@@ -508,28 +573,6 @@ const normalizeCheckbox = ( value, fallback = true ) => {
 	return fallback
 }
 
-const normalizeBoundPercentage = ( value, fallback = 0 ) => {
-
-	const numeric = Number( value )
-	if( Number.isFinite( numeric ) === false ){
-		return fallback
-	}
-
-	return Math.min( 100, Math.max( 0, numeric ))
-}
-
-const normalizeBoundRange = ( lowerValue, upperValue ) => {
-
-	const lower = normalizeBoundPercentage( lowerValue, 7.5 )
-	const upper = normalizeBoundPercentage( upperValue, 97.5 )
-
-	if( lower <= upper ){
-		return { lower, upper }
-	}
-
-	return { lower: upper, upper: lower }
-}
-
 const normalizeOpacity = ( value, fallback = 0.25 ) => {
 
 	const numeric = Number( value )
@@ -547,6 +590,12 @@ const normalizeDisplayMode = ( value ) => {
 
 const normalizeHeatmapInteraction = ( value ) => {
 	return String( value ?? "" ).trim().toLowerCase() === "zoom" ? "zoom" : "select"
+}
+
+const normalizeHeatmapRenderer = () => "deckgl"
+
+const normalizeHeatmapZoomAspectRatio = ( value ) => {
+	return String( value ?? "" ).trim().toLowerCase() === "free" ? "free" : "square"
 }
 
 const normalizeSelectionConfidenceLevel = ( value ) => {
@@ -573,6 +622,35 @@ const normalizeShowHide = ( value, fallback = "hide" ) => {
 
 const normalizeFalseColoringBasis = ( value ) => {
 	return String( value ?? "" ).trim().toLowerCase() === "raman" ? "raman" : "measurement"
+}
+
+const normalizeZBlendPalette = ( value ) => {
+	const source = Array.isArray( value ) ? value : []
+	const resolvedPalette = source
+		.map(( entry ) => String( entry ?? "" ).trim() )
+		.filter(( entry ) => entry.length > 0 )
+		.slice( 0, DEFAULT_Z_BLEND_PALETTE.length )
+
+	while( resolvedPalette.length < DEFAULT_Z_BLEND_PALETTE.length ){
+		resolvedPalette.push( DEFAULT_Z_BLEND_PALETTE[resolvedPalette.length] )
+	}
+
+	return resolvedPalette
+}
+
+const normalizePrioritization = ( value ) => {
+
+	const source = value !== null && typeof value === "object" ? value : {}
+	const normalized = { ...DEFAULT_HYPERSPECTRUM_PRIORITIZATION }
+
+	for( const key of Object.keys( DEFAULT_HYPERSPECTRUM_PRIORITIZATION ) ){
+		normalized[key] = normalizeCheckbox(
+			source[key],
+			DEFAULT_HYPERSPECTRUM_PRIORITIZATION[key]
+		)
+	}
+
+	return normalized
 }
 
 const syncFromSettings = ( savedSettings ) => {
@@ -641,13 +719,13 @@ const syncFromSettings = ( savedSettings ) => {
 		typeof savedSettings?.hyperspectrumColors?.umapChannels?.b === "string" && savedSettings.hyperspectrumColors.umapChannels.b.length > 0
 			? savedSettings.hyperspectrumColors.umapChannels.b
 			: "#0000ff"
-
-	const boundRange = normalizeBoundRange(
-		savedSettings?.hyperspectrumSpectrum?.lowerBoundPercentage,
-		savedSettings?.hyperspectrumSpectrum?.upperBoundPercentage
+	const normalizedZBlendPalette = normalizeZBlendPalette(
+		savedSettings?.hyperspectrumColors?.zBlendPalette
 	)
-	spectrumOptions.lowerBoundPercentage = boundRange.lower
-	spectrumOptions.upperBoundPercentage = boundRange.upper
+	for( let index = 0; index < DEFAULT_Z_BLEND_PALETTE.length; index++ ){
+		zBlendPalette[index] = normalizedZBlendPalette[index]
+	}
+
 	spectrumOptions.intervalOpacity = normalizeOpacity(
 		savedSettings?.hyperspectrumSpectrum?.intervalOpacity,
 		0.25
@@ -676,6 +754,12 @@ const syncFromSettings = ( savedSettings ) => {
 	viewerDefaults.heatmapInteraction = normalizeHeatmapInteraction(
 		savedSettings?.hyperspectrumDefaults?.heatmapInteraction
 	)
+	viewerDefaults.heatmapRenderer = normalizeHeatmapRenderer(
+		savedSettings?.hyperspectrumDefaults?.heatmapRenderer
+	)
+	viewerDefaults.heatmapZoomAspectRatio = normalizeHeatmapZoomAspectRatio(
+		savedSettings?.hyperspectrumDefaults?.heatmapZoomAspectRatio
+	)
 	viewerDefaults.selectionConfidenceLevel = normalizeSelectionConfidenceLevel(
 		savedSettings?.hyperspectrumDefaults?.selectionConfidenceLevel
 	)
@@ -690,6 +774,12 @@ const syncFromSettings = ( savedSettings ) => {
 		savedSettings?.hyperspectrumDefaults?.roiEstimateUncertainty,
 		"show"
 	)
+	const normalizedPrioritization = normalizePrioritization(
+		savedSettings?.hyperspectrumPrioritization
+	)
+	for( const key of Object.keys( DEFAULT_HYPERSPECTRUM_PRIORITIZATION ) ){
+		prioritization[key] = normalizedPrioritization[key]
+	}
 
 	fontSizes.axis = Number.isFinite( Number( savedSettings?.font?.sizes?.axis ))
 		? Number( savedSettings.font.sizes.axis )
@@ -759,26 +849,18 @@ const updateSettings = async () => {
 			g: umapChannelColors.g,
 			b: umapChannelColors.b
 		},
+		zBlendPalette: normalizeZBlendPalette( zBlendPalette ),
 		pcaComponents: {
 			...( savedSettings.hyperspectrumColors?.pcaComponents ?? {} )
 		}
 	}
 
-	const updatedBoundRange = normalizeBoundRange(
-		spectrumOptions.lowerBoundPercentage,
-		spectrumOptions.upperBoundPercentage
-	)
-
 	savedSettings.hyperspectrumSpectrum = {
 		...( savedSettings.hyperspectrumSpectrum ?? {} ),
-		lowerBoundPercentage: updatedBoundRange.lower,
-		upperBoundPercentage: updatedBoundRange.upper,
 		showInterval: spectrumOptions.showInterval,
 		intervalOpacity: normalizeOpacity( spectrumOptions.intervalOpacity, 0.25 )
 	}
 
-	spectrumOptions.lowerBoundPercentage = updatedBoundRange.lower
-	spectrumOptions.upperBoundPercentage = updatedBoundRange.upper
 	spectrumOptions.intervalOpacity = normalizeOpacity( spectrumOptions.intervalOpacity, 0.25 )
 
 	savedSettings.hyperspectrumRoi = {
@@ -792,12 +874,18 @@ const updateSettings = async () => {
 		...( savedSettings.hyperspectrumDefaults ?? {} ),
 		displayMode: normalizeDisplayMode( viewerDefaults.displayMode ),
 		heatmapInteraction: normalizeHeatmapInteraction( viewerDefaults.heatmapInteraction ),
+		heatmapRenderer: normalizeHeatmapRenderer( viewerDefaults.heatmapRenderer ),
+		heatmapZoomAspectRatio: normalizeHeatmapZoomAspectRatio( viewerDefaults.heatmapZoomAspectRatio ),
 		selectionConfidenceLevel: viewerDefaults.selectionConfidenceLevel === "none"
 			? "none"
 			: Number.parseInt( normalizeSelectionConfidenceLevel( viewerDefaults.selectionConfidenceLevel ), 10 ),
 		loadings: normalizeShowHide( viewerDefaults.loadings, "hide" ),
 		falseColoringBasis: normalizeFalseColoringBasis( viewerDefaults.falseColoringBasis ),
 		roiEstimateUncertainty: normalizeShowHide( viewerDefaults.roiEstimateUncertainty, "show" )
+	}
+	savedSettings.hyperspectrumPrioritization = {
+		...( savedSettings.hyperspectrumPrioritization ?? {} ),
+		...normalizePrioritization( prioritization )
 	}
 
 	roiOptions.intervalOpacity = normalizeOpacity( roiOptions.intervalOpacity, 0.25 )

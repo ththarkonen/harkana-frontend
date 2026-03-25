@@ -2,10 +2,12 @@ import { defineConfig } from 'vite';
 import vue from '@vitejs/plugin-vue';
 import { fileURLToPath } from 'url';
 import path from 'path';
+import { defineFrontendVersion, resolveFrontendVersion } from '../../build/versioning.mjs';
 
 
 const filename = fileURLToPath(import.meta.url);
 const pathSegments = path.dirname(filename);
+const versionInfo = resolveFrontendVersion(import.meta.url);
 
 export default defineConfig({
   plugins: [vue()],
@@ -19,5 +21,6 @@ export default defineConfig({
     // By default, Vite doesn't include shims for NodeJS/
     // necessary for segment analytics lib to work
     global: {},
+    ...defineFrontendVersion(versionInfo),
   },
 })

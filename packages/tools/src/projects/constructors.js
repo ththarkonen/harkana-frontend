@@ -1,5 +1,6 @@
 import { Amplify } from 'aws-amplify'
 import awsconfig from '@/aws-exports.js'
+import version from '../version.js'
 
 Amplify.configure( awsconfig )
 const Auth = Amplify.Auth;
@@ -14,7 +15,7 @@ var project = async function( id, fileName, rawFileName){
 	project.id = id;
 	project.name = fileName;
 	project.rawFileName = rawFileName;
-	project.version = import.meta.env.VITE_VERSION;
+	project.version = version.display;
 	project.folders = ["All projects"];
 	project.state = "Ready";
     project.lastModified = date;

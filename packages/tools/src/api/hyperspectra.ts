@@ -1,5 +1,20 @@
 import { apiFetch, buildQueryString} from './http'
 
+type ZBlendChannelPreset = {
+    enabled: boolean
+    requestedZ: number
+    resolvedLayerIndex: number
+    clampMin: number
+    clampMax: number
+}
+
+type ZBlendPreset = {
+    version: "zblend-v1"
+    projectID: string
+    dataType: "hypercars" | "raman"
+    channels: ZBlendChannelPreset[]
+}
+
 var resolveProjectReference = ( project: any ) => {
 
     const shareInfo = project?.shareInfo ?? {}
@@ -53,8 +68,8 @@ var resolveDataType = ( dataType: string = "" ) => {
 var resolveRoiDataType = ( dataType: string = "" ) => {
 
     const normalized = resolveDataType( dataType ).toLowerCase()
-    if( normalized === "raman" ){
-        return "raman"
+    if( normalized === "raman" || normalized === "hyperraman" ){
+        return "hyperraman"
     }
 
     return "hypercars"
@@ -62,6 +77,40 @@ var resolveRoiDataType = ( dataType: string = "" ) => {
 
 var resolveDataSource = ( dataSource: string = "" ) => {
     return String( dataSource ?? "" ).trim()
+}
+
+var resolveBoundingBox = ( boundingBox: any ) => {
+
+    if( boundingBox === null || typeof boundingBox !== "object" ){
+        return null
+    }
+
+    const minX = Number.parseInt( boundingBox.minX, 10 )
+    const maxX = Number.parseInt( boundingBox.maxX, 10 )
+    const minY = Number.parseInt( boundingBox.minY, 10 )
+    const maxY = Number.parseInt( boundingBox.maxY, 10 )
+
+    if(
+        Number.isInteger( minX ) === false ||
+        Number.isInteger( maxX ) === false ||
+        Number.isInteger( minY ) === false ||
+        Number.isInteger( maxY ) === false
+    ){
+        return null
+    }
+
+    if( maxX < minX || maxY < minY ){
+        return null
+    }
+
+    return {
+        minX,
+        maxX,
+        minY,
+        maxY,
+        width: maxX - minX + 1,
+        height: maxY - minY + 1
+    }
 }
 
 var resolveConfidenceLevels = ( confidenceLevels: Array<number | string> = [] ) => {
@@ -157,12 +206,16 @@ var spectrum = async (
 
 var meanSpectrum = async (
     project: any,
-    points: Array<[number, number] | { x: number, y: number }>,
+    boundingBox: {
+        minX: number
+        maxX: number
+        minY: number
+        maxY: number
+        width?: number
+        height?: number
+    },
     groupID: string = "",
-    deduplicate: boolean = true,
     strictBounds: boolean = false,
-    lowerPercentage: number = 2.5,
-    upperPercentage: number = 97.5,
     dataType: string = "",
     dataSource: string = "",
     confidenceLevels: Array<number | string> = []
@@ -170,8 +223,6 @@ var meanSpectrum = async (
 
     var parameters: Record<string, string> = {}
     parameters.groupID = groupID ?? ""
-    parameters.lowerPercentage = String( Number.isFinite( Number( lowerPercentage )) ? Number( lowerPercentage ) : 2.5 )
-    parameters.upperPercentage = String( Number.isFinite( Number( upperPercentage )) ? Number( upperPercentage ) : 97.5 )
     parameters.dataType = resolveDataType( dataType )
     const resolvedDataSource = resolveDataSource( dataSource )
     if( resolvedDataSource.length > 0 ){
@@ -193,11 +244,15 @@ var meanSpectrum = async (
     const base = (import.meta as any).env.VITE_BASE_URL + route
     const url = base + "?" + buildQueryString( parameters )
 
+    const normalizedBoundingBox = resolveBoundingBox( boundingBox )
+    if( normalizedBoundingBox === null ){
+        throw new Error( "Mean spectrum boundingBox is required." )
+    }
+
     const body: Record<string, any> = {
         projectID: projectReference.projectID,
         dataType: resolveDataType( dataType ),
-        points,
-        deduplicate,
+        boundingBox: normalizedBoundingBox,
         strictBounds
     }
     if( projectReference.isShared || projectReference.projectKey.length > 0 ){
@@ -263,14 +318,18 @@ var createRoi = async (
         roiId?: string
         name: string
         description?: string
-        shapeType?: "pixel-list"
-        deduplicate?: boolean
+        shapeType?: "bounding-box"
         strictBounds?: boolean
-        points: Array<[number, number] | { x: number, y: number }>
+        boundingBox: {
+            minX: number
+            maxX: number
+            minY: number
+            maxY: number
+            width?: number
+            height?: number
+        }
     },
     groupID: string = "",
-    lowerPercentage?: number,
-    upperPercentage?: number,
     confidenceLevels: Array<number | string> = []
 ) => {
 
@@ -283,19 +342,18 @@ var createRoi = async (
         throw new Error( "ROI name is required." )
     }
 
-    const points = Array.isArray( payload?.points ) ? payload.points : []
-    if( points.length === 0 ){
-        throw new Error( "ROI points are required." )
+    const boundingBox = resolveBoundingBox( payload?.boundingBox )
+    if( boundingBox === null ){
+        throw new Error( "ROI boundingBox is required." )
     }
 
     const body: Record<string, any> = {
         projectID: projectReference.projectID,
         name,
         description: String( payload?.description ?? "" ),
-        shapeType: "pixel-list",
-        deduplicate: payload?.deduplicate !== false,
+        shapeType: "bounding-box",
         strictBounds: payload?.strictBounds === true,
-        points
+        boundingBox
     }
 
     const roiId = String( payload?.roiId ?? "" ).trim()
@@ -312,20 +370,10 @@ var createRoi = async (
         parameters.groupID = groupID ?? ""
     }
 
-    const hasMultiplePoints = points.length > 1
-    const normalizedLowerPercentage = Number( lowerPercentage )
-    const normalizedUpperPercentage = Number( upperPercentage )
-
-    if( hasMultiplePoints && Number.isFinite( normalizedLowerPercentage ) ){
-        parameters.lowerPercentage = String( normalizedLowerPercentage )
-    }
-
-    if( hasMultiplePoints && Number.isFinite( normalizedUpperPercentage ) ){
-        parameters.upperPercentage = String( normalizedUpperPercentage )
-    }
+    const hasMultiplePixels = ( boundingBox.width * boundingBox.height ) > 1
 
     const resolvedConfidenceLevels = resolveConfidenceLevels( confidenceLevels )
-    if( hasMultiplePoints && resolvedConfidenceLevels.length > 0 ){
+    if( hasMultiplePixels && resolvedConfidenceLevels.length > 0 ){
         parameters.confidenceLevels = resolvedConfidenceLevels
     }
 
@@ -374,4 +422,95 @@ var deleteRoi = async ( project: any, roiId: string ) => {
     })
 }
 
-export default { parse, estimate, spectrum, meanSpectrum, status, listRois, createRoi, deleteRoi }
+var loadZBlendSettings = async (
+    project: any,
+    dataType: string = ""
+) => {
+
+    const projectReference = resolveProjectReference( project )
+    if( projectReference.projectID.length === 0 ){
+        throw new Error( "Missing projectID for z-blend settings request." )
+    }
+
+    const parameters: Record<string, string> = {
+        projectID: projectReference.projectID,
+        dataType: resolveRoiDataType( dataType )
+    }
+
+    if( projectReference.isShared || projectReference.projectKey.length > 0 ){
+        parameters.projectKey = projectReference.projectKey
+    }
+
+    const route = projectReference.isShared
+        ? "/hyperspectrum/shared/zblend/settings"
+        : "/hyperspectrum/zblend/settings"
+
+    const base = (import.meta as any).env.VITE_BASE_URL + route
+    const url = base + "?" + buildQueryString( parameters )
+
+    return await apiFetch<ZBlendPreset>( url )
+}
+
+var saveZBlendSettings = async (
+    project: any,
+    preset: Partial<ZBlendPreset> = {},
+    dataType: string = ""
+) => {
+
+    const projectReference = resolveProjectReference( project )
+    if( projectReference.projectID.length === 0 ){
+        throw new Error( "Missing projectID for z-blend settings save." )
+    }
+
+    const normalizedDataType = resolveRoiDataType( dataType )
+    const normalizedChannels = Array.isArray( preset?.channels ) ? preset.channels : []
+
+    const body: ZBlendPreset = {
+        version: "zblend-v1",
+        projectID: projectReference.projectID,
+        dataType: normalizedDataType,
+        channels: normalizedChannels.map(( channel ) => {
+            return {
+                enabled: channel?.enabled !== false,
+                requestedZ: Number( channel?.requestedZ ?? 0 ),
+                resolvedLayerIndex: Math.max( 0, Number.parseInt( channel?.resolvedLayerIndex ?? 0, 10 ) || 0 ),
+                clampMin: Number( channel?.clampMin ?? 0 ),
+                clampMax: Number( channel?.clampMax ?? 1 )
+            }
+        })
+    }
+
+    const parameters: Record<string, string> = {
+        projectID: projectReference.projectID,
+        dataType: normalizedDataType
+    }
+
+    if( projectReference.isShared || projectReference.projectKey.length > 0 ){
+        parameters.projectKey = projectReference.projectKey
+    }
+
+    const route = projectReference.isShared
+        ? "/hyperspectrum/shared/zblend/settings"
+        : "/hyperspectrum/zblend/settings"
+
+    const base = (import.meta as any).env.VITE_BASE_URL + route
+    const url = base + "?" + buildQueryString( parameters )
+
+    return await apiFetch<any>( url, {
+        method: "PUT",
+        body: JSON.stringify( body )
+    })
+}
+
+export default {
+    parse,
+    estimate,
+    spectrum,
+    meanSpectrum,
+    status,
+    listRois,
+    createRoi,
+    deleteRoi,
+    loadZBlendSettings,
+    saveZBlendSettings
+}

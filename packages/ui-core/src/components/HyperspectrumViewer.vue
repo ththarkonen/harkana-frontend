@@ -5,24 +5,44 @@
 	<!-- Mobile overlay -->
 	<div v-if = "sidebarOpen" @click = "sidebarOpen = false" class = "fixed inset-0 bg-black/40 z-30 md:hidden"></div>
 	<!-- App Grid -->
-	<div class="grid h-[calc(100vh-4px)] gap-[2px] grid-cols-1 grid-rows-[auto_1fr] md:grid-cols-[16rem_1fr] md:grid-rows-[auto_1fr]">
+	<div class="grid h-[calc(100vh-4px)] gap-[2px] grid-cols-1 grid-rows-[auto_1fr] md:grid-cols-[16rem_1fr] md:grid-rows-[auto_1fr]"
+		 data-tutorial = "viewer-layout">
 
 			<Sidebar :style = "sidebarStyle">
-				<Logo></Logo>
+				<RouterLink :to = "{ name: 'Main menu' }"
+							class = "block text-left rounded-md focus:outline-none focus:ring-2 focus:ring-brand"
+							aria-label = "Open project menu">
+					<Logo></Logo>
+				</RouterLink>
 
-				<SidebarButton @click = "navigation.route('Main menu', {})" class = "my-2">
-					Project menu
-				</SidebarButton>
+				<div class = "mt-2 p-2 shadow-md shadow-black border-2 border-gray bg-gray-800 rounded-lg"
+					 data-tutorial = "display-section">
+					<div class = "flex items-center justify-between gap-1 mb-2">
+						<div class = "flex min-w-0 items-center gap-1">
+							<span class = "inline-flex h-5 w-5 items-center justify-center text-white" aria-hidden = "true">
+								<i class = "fas fa-layer-group text-sm"></i>
+							</span>
+							<h3 class = "text-white font-semibold whitespace-nowrap">Display</h3>
+							<span v-if = "showDisplayInfoIcon"
+								  ref = "displayInfoTrigger"
+								  class = "relative inline-flex items-center"
+								  @mouseenter = "showDisplayInfoTooltipOverlay"
+								  @mouseleave = "hideDisplayInfoTooltipOverlay">
+								<span class = "inline-flex h-4 w-4 items-center justify-center text-xs text-white/70 cursor-help">
+									<i class = "fas fa-info-circle" aria-hidden = "true"></i>
+								</span>
+							</span>
+						</div>
 
-				<div class = "mt-2 p-2 shadow-md shadow-black border-2 border-gray bg-gray-800 rounded-lg">
-					<div class = "flex items-center justify-between gap-2 mb-2">
-						<h3 class = "text-white font-semibold">Display</h3>
-
-						<BaseDropdown :show-chevron = "false"
+						<div data-tutorial = "display-options">
+						<BaseDropdown ref = "displayOptionsDropdown"
+									  :open = "tutorialDisplayOptionsOpenBinding"
+									  @update:open = "handleTutorialDisplayOptionsOpenUpdate"
+									  :show-chevron = "false"
 									  :close-on-select = "true"
 									  :teleport-to-body = "true"
 									  trigger-class = "h-8 w-8 inline-flex items-center justify-center rounded-md text-white transition-colors hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-brand"
-									  menu-class = "fixed z-[45] min-w-[18rem] w-max max-w-[50vw] origin-top-left rounded-md bg-dark-gray shadow-lg ring-1 ring-black/30">
+									  :menu-class = "displayOptionsMenuClass">
 							<template v-slot:trigger>
 								<span class = "sr-only">Display options</span>
 								<i class = "fas fa-ellipsis-v" aria-hidden = "true" title = "Display options"></i>
@@ -39,14 +59,35 @@
 									   aria-hidden = "true"></i>
 								</button>
 							</li>
-								<li>
-									<button @click = "setHeatmapInteractionMode('zoom')"
-											class = "flex w-full items-center justify-between gap-3 px-4 py-2 text-left text-sm text-white transition hover:bg-brand hover:text-white">
-										<span>Zoom</span>
-										<i :class = "heatmapInteractionMode === 'zoom' ? 'fas fa-check text-brand' : 'fas fa-check opacity-0'"
-										   aria-hidden = "true"></i>
-									</button>
-								</li>
+							<li>
+								<button @click = "setHeatmapInteractionMode('zoom')"
+										class = "flex w-full items-center justify-between gap-3 px-4 py-2 text-left text-sm text-white transition hover:bg-brand hover:text-white">
+									<span>Zoom</span>
+									<i :class = "heatmapInteractionMode === 'zoom' ? 'fas fa-check text-brand' : 'fas fa-check opacity-0'"
+									   aria-hidden = "true"></i>
+								</button>
+							</li>
+
+							<li><hr class = "h-0.5 bg-gray border-0"></li>
+							<li class = "px-4 pt-2 pb-1 text-xs uppercase tracking-wide text-white/70">
+								Zoom aspect ratio
+							</li>
+							<li>
+								<button @click = "setHeatmapZoomAspectRatio('square')"
+										class = "flex w-full items-center justify-between gap-3 px-4 py-2 text-left text-sm text-white transition hover:bg-brand hover:text-white">
+									<span>Lock square</span>
+									<i :class = "heatmapZoomAspectRatio === 'square' ? 'fas fa-check text-brand' : 'fas fa-check opacity-0'"
+									   aria-hidden = "true"></i>
+								</button>
+							</li>
+							<li>
+								<button @click = "setHeatmapZoomAspectRatio('free')"
+										class = "flex w-full items-center justify-between gap-3 px-4 py-2 text-left text-sm text-white transition hover:bg-brand hover:text-white">
+									<span>Free</span>
+									<i :class = "heatmapZoomAspectRatio === 'free' ? 'fas fa-check text-brand' : 'fas fa-check opacity-0'"
+									   aria-hidden = "true"></i>
+								</button>
+							</li>
 
 								<li><hr class = "h-0.5 bg-gray border-0"></li>
 								<li class = "px-4 pt-2 pb-1 text-xs uppercase tracking-wide text-white/70">
@@ -114,37 +155,192 @@
 									</button>
 								</li>
 							</BaseDropdown>
+							</div>
 						</div>
 
-					<select id = "plot-mode"
-							v-model = "activePlot"
-							class = "w-full rounded border border-gray-600 px-2 py-1 text-black bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
-						<option value = "mip">MIP</option>
-					<option value = "mip_hsv">HSV-mapped MIP</option>
-					<option value = "umap">UMAP</option>
-					<option value = "layer">Layer</option>
-					<option value = "pca">PCA classification</option>
-					<option value = "pca_mip">PCA MIP</option>
-					<option value = "pca_rgb">PCA RGB</option>
-					<option value = "rpca">RPCA classification</option>
-						<option value = "rpca_mip">RPCA MIP</option>
-						<option value = "rpca_rgb">RPCA RGB</option>
-					</select>
+						<div data-tutorial = "display-select">
+							<FloatingLabelSelect ref = "displaySelectDropdown"
+											   :model-value = "activePlot"
+											   @update:model-value = "setActiveDisplayMode"
+											   :options = "DISPLAY_MODE_SELECT_OPTIONS"
+											   label = "Display"
+											   variant = "soft"
+											   :open = "tutorialDisplaySelectOpenBinding"
+											   @update:open = "handleTutorialDisplaySelectOpenUpdate"
+											   :menu-class = "displaySelectMenuClass"></FloatingLabelSelect>
+						</div>
 
-				<div v-if = "activePlot === 'layer'" class = "mt-3">
+				<div v-if = "activePlot === 'layer'" class = "mt-3" data-tutorial = "layer-controls">
 					<label for = "layer-input" class = "block text-sm font-semibold text-white mb-1">
 						Layer index
 					</label>
-					<input id = "layer-input"
-							type = "number"
-							min = "0"
-							:max = "maxLayerIndex"
-							step = "1"
-							v-model = "layerInput"
-							@input = "debouncedApplyLayerInput"
-							@keydown.enter.prevent = "applyLayerInput"
-							@blur = "applyLayerInput"
-							class = "w-full rounded border border-gray-600 px-2 py-1 text-black text-center bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+					<div class = "viewer-stepper w-full border-b border-white/30 transition-colors focus-within:border-brand">
+						<input id = "layer-input"
+								type = "number"
+								min = "0"
+								:max = "maxLayerIndex"
+								step = "1"
+								v-model.number = "layerInput"
+								@input = "debouncedApplyLayerInput"
+								@keydown.enter.prevent = "applyLayerInput"
+								@blur = "applyLayerInput"
+								class = "viewer-stepper-input w-full bg-transparent px-0 py-1 text-center text-white placeholder:text-white/40 focus:outline-none"/>
+
+						<div class = "flex flex-col">
+							<button type = "button"
+									@click.stop = "stepLayerInput( 1 )"
+									:disabled = "canStepLayerInput( 1 ) === false"
+									class = "inline-flex h-3.5 w-4 items-center justify-center text-[10px] text-white/55 transition hover:text-white disabled:cursor-not-allowed disabled:opacity-30">
+								<span class = "sr-only">Increase layer index</span>
+								<i class = "fas fa-chevron-up" aria-hidden = "true"></i>
+							</button>
+							<button type = "button"
+									@click.stop = "stepLayerInput( -1 )"
+									:disabled = "canStepLayerInput( -1 ) === false"
+									class = "inline-flex h-3.5 w-4 items-center justify-center text-[10px] text-white/55 transition hover:text-white disabled:cursor-not-allowed disabled:opacity-30">
+								<span class = "sr-only">Decrease layer index</span>
+								<i class = "fas fa-chevron-down" aria-hidden = "true"></i>
+							</button>
+						</div>
+					</div>
+					<div class = "mt-1 text-xs text-white/70">
+						{{ layerAxisValueLabel }}
+					</div>
+				</div>
+
+				<div v-if = "activePlot === 'z_blend'" class = "mt-3 space-y-3">
+					<div class = "w-full">
+						<BaseDropdown root-class = "relative block w-full text-left"
+									  :show-chevron = "false"
+									  :close-on-select = "false"
+									  :teleport-to-body = "true"
+									  trigger-class = "inline-flex w-full items-center justify-between gap-3 rounded-md border border-gray-600 bg-gray-700 px-3 py-2 text-left text-sm text-white transition hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-brand"
+									  menu-class = "fixed z-[45] max-h-[70vh] min-w-[24rem] w-[24rem] max-w-[min(32rem,calc(100vw-1rem))] origin-top-left overflow-y-auto rounded-md bg-dark-gray shadow-lg ring-1 ring-black/30">
+							<template v-slot:trigger>
+								<span class = "font-semibold">Channels</span>
+								<div class = "flex items-center text-white/80">
+									<i class = "fas fa-sliders-h" aria-hidden = "true"></i>
+								</div>
+							</template>
+
+							<li class = "px-4 pt-3 pb-3 text-xs uppercase tracking-wide text-white/70">
+								<div class = "flex items-center gap-2">
+									<span>Z-blend channels</span>
+									<span class = "group relative inline-flex items-center z-[70] normal-case">
+										<span class = "inline-flex h-4 w-4 items-center justify-center text-xs text-white/80 cursor-help">
+											<i class = "fas fa-info-circle" aria-hidden = "true"></i>
+										</span>
+										<span class = "pointer-events-none absolute left-1/2 top-full z-[80] mt-2 hidden w-64 -translate-x-1/2 rounded-md border border-white/10 px-3 py-2 text-[11px] normal-case leading-relaxed text-white shadow-xl ring-1 ring-black/30 group-hover:block"
+											  style = "background-color: rgb(17 24 39);">
+											Each channel adds one z-layer in its assigned color. The left slider handle sets the intensity below which that channel is hidden, and the right handle sets the intensity at which the channel reaches full color. Intensities between those two values fade in smoothly before all channels are added together.
+										</span>
+									</span>
+								</div>
+							</li>
+
+							<li v-for = "( channel, index ) in zBlendChannels"
+								:key = "'z-blend-channel-' + index"
+								class = "border-t border-gray/40 px-4 py-3 text-white first:border-t-0">
+								<div class = "space-y-1.5" :class = "channel.enabled === false ? 'opacity-45' : ''">
+									<div class = "flex items-center gap-3">
+										<label class = "inline-flex shrink-0 items-center justify-center">
+											<input :checked = "channel.enabled !== false"
+												   type = "checkbox"
+												   @change = "toggleZBlendChannelEnabled( index, $event )"
+												   class = "h-4 w-4 rounded border border-brand/70 bg-gray-700 accent-brand focus:ring-2 focus:ring-brand"/>
+											<span class = "sr-only">Toggle z-blend channel</span>
+										</label>
+
+										<div class = "z-blend-value-stepper w-24 shrink-0 border-b border-white/30 transition-colors focus-within:border-brand">
+											<input :id = "'z-blend-value-' + index"
+												   v-model.number = "channel.requestedZ"
+												   type = "number"
+												   step = "any"
+												   @input = "handleZBlendChannelInput( index )"
+												   @blur = "applyZBlendChannelInput( index )"
+												   class = "z-blend-value-input w-full bg-transparent px-0 py-1 text-center text-white placeholder:text-white/40 focus:outline-none"/>
+
+											<div class = "flex flex-col">
+												<button type = "button"
+														@click.stop = "stepZBlendChannelValue( index, 1 )"
+														:disabled = "canStepZBlendChannelValue( index, 1 ) === false"
+														class = "inline-flex h-3.5 w-4 items-center justify-center text-[10px] text-white/55 transition hover:text-white disabled:cursor-not-allowed disabled:opacity-30">
+													<span class = "sr-only">Increase z value</span>
+													<i class = "fas fa-chevron-up" aria-hidden = "true"></i>
+												</button>
+												<button type = "button"
+														@click.stop = "stepZBlendChannelValue( index, -1 )"
+														:disabled = "canStepZBlendChannelValue( index, -1 ) === false"
+														class = "inline-flex h-3.5 w-4 items-center justify-center text-[10px] text-white/55 transition hover:text-white disabled:cursor-not-allowed disabled:opacity-30">
+													<span class = "sr-only">Decrease z value</span>
+													<i class = "fas fa-chevron-down" aria-hidden = "true"></i>
+												</button>
+											</div>
+										</div>
+
+										<DualRangeSlider class = "flex-1"
+														 :min = "0"
+														 :max = "zBlendChannelSliderMaximum( index )"
+														 :step = "zBlendChannelSliderStep( index )"
+														 :min-value = "channel.clampMin"
+														 :max-value = "channel.clampMax"
+														 :color = "zBlendChannelColorHex( index )"
+														 :show-values-on-hover = "true"
+														 @update:min-value = "updateZBlendClampValue( index, 'min', $event )"
+														 @update:max-value = "updateZBlendClampValue( index, 'max', $event )"/>
+
+										<button type = "button"
+												@click.stop = "removeZBlendChannel( index )"
+												:disabled = "zBlendChannels.length <= 1 || zBlendSaving"
+												class = "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-white/80 transition hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-40">
+											<span class = "sr-only">Remove z-blend channel</span>
+											<i class = "fas fa-times" aria-hidden = "true"></i>
+										</button>
+									</div>
+
+									<div class = "text-xs text-white/70">
+										Layer {{ zBlendResolvedChannelLabel( index ).layerLabel }}
+									</div>
+								</div>
+							</li>
+
+							<li class = "border-t border-gray/40 px-4 py-3">
+								<div class = "flex flex-wrap items-center justify-between gap-2">
+									<button type = "button"
+											@click.stop = "addZBlendChannel"
+											:disabled = "zBlendChannels.length >= MAX_Z_BLEND_CHANNELS || zBlendSaving"
+											class = "inline-flex items-center gap-2 rounded-md border border-gray-600 px-3 py-2 text-sm text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50">
+										<i class = "fas fa-plus" aria-hidden = "true"></i>
+										<span>Add channel</span>
+									</button>
+
+									<div class = "flex flex-wrap items-center gap-2">
+										<button type = "button"
+												@click.stop = "saveZBlendPreset"
+												:disabled = "zBlendSaving || zBlendChannels.length === 0"
+												class = "inline-flex items-center gap-2 rounded-md bg-brand px-3 py-2 text-sm font-semibold text-white transition hover:bg-brand/90 disabled:cursor-not-allowed disabled:opacity-50">
+											<span class = "relative inline-flex min-w-[4.5rem] items-center justify-center">
+												<span :class = "zBlendSaving ? 'invisible' : ''">Save</span>
+												<span v-if = "zBlendSaving" class = "absolute inset-0 flex items-center justify-center">
+													<Spinner class = "h-4 w-4 text-white"/>
+												</span>
+											</span>
+										</button>
+									</div>
+								</div>
+
+								<p v-if = "zBlendPresetStatusMessage.length > 0"
+								   class = "mt-2 text-xs"
+								   :class = "zBlendPresetStatus === 'error' ? 'text-red-300' : 'text-white/70'">
+									{{ zBlendPresetStatusMessage }}
+								</p>
+							</li>
+						</BaseDropdown>
+					</div>
+
+					<p v-if = "zBlendPresetSummaryLabel.length > 0" class = "text-xs text-white/70">
+						{{ zBlendPresetSummaryLabel }}
+					</p>
 				</div>
 
 				<div v-if = "activePlot === 'pca' || activePlot === 'pca_mip' || activePlot === 'rpca' || activePlot === 'rpca_mip'" class = "mt-3">
@@ -152,31 +348,69 @@
 						<label for = "pca-classification-component-count" class = "block text-sm font-semibold text-white mb-1">
 							Number of components
 						</label>
-						<select id = "pca-classification-component-count"
-								v-model = "pcaClassificationComponentCount"
-								@change = "applyPcaClassificationComponentCount"
-								class = "w-full rounded border border-gray-600 px-2 py-1 text-black bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
-							<option v-for = "componentCount in pcaComponentIndices"
-									:key = "'pca-classification-' + componentCount"
-									:value = "componentCount">
-								{{ componentCount }}
-							</option>
-						</select>
+						<div class = "viewer-stepper w-full border-b border-white/30 transition-colors focus-within:border-brand">
+							<input id = "pca-classification-component-count"
+									type = "number"
+									min = "1"
+									max = "10"
+									step = "1"
+									v-model.number = "pcaClassificationComponentCount"
+									@input = "debouncedApplyPcaClassificationComponentCount"
+									@keydown.enter.prevent = "applyPcaClassificationComponentCount"
+									@blur = "applyPcaClassificationComponentCount"
+									class = "viewer-stepper-input w-full bg-transparent px-0 py-1 text-center text-white placeholder:text-white/40 focus:outline-none"/>
+
+							<div class = "flex flex-col">
+								<button type = "button"
+										@click.stop = "stepPcaComponentCount( 'classification', 1 )"
+										:disabled = "canStepPcaComponentCount( 'classification', 1 ) === false"
+										class = "inline-flex h-3.5 w-4 items-center justify-center text-[10px] text-white/55 transition hover:text-white disabled:cursor-not-allowed disabled:opacity-30">
+									<span class = "sr-only">Increase number of components</span>
+									<i class = "fas fa-chevron-up" aria-hidden = "true"></i>
+								</button>
+								<button type = "button"
+										@click.stop = "stepPcaComponentCount( 'classification', -1 )"
+										:disabled = "canStepPcaComponentCount( 'classification', -1 ) === false"
+										class = "inline-flex h-3.5 w-4 items-center justify-center text-[10px] text-white/55 transition hover:text-white disabled:cursor-not-allowed disabled:opacity-30">
+									<span class = "sr-only">Decrease number of components</span>
+									<i class = "fas fa-chevron-down" aria-hidden = "true"></i>
+								</button>
+							</div>
+						</div>
 					</div>
 					<div v-if = "activePlot === 'pca_mip' || activePlot === 'rpca_mip'" class = "mt-3">
 						<label for = "pca-mip-component-count" class = "block text-sm font-semibold text-white mb-1">
 							Number of components
 						</label>
-						<select id = "pca-mip-component-count"
-								v-model = "pcaMipComponentCount"
-								@change = "applyPcaMipComponentCount"
-								class = "w-full rounded border border-gray-600 px-2 py-1 text-black bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
-							<option v-for = "componentCount in pcaComponentIndices"
-									:key = "'pca-mip-' + componentCount"
-									:value = "componentCount">
-								{{ componentCount }}
-							</option>
-						</select>
+						<div class = "viewer-stepper w-full border-b border-white/30 transition-colors focus-within:border-brand">
+							<input id = "pca-mip-component-count"
+									type = "number"
+									min = "1"
+									max = "10"
+									step = "1"
+									v-model.number = "pcaMipComponentCount"
+									@input = "debouncedApplyPcaMipComponentCount"
+									@keydown.enter.prevent = "applyPcaMipComponentCount"
+									@blur = "applyPcaMipComponentCount"
+									class = "viewer-stepper-input w-full bg-transparent px-0 py-1 text-center text-white placeholder:text-white/40 focus:outline-none"/>
+
+							<div class = "flex flex-col">
+								<button type = "button"
+										@click.stop = "stepPcaComponentCount( 'mip', 1 )"
+										:disabled = "canStepPcaComponentCount( 'mip', 1 ) === false"
+										class = "inline-flex h-3.5 w-4 items-center justify-center text-[10px] text-white/55 transition hover:text-white disabled:cursor-not-allowed disabled:opacity-30">
+									<span class = "sr-only">Increase number of components</span>
+									<i class = "fas fa-chevron-up" aria-hidden = "true"></i>
+								</button>
+								<button type = "button"
+										@click.stop = "stepPcaComponentCount( 'mip', -1 )"
+										:disabled = "canStepPcaComponentCount( 'mip', -1 ) === false"
+										class = "inline-flex h-3.5 w-4 items-center justify-center text-[10px] text-white/55 transition hover:text-white disabled:cursor-not-allowed disabled:opacity-30">
+									<span class = "sr-only">Decrease number of components</span>
+									<i class = "fas fa-chevron-down" aria-hidden = "true"></i>
+								</button>
+							</div>
+						</div>
 					</div>
 
 						<div class = "grid grid-cols-2 gap-x-3 gap-y-1 mt-2">
@@ -204,55 +438,117 @@
 					<div class = "grid grid-cols-3 gap-2 mt-2">
 						<div>
 							<label for = "pca-r-input" class = "block text-xs font-semibold mb-1" style = "color: rgb(239, 68, 68);">R</label>
-							<input id = "pca-r-input"
-									type = "number"
-									min = "1"
-									max = "10"
-									step = "1"
-									v-model = "pcaRgbRedInput"
-									@input = "debouncedApplyPcaRgbInput"
-									@keydown.enter.prevent = "applyPcaRgbInput"
-									@blur = "applyPcaRgbInput"
-									class = "w-full rounded border border-gray-600 px-2 py-1 text-black text-center bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+							<div class = "viewer-stepper border-b border-white/30 transition-colors focus-within:border-brand">
+								<input id = "pca-r-input"
+										type = "number"
+										min = "1"
+										max = "10"
+										step = "1"
+										v-model.number = "pcaRgbRedInput"
+										@input = "debouncedApplyPcaRgbInput"
+										@keydown.enter.prevent = "applyPcaRgbInput"
+										@blur = "applyPcaRgbInput"
+										class = "viewer-stepper-input w-full bg-transparent px-0 py-1 text-center text-white placeholder:text-white/40 focus:outline-none"/>
+
+								<div class = "flex flex-col">
+									<button type = "button"
+											@click.stop = "stepPcaRgbComponent( 'r', 1 )"
+											:disabled = "canStepPcaRgbComponent( 'r', 1 ) === false"
+											class = "inline-flex h-3.5 w-4 items-center justify-center text-[10px] text-white/55 transition hover:text-white disabled:cursor-not-allowed disabled:opacity-30">
+										<span class = "sr-only">Increase red component</span>
+										<i class = "fas fa-chevron-up" aria-hidden = "true"></i>
+									</button>
+									<button type = "button"
+											@click.stop = "stepPcaRgbComponent( 'r', -1 )"
+											:disabled = "canStepPcaRgbComponent( 'r', -1 ) === false"
+											class = "inline-flex h-3.5 w-4 items-center justify-center text-[10px] text-white/55 transition hover:text-white disabled:cursor-not-allowed disabled:opacity-30">
+										<span class = "sr-only">Decrease red component</span>
+										<i class = "fas fa-chevron-down" aria-hidden = "true"></i>
+									</button>
+								</div>
+							</div>
 						</div>
 
 						<div>
 							<label for = "pca-g-input" class = "block text-xs font-semibold mb-1" style = "color: rgb(34, 197, 94);">G</label>
-							<input id = "pca-g-input"
-									type = "number"
-									min = "1"
-									max = "10"
-									step = "1"
-									v-model = "pcaRgbGreenInput"
-									@input = "debouncedApplyPcaRgbInput"
-									@keydown.enter.prevent = "applyPcaRgbInput"
-									@blur = "applyPcaRgbInput"
-									class = "w-full rounded border border-gray-600 px-2 py-1 text-black text-center bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+							<div class = "viewer-stepper border-b border-white/30 transition-colors focus-within:border-brand">
+								<input id = "pca-g-input"
+										type = "number"
+										min = "1"
+										max = "10"
+										step = "1"
+										v-model.number = "pcaRgbGreenInput"
+										@input = "debouncedApplyPcaRgbInput"
+										@keydown.enter.prevent = "applyPcaRgbInput"
+										@blur = "applyPcaRgbInput"
+										class = "viewer-stepper-input w-full bg-transparent px-0 py-1 text-center text-white placeholder:text-white/40 focus:outline-none"/>
+
+								<div class = "flex flex-col">
+									<button type = "button"
+											@click.stop = "stepPcaRgbComponent( 'g', 1 )"
+											:disabled = "canStepPcaRgbComponent( 'g', 1 ) === false"
+											class = "inline-flex h-3.5 w-4 items-center justify-center text-[10px] text-white/55 transition hover:text-white disabled:cursor-not-allowed disabled:opacity-30">
+										<span class = "sr-only">Increase green component</span>
+										<i class = "fas fa-chevron-up" aria-hidden = "true"></i>
+									</button>
+									<button type = "button"
+											@click.stop = "stepPcaRgbComponent( 'g', -1 )"
+											:disabled = "canStepPcaRgbComponent( 'g', -1 ) === false"
+											class = "inline-flex h-3.5 w-4 items-center justify-center text-[10px] text-white/55 transition hover:text-white disabled:cursor-not-allowed disabled:opacity-30">
+										<span class = "sr-only">Decrease green component</span>
+										<i class = "fas fa-chevron-down" aria-hidden = "true"></i>
+									</button>
+								</div>
+							</div>
 						</div>
 
 						<div>
 							<label for = "pca-b-input" class = "block text-xs font-semibold mb-1" style = "color: rgb(59, 130, 246);">B</label>
-							<input id = "pca-b-input"
-									type = "number"
-									min = "1"
-									max = "10"
-									step = "1"
-									v-model = "pcaRgbBlueInput"
-									@input = "debouncedApplyPcaRgbInput"
-									@keydown.enter.prevent = "applyPcaRgbInput"
-									@blur = "applyPcaRgbInput"
-									class = "w-full rounded border border-gray-600 px-2 py-1 text-black text-center bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+							<div class = "viewer-stepper border-b border-white/30 transition-colors focus-within:border-brand">
+								<input id = "pca-b-input"
+										type = "number"
+										min = "1"
+										max = "10"
+										step = "1"
+										v-model.number = "pcaRgbBlueInput"
+										@input = "debouncedApplyPcaRgbInput"
+										@keydown.enter.prevent = "applyPcaRgbInput"
+										@blur = "applyPcaRgbInput"
+										class = "viewer-stepper-input w-full bg-transparent px-0 py-1 text-center text-white placeholder:text-white/40 focus:outline-none"/>
+
+								<div class = "flex flex-col">
+									<button type = "button"
+											@click.stop = "stepPcaRgbComponent( 'b', 1 )"
+											:disabled = "canStepPcaRgbComponent( 'b', 1 ) === false"
+											class = "inline-flex h-3.5 w-4 items-center justify-center text-[10px] text-white/55 transition hover:text-white disabled:cursor-not-allowed disabled:opacity-30">
+										<span class = "sr-only">Increase blue component</span>
+										<i class = "fas fa-chevron-up" aria-hidden = "true"></i>
+									</button>
+									<button type = "button"
+											@click.stop = "stepPcaRgbComponent( 'b', -1 )"
+											:disabled = "canStepPcaRgbComponent( 'b', -1 ) === false"
+											class = "inline-flex h-3.5 w-4 items-center justify-center text-[10px] text-white/55 transition hover:text-white disabled:cursor-not-allowed disabled:opacity-30">
+										<span class = "sr-only">Decrease blue component</span>
+										<i class = "fas fa-chevron-down" aria-hidden = "true"></i>
+									</button>
+								</div>
+							</div>
 						</div>
 					</div>
 
 					</div>
 			</div>
 
-				<div v-if = "project.shared || hasEstimatedRamanSpectraReady"
-						 class = "mt-4 p-2 shadow-md shadow-black border-2 border-gray bg-gray-800 rounded-lg">
-					<div class = "flex items-center justify-between gap-2">
-						<div>
-							<h3 class = "text-white font-semibold">Raman inference</h3>
+					<div v-if = "showRamanInferenceTutorialBlock"
+						 class = "mt-4 p-2 shadow-md shadow-black border-2 border-gray bg-gray-800 rounded-lg"
+						 data-tutorial = "raman-inference-sidebar-block">
+					<div v-if = "showTutorialRamanSidebarPlaceholder === false"
+						 class = "flex items-center justify-between gap-1">
+						<div class = "flex min-w-0 items-center gap-1">
+							<span class = "inline-flex h-5 w-5 items-center justify-center text-white" aria-hidden = "true">
+								<i class = "fas fa-wave-square text-sm"></i>
+							</span>
+							<h3 class = "text-white font-semibold whitespace-nowrap">Raman inference</h3>
 						</div>
 
 						<BaseDropdown :show-chevron = "false"
@@ -331,13 +627,37 @@
 							</li>
 						</BaseDropdown>
 					</div>
+
+					<div v-else
+						 class = "flex min-h-8 items-center justify-between gap-1">
+						<div class = "flex min-w-0 items-center gap-1">
+							<span class = "inline-flex h-5 w-5 items-center justify-center text-white" aria-hidden = "true">
+								<i class = "fas fa-wave-square text-sm"></i>
+							</span>
+							<h3 class = "text-white font-semibold whitespace-nowrap">Raman inference</h3>
+						</div>
+
+						<button type = "button"
+								disabled
+								class = "h-8 w-8 inline-flex items-center justify-center rounded-md text-white/80">
+							<span class = "sr-only">Raman inference options</span>
+							<i class = "fas fa-ellipsis-v" aria-hidden = "true" title = "Raman inference options"></i>
+						</button>
+					</div>
+
 				</div>
 
-					<div class = "mt-4 p-2 shadow-md shadow-black border-2 border-gray bg-gray-800 rounded-lg">
-						<div class = "flex items-center justify-between gap-2 mb-2">
-							<h3 class = "text-white font-semibold">Regions of interest</h3>
+					<div class = "mt-4 p-2 shadow-md shadow-black border-2 border-gray bg-gray-800 rounded-lg"
+						 data-tutorial = "roi-controls">
+						<div class = "flex items-center justify-between gap-1 mb-2">
+							<div class = "flex min-w-0 items-center gap-1">
+								<span class = "inline-flex h-5 w-5 items-center justify-center text-white" aria-hidden = "true">
+									<i class = "fas fa-crop-simple text-sm"></i>
+								</span>
+								<h3 class = "text-white font-semibold whitespace-nowrap">Regions of interest</h3>
+							</div>
 
-							<div class = "flex items-center gap-1.5">
+							<div class = "flex items-center gap-1">
 								<BaseDropdown :show-chevron = "false"
 									  :close-on-select = "true"
 									  :teleport-to-body = "true"
@@ -355,6 +675,14 @@
 											<i :class = "showAllRoiOverlays ? 'fas fa-eye-slash' : 'fas fa-eye'"
 											   aria-hidden = "true"></i>
 											<span>{{ showAllRoiOverlays ? "Hide all ROI boxes" : "Show all ROI boxes" }}</span>
+										</button>
+									</li>
+									<li>
+										<button @click = "downloadAllRois"
+												:disabled = "rois.length === 0"
+												class = "flex w-full items-center gap-3 px-4 py-2 text-left text-sm text-white transition hover:bg-brand hover:text-white disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent">
+											<i class = "fas fa-download" aria-hidden = "true"></i>
+											<span>Download all ROIs</span>
 										</button>
 									</li>
 
@@ -384,14 +712,11 @@
 							</div>
 						</div>
 
-						<select id = "roi-select"
-								v-model = "selectedRoiId"
-							class = "w-full rounded border border-gray-600 px-2 py-1 text-black bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
-						<option class = "text-gray" value = "">No region selected</option>
-						<option v-for = "roi in rois" :key = "roi.roiId" :value = "roi.roiId">
-							{{ roi.name }}
-						</option>
-					</select>
+						<FloatingLabelSelect :model-value = "selectedRoiId"
+											 @update:model-value = "setSelectedRoiId"
+											 :options = "roiSelectOptions"
+											 variant = "soft"
+											 menu-class = "fixed z-[45] min-w-[16rem] w-max max-w-[50vw] origin-top-left rounded-md bg-dark-gray shadow-lg ring-1 ring-black/30"></FloatingLabelSelect>
 
 					<div class = "mt-2 flex flex-wrap items-center gap-1.5">
 						<button v-if = "canMutateRois"
@@ -420,19 +745,28 @@
 							<i class = "fas fa-info-circle" aria-hidden = "true"></i>
 						</button>
 
+						<button @click = "downloadSelectedRoi"
+								:disabled = "!selectedRoi"
+								class = "h-8 w-8 inline-flex items-center justify-center rounded-md text-white transition-colors hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-brand disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+								title = "Download selected ROI"
+								aria-label = "Download selected ROI">
+							<i class = "fas fa-download" aria-hidden = "true"></i>
+						</button>
+
 						<button @click = "refreshRoisFromBackend"
 								:disabled = "isRoiRefreshDisabled"
 								class = "h-8 w-8 inline-flex items-center justify-center rounded-md text-white transition-colors hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-brand disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
 								title = "Reload ROIs from backend"
 								aria-label = "Reload ROIs from backend">
-							<i class = "fas fa-sync-alt"
-							   :class = "{ 'roi-refresh-spin': isRoiRefreshDisabled }"
-							   aria-hidden = "true"></i>
+							<span class = "inline-flex h-4 w-4 items-center justify-center"
+								  :class = "{ 'roi-refresh-spin': isRoiRefreshDisabled }">
+								<i class = "fas fa-sync-alt" aria-hidden = "true"></i>
+							</span>
 						</button>
 					</div>
 
 					<p v-if = "canMutateRois && !hasSelectedRegion" class = "text-xs text-white/80 mt-1 leading-snug">
-						Select a heatmap region first to save a new ROI.
+						Select a heatmap region first to save a new region of interest.
 					</p>
 
 			</div>
@@ -442,62 +776,98 @@
 		<NavigationBar>
 			<template v-slot:left-items>
 				<button @click = "sidebarOpen = true" class = "md:hidden mr-4 px-3 py-2 rounded bg-slate-100">☰</button>
-				<BaseDropdown>
+				<div data-tutorial = "project-menu">
+				<BaseDropdown ref = "projectMenuDropdown"
+							  :open = "tutorialProjectMenuOpenBinding"
+							  @update:open = "handleTutorialProjectMenuOpenUpdate"
+							  :teleport-to-body = "true"
+							  portal-placement = "bottom-start"
+							  :portal-offset-x = "0"
+							  :portal-offset-y = "8"
+							  :menu-class = "projectMenuClass">
 					<template v-slot:trigger>
 						<span class = "font-medium">Project</span>
 					</template>
 
 					<BaseDropdownItem @select = "focusProjectNameEdit"
+									  :dimmed = "isProjectMenuItemDimmed('core')"
 									  :disabled = "project.shared"
 									  :tooltip = "ownedProjectActionTooltip('Renaming')">
 						Rename
 					</BaseDropdownItem>
 
 					<BaseDropdownItem @select = "openXyzSettingsModal"
+									  :dimmed = "isProjectMenuItemDimmed('core')"
 									  :disabled = "project.shared"
 									  :tooltip = "ownedProjectActionTooltip('Axis value editing')">
 						Edit axis values
 					</BaseDropdownItem>
 
 					<BaseDropdownItem @select = "openGpuInferenceModal"
+									  :dimmed = "isProjectMenuItemDimmed('core')"
 									  :disabled = "project.shared"
 									  :tooltip = "ownedProjectActionTooltip('Raman inference')">
 						Raman spectrum inference
 					</BaseDropdownItem>
 
-					<hr class = "h-0.5 bg-gray border-0 ">
+					<hr :class = "projectMenuDividerClass('sharing')">
 
 					<BaseDropdownItem @select = "openShareModal"
+									  :dimmed = "isProjectMenuItemDimmed('sharing')"
 									  :disabled = "project.shared"
 									  :tooltip = "ownedProjectActionTooltip('Sharing')">
 						Share
 					</BaseDropdownItem>
 
-					<BaseDropdownItem @select = "openProjectChat">
+					<BaseDropdownItem @select = "openProjectChat"
+									  :dimmed = "isProjectMenuItemDimmed('sharing')">
 						Notes
 					</BaseDropdownItem>
 
-					<BaseDropdownItem @select = "openMetadataModal">
+					<BaseDropdownItem @select = "openMetadataModal"
+									  :dimmed = "isProjectMenuItemDimmed('sharing')">
 						Metadata
 					</BaseDropdownItem>
 
-					<BaseDropdownItem @select = "download">
+					<BaseDropdownItem @select = "download"
+									  :dimmed = "isProjectMenuItemDimmed('sharing')">
 						Download
 					</BaseDropdownItem>
 
 					<BaseDropdownItem @select = "openZenodoModal"
+									  :dimmed = "isProjectMenuItemDimmed('sharing')"
 									  :disabled = "project.shared"
 									  :tooltip = "ownedProjectActionTooltip('Zenodo exporting')">
 						Zenodo export
 					</BaseDropdownItem>
 
-					<hr class = "h-0.5 bg-gray border-0 ">
+					<hr :class = "projectMenuDividerClass('utility')">
 
-					<BaseDropdownItem @select = "openVisualizationSettings">
+					<BaseDropdownItem @select = "openVisualizationSettings"
+									  :dimmed = "isProjectMenuItemDimmed('utility')">
 						Visualization settings
 					</BaseDropdownItem>
 
+					<BaseDropdownItem @select = "openProjectMenu"
+									  :dimmed = "isProjectMenuItemDimmed('utility')">
+						Main menu
+					</BaseDropdownItem>
+
+					<hr :class = "projectMenuDividerClass('utility')">
+
+					<BaseDropdownItem @select = "restartViewerTutorial"
+									  :dimmed = "isProjectMenuItemDimmed('utility')">
+						Tutorial
+					</BaseDropdownItem>
+
+					<li v-if = "frontendVersionDisplay.length > 0"
+						class = "px-4 py-2 text-left text-sm text-white/45"
+						:title = "'Release ' + version.release + ( version.buildSha.length > 0 ? '\nCommit ' + version.buildSha : '' ) + ( version.buildDate.length > 0 ? '\nBuilt ' + version.buildDate : '' )">
+						Version {{ frontendVersionDisplay }}
+					</li>
+
 				</BaseDropdown>
+				</div>
 				<ProjectNameInput ref = "projectNameInput" :project = "project"></ProjectNameInput>
 			</template>
 			<template v-slot:right-items>
@@ -508,7 +878,53 @@
 
 		<!-- Main Content -->
 			<main class="relative z-0 bg-dark-gray rounded-lg overflow-hidden shadow-sm p-0">
-				<div ref = "graph" class = "w-full h-full bg-white rounded-lg"></div>
+				<template v-if = "heatmapRendererMode === 'deckgl'">
+					<div ref = "deckLayoutContainer" class = "flex h-full min-h-0 gap-1 p-2">
+						<div class = "flex min-w-0 flex-1 flex-col gap-2 md:min-w-[20rem]"
+							 data-tutorial = "spectra-panels">
+							<div ref = "deckTopPanelGraph" class = "h-1/2 min-h-0 overflow-hidden rounded-lg bg-white"></div>
+							<div ref = "deckBottomPanelGraph" class = "h-1/2 min-h-0 overflow-hidden rounded-lg bg-white"></div>
+						</div>
+						<div class = "relative w-5 shrink-0 cursor-col-resize touch-none"
+							 title = "Resize"
+							 @pointerdown = "startDeckPaneResize">
+							<div class = "absolute inset-y-2 left-1/2 w-px -translate-x-1/2 rounded-full bg-gray/90"></div>
+							<div class = "absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center"
+								 aria-hidden = "true">
+								<span class = "flex flex-col items-center gap-[2px] rounded-md border border-gray/70 bg-dark-gray/90 px-1 py-1 shadow-sm">
+									<span class = "h-1 w-1 rotate-45 bg-white/60"></span>
+									<span class = "h-1 w-1 rotate-45 bg-white/60"></span>
+									<span class = "h-1 w-1 rotate-45 bg-white/60"></span>
+								</span>
+							</div>
+						</div>
+							<div class = "relative h-full shrink-0 overflow-hidden rounded-lg bg-white"
+								 data-tutorial = "heatmap-pane"
+								 :style = "deckHeatmapPaneStyle">
+								<div class = "absolute inset-1">
+									<div class = "relative h-full w-full">
+										<div ref = "graph" class = "w-full h-full bg-white rounded-lg"></div>
+										<HeatmapRendererPane :renderer-mode = "heatmapRendererMode"
+															 :payload = "heatmapRendererPayload"
+															 :pane-state = "heatmapRendererPaneState"
+															 :interaction-mode = "heatmapInteractionMode"
+															 :lock-square-zoom = "heatmapZoomAspectRatio === 'square'"
+															 :overlays = "activeRoiOverlays()"
+															 :view-mode = "activePlot"
+															 :benchmark-token = "heatmapRenderBenchmarkToken"
+															 @point-select = "handleHeatmapPointSelection"
+															 @region-select = "handleHeatmapRegionSelection"
+															 @zoom-range = "handleHeatmapZoomRange"
+															 @reset-zoom = "handleHeatmapResetZoom"
+															 @render-timing = "handleHeatmapRendererTiming"></HeatmapRendererPane>
+									</div>
+								</div>
+							</div>
+						</div>
+					</template>
+				<template v-else>
+					<div ref = "graph" class = "w-full h-full bg-white rounded-lg"></div>
+				</template>
 			</main>
 
 	</div>
@@ -541,25 +957,68 @@
 					  @save = "saveXyzSettings"></XyzSettingsModal>
 	<ProjectChatWindow v-model = "projectChatOpen"
 					   :project = "project"></ProjectChatWindow>
+	<ViewerTutorialPrompt :visible = "viewerTutorialPromptVisible"
+						  @start = "startViewerTutorial"
+						  @skip = "skipViewerTutorialPrompt"></ViewerTutorialPrompt>
+	<ViewerTutorialOverlay :visible = "viewerTutorialVisible"
+						   :step-id = "activeViewerTutorialStep?.id ?? ''"
+						   :title = "activeViewerTutorialStep?.title ?? ''"
+						   :body = "activeViewerTutorialStep?.body ?? ''"
+						   :step-number = "viewerTutorialStepIndex + 1"
+						   :step-count = "viewerTutorialSteps.length"
+						   :can-go-back = "viewerTutorialStepIndex > 0"
+						   :is-final = "viewerTutorialStepIndex >= viewerTutorialSteps.length - 1"
+						   :preferred-placement = "activeViewerTutorialStep?.placement ?? 'center'"
+						   :target-element = "activeViewerTutorialTargetElement"
+						   :spotlight-enabled = "activeViewerTutorialStep?.kind !== 'centered'"
+						   @next = "advanceViewerTutorial"
+						   @back = "rewindViewerTutorial"
+						   @skip = "skipActiveViewerTutorial"></ViewerTutorialOverlay>
+	<div v-if = "showDisplayInfoTooltip && showDisplayInfoIcon"
+		 class = "pointer-events-none fixed z-[120] w-64 rounded-md border border-white/10 px-3 py-2 text-[11px] leading-relaxed text-white shadow-xl ring-1 ring-black/30"
+		 :style = "displayInfoTooltipStyle">
+		<span class = "block">
+			The select menu can be used to select various false-color visualizations. Views are downloaded when needed and then cached so returning to them is faster.
+		</span>
+		<span v-if = "pendingPreparationTargets.length > 0" class = "mt-2 block text-white/70">
+			Preparing
+		</span>
+		<span v-for = "target in pendingPreparationTargets"
+			  :key = "'display-tooltip-overlay-' + target"
+			  class = "mt-1 flex items-center gap-2 text-white/80">
+			<Spinner v-if = "currentPreparationTarget === target"
+					 class = "h-3 w-3 text-brand"/>
+			<span v-else
+				  class = "inline-block h-1.5 w-1.5 rounded-full bg-white/30"></span>
+			<span>{{ preparationTargetLabel( target ) }}</span>
+		</span>
+	</div>
 </div>
 </template>
 
 <script setup>
 
-import { ref, watch, computed, nextTick, onMounted, onBeforeUnmount} from 'vue'
-import { useRoute } from 'vue-router'
+import { ref, shallowRef, watch, computed, nextTick, onMounted, onBeforeUnmount} from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { debounce } from 'lodash'
 const route = useRoute()
+const router = useRouter()
 
 const emit = defineEmits(["loaded"])
 
-import { projects as projectlib, settings as settingslib} from "@harkana/tools"
-import { navigation, hyperspectrumCache, hyperspectra, results } from "@harkana/tools"
+import {
+	projects as projectlib,
+	settings as settingslib,
+	version,
+	navigation,
+	hyperspectrumCache,
+	hyperspectra,
+	results
+} from "@harkana/tools"
 import { hyperspectrum } from "@harkana/plot"
 
 import Sidebar from './sidebar/Sidebar.vue'
 import Logo from "./sidebar/Logo.vue"
-import SidebarButton from './sidebar/SidebarButton.vue'
 
 import NavigationBar from './navbar/NavigationBar.vue'
 import AccountDropdown from './navbar/AccountDropdown.vue'
@@ -578,6 +1037,12 @@ import GpuInferenceOutcomeModal from './modals/GpuInferenceOutcomeModal.vue'
 import DownloadPreparingModal from './modals/DownloadPreparingModal.vue'
 import XyzSettingsModal from './modals/XyzSettingsModal.vue'
 import ProjectChatWindow from './chat/ProjectChatWindow.vue'
+import HeatmapRendererPane from './plot/HeatmapRendererPane.vue'
+import DualRangeSlider from './general/DualRangeSlider.vue'
+import FloatingLabelSelect from './general/FloatingLabelSelect.vue'
+import Spinner from './general/Spinner.vue'
+import ViewerTutorialPrompt from './tutorial/ViewerTutorialPrompt.vue'
+import ViewerTutorialOverlay from './tutorial/ViewerTutorialOverlay.vue'
 
 const metadataModal = ref(null)
 const shareModal = ref(null)
@@ -590,6 +1055,17 @@ const gpuInferenceModal = ref(null)
 const gpuInferenceOutcomeModal = ref(null)
 const downloadPreparingModal = ref(null)
 const xyzSettingsModal = ref(null)
+const displayInfoTrigger = ref(null)
+const displayOptionsDropdown = ref(null)
+const projectMenuDropdown = ref(null)
+const displaySelectDropdown = ref(null)
+const showDisplayInfoTooltip = ref(false)
+const displayInfoTooltipStyle = ref({
+	left: "0px",
+	top: "0px",
+	backgroundColor: "rgb(17 24 39)"
+})
+const frontendVersionDisplay = String( version.display ?? "" ).trim()
 
 const currentProjectID = () => {
 	return typeof route.params.id === "string" ? route.params.id : ""
@@ -599,23 +1075,42 @@ const project = ref({id: ""})
 const projects = ref({})
 const settings = ref({})
 
-const mip = ref(null)
-const mipHsv = ref(null)
-const umap = ref(null)
-const xyzAxes = ref(null)
-const layer = ref(null)
-const pcaClassification = ref(null)
-const pcaClassificationMip = ref(null)
-const pcaMip = ref(null)
-const pcaLoadings = ref(null)
-const rpcaClassification = ref(null)
-const rpcaClassificationMip = ref(null)
-const rpcaMip = ref(null)
-const rpcaLoadings = ref(null)
+const mip = shallowRef(null)
+const mipHsv = shallowRef(null)
+const umap = shallowRef(null)
+const xyzAxes = shallowRef(null)
+const layer = shallowRef(null)
+const pcaClassification = shallowRef(null)
+const pcaClassificationMip = shallowRef(null)
+const pcaMip = shallowRef(null)
+const pcaLoadings = shallowRef(null)
+const rpcaClassification = shallowRef(null)
+const rpcaClassificationMip = shallowRef(null)
+const rpcaMip = shallowRef(null)
+const rpcaLoadings = shallowRef(null)
+const deckLayoutContainer = ref(null)
+const deckTopPanelGraph = ref(null)
+const deckBottomPanelGraph = ref(null)
 const graph = ref(null)
 const activePlot = ref("umap")
+const heatmapRendererMode = ref("deckgl")
+const heatmapRendererPayload = shallowRef(null)
+const heatmapRendererPaneState = shallowRef(null)
+const heatmapZoomAspectRatio = ref("square")
+const heatmapRenderBenchmark = ref({
+	renderer: "plotly",
+	viewMode: "",
+	initialRenderMs: null,
+	lastMeasuredAt: null
+})
+const heatmapRenderBenchmarkToken = ref(0)
+const pendingDeckRenderBenchmark = ref(null)
+const lastDeckUpperPanelKey = ref("")
+const lastDeckLowerPanelKey = ref("")
+const lastDeckHeatmapPaneKey = ref("")
 const activeLayerIndex = ref(0)
 const activeLayerRequestID = ref(0)
+const activeLayerPayloadPrewarmRequestID = ref(0)
 const activeMipHsvRequestID = ref(0)
 const activeUmapRequestID = ref(0)
 const activeXyzRequestID = ref(0)
@@ -632,6 +1127,14 @@ const activeEstimatedMipRequestID = ref(0)
 const activeEstimatedMipHsvRequestID = ref(0)
 const activeEstimatedUmapRequestID = ref(0)
 const layerInput = ref(0)
+const zBlendChannels = ref([])
+const zBlendPresetStatus = ref("idle")
+const zBlendPresetStatusMessage = ref("")
+const zBlendPresetLoadedFromBackend = ref(false)
+const zBlendDirty = ref(false)
+const zBlendSaving = ref(false)
+const zBlendMeasurementIntensityMaximumByLayer = ref({})
+const zBlendEstimatedIntensityMaximumByLayer = ref({})
 const pcaRgbRedInput = ref(1)
 const pcaRgbGreenInput = ref(2)
 const pcaRgbBlueInput = ref(3)
@@ -646,6 +1149,7 @@ const DISPLAY_MODE_OPTIONS = new Set([
 	"mip_hsv",
 	"umap",
 	"layer",
+	"z_blend",
 	"pca",
 	"pca_mip",
 	"pca_rgb",
@@ -653,6 +1157,141 @@ const DISPLAY_MODE_OPTIONS = new Set([
 	"rpca_mip",
 	"rpca_rgb"
 ])
+const MAX_Z_BLEND_CHANNELS = 10
+const DEFAULT_Z_BLEND_PALETTE = [
+	"#0000ff",
+	"#00ff00",
+	"#ff00ff",
+	"#ffff00",
+	"#00ffff",
+	"#ff0000",
+	"#0000ff",
+	"#00ff00",
+	"#ff00ff",
+	"#ffff00"
+]
+const DEFAULT_HYPERSPECTRUM_PRIORITIZATION = {
+	mip: true,
+	mip_hsv: true,
+	umap: true,
+	z_blend: false,
+	layer_window: true,
+	pca: false,
+	pca_mip: false,
+	pca_rgb: false,
+	rpca: false,
+	rpca_mip: false,
+	rpca_rgb: false
+}
+const VIEWER_TUTORIAL_STORAGE_KEY = "harkana.viewerTutorial.v1"
+const PREPARATION_TARGET_ORDER = [
+	"mip",
+	"mip_hsv",
+	"umap",
+	"z_blend",
+	"pca",
+	"pca_mip",
+	"pca_rgb",
+	"rpca",
+	"rpca_mip",
+	"rpca_rgb",
+	"layer_window"
+]
+
+const createDefaultViewerTutorialState = () => {
+	return {
+		prompted: false,
+		completed: false,
+		skipped: false,
+		lastCompletedAt: ""
+	}
+}
+
+const readViewerTutorialState = () => {
+	if( typeof window === "undefined" || typeof window.localStorage === "undefined" ){
+		return createDefaultViewerTutorialState()
+	}
+
+	try{
+		const raw = window.localStorage.getItem( VIEWER_TUTORIAL_STORAGE_KEY )
+		if( typeof raw !== "string" || raw.length === 0 ){
+			return createDefaultViewerTutorialState()
+		}
+
+		const parsed = JSON.parse( raw )
+		return {
+			prompted: parsed?.prompted === true,
+			completed: parsed?.completed === true,
+			skipped: parsed?.skipped === true,
+			lastCompletedAt: typeof parsed?.lastCompletedAt === "string" ? parsed.lastCompletedAt : ""
+		}
+	} catch( error ){
+		console.log( error )
+		return createDefaultViewerTutorialState()
+	}
+}
+
+const viewerTutorialState = ref( readViewerTutorialState() )
+
+const persistViewerTutorialState = ( nextState ) => {
+	viewerTutorialState.value = {
+		...createDefaultViewerTutorialState(),
+		...viewerTutorialState.value,
+		...nextState
+	}
+
+	if( typeof window === "undefined" || typeof window.localStorage === "undefined" ){
+		return
+	}
+
+	try{
+		window.localStorage.setItem(
+			VIEWER_TUTORIAL_STORAGE_KEY,
+			JSON.stringify( viewerTutorialState.value )
+		)
+	} catch( error ){
+		console.log( error )
+	}
+}
+const PREPARATION_TARGET_LABELS = {
+	mip: "MIP",
+	mip_hsv: "HSV-mapped MIP",
+	umap: "UMAP",
+	layer_window: "Layer neighborhood",
+	z_blend: "Z-blend",
+	pca: "PCA classification",
+	pca_mip: "PCA MIP",
+	pca_rgb: "PCA RGB",
+	rpca: "RPCA classification",
+	rpca_mip: "RPCA MIP",
+	rpca_rgb: "RPCA RGB"
+}
+const DISPLAY_MODE_SELECT_OPTIONS = [
+	{ value: "mip", label: "MIP" },
+	{ value: "mip_hsv", label: "HSV-mapped MIP" },
+	{ value: "umap", label: "UMAP" },
+	{ value: "layer", label: "Layer" },
+	{ value: "z_blend", label: "Z-blend" },
+	{ value: "pca", label: "PCA classification" },
+	{ value: "pca_mip", label: "PCA MIP" },
+	{ value: "pca_rgb", label: "PCA RGB" },
+	{ value: "rpca", label: "RPCA classification" },
+	{ value: "rpca_mip", label: "RPCA MIP" },
+	{ value: "rpca_rgb", label: "RPCA RGB" }
+]
+const DISPLAY_MODE_LABELS = {
+	mip: "MIP",
+	mip_hsv: "HSV-mapped MIP",
+	umap: "UMAP",
+	layer: "Layer",
+	z_blend: "Z-blend",
+	pca: "PCA classification",
+	pca_mip: "PCA MIP",
+	pca_rgb: "PCA RGB",
+	rpca: "RPCA classification",
+	rpca_mip: "RPCA MIP",
+	rpca_rgb: "RPCA RGB"
+}
 const selectedConfidenceLevel = ref(95)
 const roiEstimateUncertaintyMode = ref("show")
 const billingSettings = ref({ groupID: "" })
@@ -663,34 +1302,39 @@ const visualizationDataSource = ref("measurement")
 const spectrumDataSource = ref("measurement")
 const primarySpectrumSource = ref("measurement")
 const selectedHeatmapIndices = ref({ xIndices: [], yIndices: [] })
-const latestSelectedRegionPoints = ref([])
-const latestMeasurementSingleSpectrum = ref(null)
-const latestMeasurementMeanSpectrum = ref(null)
-const latestMeasurementSelectedSpectrum = ref(null)
-const latestRamanSingleSpectrum = ref(null)
-const latestRamanMeanSpectrum = ref(null)
-const latestRamanSelectedSpectrum = ref(null)
-const ramanRoiSpectrum = ref(null)
-const roiStorage = ref([])
-const estimatedRoiStorage = ref([])
+const selectedHeatmapBoundingBox = ref(null)
+const latestMeasurementSingleSpectrum = shallowRef(null)
+const latestMeasurementMeanSpectrum = shallowRef(null)
+const latestMeasurementSelectedSpectrum = shallowRef(null)
+const latestRamanSingleSpectrum = shallowRef(null)
+const latestRamanMeanSpectrum = shallowRef(null)
+const latestRamanSelectedSpectrum = shallowRef(null)
+const ramanRoiSpectrum = shallowRef(null)
 const estimatedRoiList = ref([])
 const estimatedRoiListMode = ref("")
-const estimatedRoiStorageMode = ref("")
 const estimatedRoiListAttempted = ref(false)
-const estimatedRoiStorageAttempted = ref(false)
-const estimatedMip = ref(null)
-const estimatedMipHsv = ref(null)
-const estimatedUmap = ref(null)
-const estimatedLayer = ref(null)
-const estimatedPcaClassification = ref(null)
-const estimatedPcaClassificationMip = ref(null)
-const estimatedPcaMip = ref(null)
-const estimatedPcaLoadings = ref(null)
-const estimatedRpcaClassification = ref(null)
-const estimatedRpcaClassificationMip = ref(null)
-const estimatedRpcaMip = ref(null)
-const estimatedRpcaLoadings = ref(null)
+const estimatedMip = shallowRef(null)
+const estimatedMipHsv = shallowRef(null)
+const estimatedUmap = shallowRef(null)
+const estimatedLayer = shallowRef(null)
+const zBlendMeasurementSource = shallowRef(null)
+const zBlendEstimatedSource = shallowRef(null)
+const estimatedPcaClassification = shallowRef(null)
+const estimatedPcaClassificationMip = shallowRef(null)
+const estimatedPcaMip = shallowRef(null)
+const estimatedPcaLoadings = shallowRef(null)
+const estimatedRpcaClassification = shallowRef(null)
+const estimatedRpcaClassificationMip = shallowRef(null)
+const estimatedRpcaMip = shallowRef(null)
+const estimatedRpcaLoadings = shallowRef(null)
 const activeEstimatedLayerIndex = ref(-1)
+const activeZBlendMeasurementRequestID = ref(0)
+const currentPreparationTarget = ref(null)
+const queuedPreparationTargets = ref([])
+const completedPreparationTargets = ref([])
+const failedPreparationTargets = ref([])
+const viewerLoadedEmitted = ref(false)
+const activeZBlendEstimatedRequestID = ref(0)
 const activeEstimatedPcaClassificationRequestID = ref(0)
 const activeEstimatedPcaClassificationMipRequestID = ref(0)
 const activeEstimatedPcaMipRequestID = ref(0)
@@ -715,6 +1359,8 @@ const showPcaLoadings = ref(false)
 const showSelectedSpectra = ref(true)
 const projectChatOpen = ref(false)
 const isRoiRefreshDisabled = computed(() => refreshingRois.value)
+
+let heatmapViewportSyncHandler = null
 
 const pcaComponentIndices = Array.from({ length: 10 }, (_, index ) => index + 1)
 const activePcaComponents = ref([ 1, 2 ])
@@ -760,12 +1406,43 @@ const pcaLegend = computed(() => {
 })
 
 var resizeObserver = null
+let deckPaneResizeSession = null
+let deckPaneResponsiveResizeQueued = false
+
+const MIN_DECK_HEATMAP_PANE_WIDTH = 320
+const MIN_DECK_SPECTRA_PANE_WIDTH = 360
+const DECK_HEATMAP_PANE_INSET_PX = 8
+const LAYER_CACHE_WINDOW_RADIUS = 10
+
+const deckHeatmapPaneWidth = ref(null)
+const deckHeatmapPaneWidthTouched = ref(false)
+const viewerTutorialPromptVisible = ref(false)
+const viewerTutorialVisible = ref(false)
+const viewerTutorialStepIndex = ref(0)
+const viewerTutorialRunToken = ref(0)
+const viewerTutorialOriginalDisplayMode = ref("")
+const viewerTutorialOriginalInteractionMode = ref("")
+const tutorialDisplaySelectOpen = ref(false)
+const tutorialDisplayOptionsOpen = ref(false)
+const tutorialProjectMenuOpen = ref(false)
+const activeViewerTutorialTargetElement = ref(null)
 
 const cacheOptions = {
-	memoryBudgetBytes: 120 * 1024 * 1024,
+	memoryBudgetBytes: 2 * 1024 * 1024 * 1024,
 	ttlMs: 7 * 24 * 60 * 60 * 1000,
-	prefetchRadius: 2,
-	lowConcurrency: 1
+	prefetchRadius: LAYER_CACHE_WINDOW_RADIUS,
+	lowConcurrency: 4
+}
+
+const layerCacheOptions = () => {
+
+	const options = { ...cacheOptions }
+	const zValues = Array.isArray( xyzAxes.value?.z ) ? xyzAxes.value.z : []
+	if( zValues.length > 0 ){
+		options.maxLayerIndex = Math.max( 0, zValues.length - 1 )
+	}
+
+	return options
 }
 
 const GPU_STATUS_POLL_INTERVAL_MS = 60 * 1000
@@ -774,6 +1451,8 @@ const GPU_TERMINAL_STATUSES = new Set([ "SUCCEEDED", "FAILED" ])
 
 let gpuStatusPollTimer = null
 let gpuStatusPollInFlight = false
+let pcaClassificationLoadPromise = null
+let rpcaClassificationLoadPromise = null
 
 const downloading = ref(false)
 
@@ -810,8 +1489,22 @@ const selectedRoi = computed(() => {
 	return rois.value.find(( roi ) => roi.roiId === selectedRoiId.value ) ?? null
 })
 
+const roiSelectOptions = computed(() => {
+	return [
+		{ value: "", label: "No region selected" },
+		...rois.value.map(( roi ) => ({
+			value: String( roi?.roiId ?? "" ),
+			label: String( roi?.name ?? "Unnamed ROI" )
+		}))
+	]
+})
+
+const setSelectedRoiId = ( nextValue ) => {
+	selectedRoiId.value = String( nextValue ?? "" )
+}
+
 const hasSelectedRegion = computed(() => {
-	return Array.isArray( latestSelectedRegionPoints.value ) && latestSelectedRegionPoints.value.length > 0
+	return normalizeSelectionBoundingBox( selectedHeatmapBoundingBox.value ) !== null
 })
 
 const visiblePcaLoadingCount = computed(() => {
@@ -836,12 +1529,104 @@ const maxLayerIndex = computed(() => {
 	return Math.max( 0, zValues.length - 1 )
 })
 
+const zAxisUnitLabel = computed(() => {
+	const unit = typeof xyzAxes.value?.zUnit === "string" ? xyzAxes.value.zUnit.trim() : ""
+	return unit.length > 0 ? unit : ""
+})
+
+const formatCompactNumericValue = ( value ) => {
+
+	const numeric = Number( value )
+	if( Number.isFinite( numeric ) === false ){
+		return ""
+	}
+
+	const absolute = Math.abs( numeric )
+	if( absolute >= 10000 || ( absolute > 0 && absolute < 0.01 ) ){
+		return numeric.toPrecision( 5 ).replace(/\.?0+e/, "e" )
+	}
+
+	return numeric.toLocaleString( undefined, {
+		maximumFractionDigits: 4
+	})
+}
+
+const layerAxisValueLabel = computed(() => {
+
+	const layerIndex = normalizeLayerInput( layerInput.value )
+	const axisValue = zValueForLayerIndex( layerIndex, layerIndex )
+	const formattedValue = formatCompactNumericValue( axisValue )
+
+	if( formattedValue.length === 0 ){
+		return ""
+	}
+
+	return zAxisUnitLabel.value.length > 0
+		? `${formattedValue} ${zAxisUnitLabel.value}`
+		: formattedValue
+})
+
 const hasSuccessfulRamanInference = computed(() => {
 	return String( gpuInferenceStatus.value ?? "" ).trim().toUpperCase() === "SUCCEEDED"
 })
 
 const hasEstimatedRamanSpectraReady = computed(() => {
 	return gpuInferenceEstimateSpectraReady.value === true || hasSuccessfulRamanInference.value
+})
+
+const activeViewerTutorialStepId = computed(() => {
+	return viewerTutorialVisible.value
+		? viewerTutorialSteps.value[ viewerTutorialStepIndex.value ]?.id ?? ""
+		: ""
+})
+
+const isDisplayOptionsTutorialStepActive = computed(() => {
+	return activeViewerTutorialStepId.value === "display-options"
+})
+
+const isProjectMenuTutorialStepActive = computed(() => {
+	return activeViewerTutorialStepId.value === "project-menu" ||
+		activeViewerTutorialStepId.value === "project-sharing-actions"
+})
+
+const activeProjectMenuTutorialSection = computed(() => {
+	if( activeViewerTutorialStepId.value === "project-menu" ){
+		return "core"
+	}
+
+	if( activeViewerTutorialStepId.value === "project-sharing-actions" ){
+		return "sharing"
+	}
+
+	return ""
+})
+
+const isProjectMenuItemDimmed = ( section ) => {
+	const activeSection = activeProjectMenuTutorialSection.value
+	if( activeSection.length === 0 ){
+		return false
+	}
+
+	return String( section ?? "" ) !== activeSection
+}
+
+const projectMenuDividerClass = ( section ) => {
+	return isProjectMenuItemDimmed( section )
+		? "h-0.5 bg-gray border-0 opacity-30"
+		: "h-0.5 bg-gray border-0"
+}
+
+const showTutorialRamanSidebarPlaceholder = computed(() => {
+	return viewerTutorialVisible.value === true &&
+		activeViewerTutorialStepId.value === "raman-inference-sidebar" &&
+		project.value?.shared !== true &&
+		hasEstimatedRamanSpectraReady.value === false
+})
+
+const showRamanInferenceTutorialBlock = computed(() => {
+	return project.value?.shared === true ||
+		hasEstimatedRamanSpectraReady.value === true ||
+		showTutorialRamanSidebarPlaceholder.value === true
 })
 
 const heatmapUsesEstimatedRaman = computed(() => {
@@ -950,6 +1735,173 @@ const openMetadataModal = () => {
 
 const openProjectChat = () => {
 	projectChatOpen.value = true
+}
+
+const openProjectMenu = async () => {
+	projectMenuDropdown.value?.close?.()
+	await router.push({ name: "Main menu" })
+}
+
+const tutorialTargetElement = ( targetKey ) => {
+	if( typeof document === "undefined" ) return null
+	const normalizedKey = String( targetKey ?? "" ).trim()
+	if( normalizedKey.length === 0 ) return null
+	return document.querySelector(`[data-tutorial="${normalizedKey}"]`)
+}
+
+const displayOptionsMenuClass = computed(() => {
+	return isDisplayOptionsTutorialStepActive.value
+		? "fixed z-[10030] pointer-events-none min-w-[18rem] w-max max-w-[50vw] origin-top-left rounded-md bg-dark-gray shadow-lg ring-1 ring-black/30"
+		: "fixed z-[45] min-w-[18rem] w-max max-w-[50vw] origin-top-left rounded-md bg-dark-gray shadow-lg ring-1 ring-black/30"
+})
+
+const projectMenuClass = computed(() => {
+	if( isProjectMenuTutorialStepActive.value ){
+		return "fixed z-[10030] pointer-events-none min-w-[14rem] w-max max-w-[50vw] origin-top-left rounded-md bg-dark-gray shadow-lg ring-1 ring-black/30"
+	}
+
+	return "fixed z-[50] min-w-[14rem] w-max max-w-[50vw] origin-top-left rounded-md bg-dark-gray shadow-lg ring-1 ring-black/30"
+})
+
+const isDisplaySelectTutorialStepActive = computed(() => {
+	return activeViewerTutorialStepId.value === "display-select"
+})
+
+const displaySelectMenuClass = computed(() => {
+	return isDisplaySelectTutorialStepActive.value
+		? "fixed z-[10030] pointer-events-none min-w-[16rem] w-max max-w-[50vw] origin-top-left rounded-md bg-dark-gray shadow-lg ring-1 ring-black/30"
+		: "fixed z-[45] min-w-[16rem] w-max max-w-[50vw] origin-top-left rounded-md bg-dark-gray shadow-lg ring-1 ring-black/30"
+})
+
+const tutorialDisplaySelectOpenBinding = computed(() => {
+	return viewerTutorialVisible.value ? tutorialDisplaySelectOpen.value : undefined
+})
+
+const handleTutorialDisplaySelectOpenUpdate = ( nextOpen ) => {
+	if( isDisplaySelectTutorialStepActive.value && nextOpen !== true ){
+		return
+	}
+	tutorialDisplaySelectOpen.value = nextOpen === true
+}
+
+const tutorialDisplayOptionsOpenBinding = computed(() => {
+	return viewerTutorialVisible.value ? tutorialDisplayOptionsOpen.value : undefined
+})
+
+const handleTutorialDisplayOptionsOpenUpdate = ( nextOpen ) => {
+	if( isDisplayOptionsTutorialStepActive.value && nextOpen !== true ){
+		return
+	}
+	tutorialDisplayOptionsOpen.value = nextOpen === true
+}
+
+const tutorialProjectMenuOpenBinding = computed(() => {
+	return viewerTutorialVisible.value ? tutorialProjectMenuOpen.value : undefined
+})
+
+const handleTutorialProjectMenuOpenUpdate = ( nextOpen ) => {
+	if( isProjectMenuTutorialStepActive.value && nextOpen !== true ){
+		return
+	}
+	tutorialProjectMenuOpen.value = nextOpen === true
+}
+
+const viewerTutorialSteps = computed(() => {
+	return [
+		{
+			id: "viewer-layout",
+			kind: "highlight",
+			title: "Viewer layout",
+			body: "The viewer combines spatial false-color views, spectra panels, and analysis controls in one workspace.",
+			target: "viewer-layout",
+			placement: "center"
+		},
+		{
+			id: "display-select",
+			kind: "menu",
+			title: "Display selector",
+			body: "Use this menu to switch between false-color visualizations. Colormaps for the false-color images can be changed in Visualization settings from the Project menu.",
+			target: "display-select",
+			placement: "right"
+		},
+		{
+			id: "display-options",
+			kind: "menu",
+			title: "Display options",
+			body: "This menu controls how you interact with the heatmap, including spectrum selection and zoom behavior.",
+			target: "display-options",
+			placement: "right"
+		},
+		{
+			id: "heatmap",
+			kind: "highlight",
+			title: "Heatmap interaction",
+			body: "Clicking or selecting a region updates the spectra panels to show the spectral signals at that pixel or region. Hovering shows pixel indices.",
+			target: "heatmap-pane",
+			placement: "left"
+		},
+		{
+			id: "spectra",
+			kind: "highlight",
+			title: "Spectra panels",
+			body: "These panels update from the current pixel or region selection and are used to visualize the spectral signals.",
+			target: "spectra-panels",
+			placement: "right"
+		},
+		{
+			id: "roi-controls",
+			kind: "highlight",
+			title: "Regions of interest",
+			body: "Save, inspect, refresh, and download regions of interest here so you can revisit the same spatial selections later.",
+			target: "roi-controls",
+			placement: "right"
+		},
+		{
+			id: "project-menu",
+			kind: "menu",
+			title: "Project menu",
+			body: "Use these actions to rename the project, edit axis values, and run Raman spectrum inference.\n\nYou can also rename the project by clicking the current project name, typing a new name, and pressing Enter.\n\nThe platform attempts to parse axis values from available metadata automatically, but you can also enter the spatial and spectral axis values manually here.",
+			target: "project-menu",
+			placement: "bottom"
+		},
+		{
+			id: "raman-inference-sidebar",
+			kind: "highlight",
+			title: "Raman inference controls",
+			body: "After inference is available, this block is where you switch to estimated Raman-based views and related spectra controls. The extra false-color options become available from there.",
+			target: "raman-inference-sidebar-block",
+			placement: "right"
+		},
+		{
+			id: "project-sharing-actions",
+			kind: "menu",
+			title: "Sharing and export",
+			body: "This part of the Project menu is used for sharing, project notes, metadata, downloads, and Zenodo export.\n\nUse Share to collaborate, Notes to keep project context, Metadata to inspect project information, Download to export the project data, and Zenodo export when you want to prepare a publication-oriented archive.",
+			target: "project-menu",
+			placement: "bottom"
+		},
+		{
+			id: "finish",
+			kind: "centered",
+			title: "You are ready to explore",
+			body: "You can reopen this tutorial later from the Project menu.",
+			target: "",
+			placement: "center"
+		}
+	]
+})
+
+const activeViewerTutorialStep = computed(() => {
+	if( viewerTutorialVisible.value === false ){
+		return null
+	}
+
+	return viewerTutorialSteps.value[ viewerTutorialStepIndex.value ] ?? null
+})
+
+const refreshActiveViewerTutorialTargetElement = () => {
+	const targetKey = activeViewerTutorialStep.value?.target ?? ""
+	activeViewerTutorialTargetElement.value = tutorialTargetElement( targetKey )
 }
 
 const openShareModal = () => {
@@ -1239,6 +2191,9 @@ const currentMeasurementMatrix = () => {
 	if( activePlot.value === "layer" ){
 		return layer.value
 	}
+	if( activePlot.value === "z_blend" ){
+		return zBlendMeasurementSource.value
+	}
 	if( activePlot.value === "pca" ){
 		return pcaClassificationMip.value
 	}
@@ -1269,6 +2224,9 @@ const currentEstimatedMatrix = () => {
 	}
 	if( activePlot.value === "layer" ){
 		return estimatedLayer.value
+	}
+	if( activePlot.value === "z_blend" ){
+		return zBlendEstimatedSource.value
 	}
 	if( activePlot.value === "mip" ){
 		return estimatedMip.value
@@ -1307,6 +2265,17 @@ const currentMatrix = () => {
 }
 
 const matrixDimensions = ( matrix ) => {
+
+	if( matrix !== null &&
+		typeof matrix === "object" &&
+		matrix.kind === "z-blend-source" &&
+		Number.isFinite( Number( matrix.width )) &&
+		Number.isFinite( Number( matrix.height )) ){
+		return {
+			width: Math.max( 1, Number( matrix.width ) || 1 ),
+			height: Math.max( 1, Number( matrix.height ) || 1 )
+		}
+	}
 
 	if( Array.isArray( matrix ) && matrix.length > 0 && Array.isArray( matrix[0] ) ){
 		return {
@@ -1351,6 +2320,349 @@ const resolvedUmapChannelColors = () => {
 	}
 }
 
+const normalizeZBlendPalette = ( palette ) => {
+
+	const source = Array.isArray( palette ) ? palette : []
+	const normalizedPalette = source
+		.map(( value ) => String( value ?? "" ).trim() )
+		.filter(( value ) => value.length > 0 )
+		.slice( 0, MAX_Z_BLEND_CHANNELS )
+
+	while( normalizedPalette.length < MAX_Z_BLEND_CHANNELS ){
+		normalizedPalette.push( DEFAULT_Z_BLEND_PALETTE[normalizedPalette.length] )
+	}
+
+	return normalizedPalette
+}
+
+const resolvedZBlendPalette = () => {
+	return normalizeZBlendPalette( settings.value?.hyperspectrumColors?.zBlendPalette )
+}
+
+const zAxisValues = () => {
+
+	const rawValues = Array.isArray( xyzAxes.value?.z ) ? xyzAxes.value.z : []
+	if( rawValues.length > 0 ){
+		return rawValues.map(( value, index ) => numericAxisValue( value, index ))
+	}
+
+	return [ 0 ]
+}
+
+const normalizeZBlendLayerIndex = ( value, fallback = 0 ) => {
+
+	const axis = zAxisValues()
+	const maximumIndex = Math.max( 0, axis.length - 1 )
+	const parsed = Number.parseInt( value, 10 )
+	const fallbackIndex = Number.isInteger( Number( fallback ) )
+		? Number( fallback )
+		: resolveZBlendLayerMatch( fallback ).layerIndex
+
+	if( Number.isInteger( parsed ) === false ){
+		return Math.max( 0, Math.min( maximumIndex, fallbackIndex ))
+	}
+
+	return Math.max( 0, Math.min( maximumIndex, parsed ))
+}
+
+const zValueForLayerIndex = ( layerIndex, fallback = 0 ) => {
+
+	const axis = zAxisValues()
+	if( axis.length === 0 ){
+		return numericAxisValue( fallback, 0 )
+	}
+
+	const normalizedIndex = normalizeZBlendLayerIndex( layerIndex, 0 )
+	return numericAxisValue( axis[normalizedIndex], normalizedIndex )
+}
+
+const resolveZBlendLayerMatch = ( requestedZ ) => {
+
+	const availableValues = zAxisValues()
+	if( availableValues.length === 0 ){
+		return {
+			layerIndex: 0,
+			resolvedZ: 0
+		}
+	}
+
+	const normalizedRequestedZ = numericAxisValue( requestedZ, availableValues[0] )
+	let bestIndex = 0
+	let bestDistance = Math.abs( availableValues[0] - normalizedRequestedZ )
+
+	for( let index = 1; index < availableValues.length; index++ ){
+		const candidateDistance = Math.abs( availableValues[index] - normalizedRequestedZ )
+		if( candidateDistance < bestDistance ){
+			bestDistance = candidateDistance
+			bestIndex = index
+		}
+	}
+
+	return {
+		layerIndex: bestIndex,
+		resolvedZ: availableValues[bestIndex]
+	}
+}
+
+const canStepZBlendChannelValue = ( index, direction ) => {
+
+	const channel = Array.isArray( zBlendResolvedChannels.value ) ? zBlendResolvedChannels.value[index] : null
+	if( channel === null || typeof channel !== "object" ){
+		return false
+	}
+
+	const axis = zAxisValues()
+	if( axis.length <= 1 ){
+		return false
+	}
+
+	const nextIndex = channel.resolvedLayerIndex + ( direction > 0 ? 1 : -1 )
+	return nextIndex >= 0 && nextIndex < axis.length
+}
+
+const stepZBlendChannelValue = ( index, direction ) => {
+
+	const normalizedChannels = normalizeZBlendChannels( zBlendChannels.value )
+	const channel = normalizedChannels[index]
+	if( channel === undefined ){
+		return
+	}
+
+	const axis = zAxisValues()
+	if( axis.length === 0 ){
+		return
+	}
+
+	const currentIndex = normalizeZBlendLayerIndex( channel.resolvedLayerIndex, index )
+	const nextIndex = Math.max( 0, Math.min( axis.length - 1, currentIndex + ( direction > 0 ? 1 : -1 ) ))
+	if( nextIndex === currentIndex ){
+		return
+	}
+
+	channel.resolvedLayerIndex = nextIndex
+	channel.requestedZ = zValueForLayerIndex( nextIndex, axis[nextIndex] )
+	zBlendChannels.value = normalizedChannels
+	markZBlendDirty()
+	queueZBlendRender()
+}
+
+const zBlendChannelColorHex = ( index ) => {
+	const palette = resolvedZBlendPalette()
+	if( palette.length === 0 ){
+		return DEFAULT_Z_BLEND_PALETTE[0]
+	}
+
+	const normalizedIndex = Number.isInteger( Number( index ) ) ? Number( index ) : 0
+	return palette[(( normalizedIndex % palette.length ) + palette.length ) % palette.length]
+}
+
+const zBlendChannelIntensityMaximum = ( matrix ) => {
+
+	if( Array.isArray( matrix ) === false || matrix.length === 0 ){
+		return 1
+	}
+
+	let maximum = 0
+
+	for( const row of matrix ){
+		if( Array.isArray( row ) === false ) continue
+
+		for( const value of row ){
+			const numeric = Number( value )
+			if( Number.isFinite( numeric ) === false ) continue
+			if( numeric > maximum ){
+				maximum = numeric
+			}
+		}
+	}
+
+	return maximum > 0 ? maximum : 1
+}
+
+const zBlendChannelDefaultContrastLimits = ( matrix ) => {
+
+	if( Array.isArray( matrix ) === false || matrix.length === 0 ){
+		return {
+			clampMin: 0,
+			clampMax: 1
+		}
+	}
+
+	const maximum = zBlendChannelIntensityMaximum( matrix )
+	if( maximum <= 0 ){
+		return {
+			clampMin: 0,
+			clampMax: 1
+		}
+	}
+
+	let nonZeroCount = 0
+	for( const row of matrix ){
+		if( Array.isArray( row ) === false ) continue
+		for( const value of row ){
+			const numeric = Number( value )
+			if( Number.isFinite( numeric ) && numeric > 0 ){
+				nonZeroCount += 1
+			}
+		}
+	}
+
+	if( nonZeroCount <= 0 ){
+		return {
+			clampMin: 0,
+			clampMax: maximum
+		}
+	}
+
+	const SAMPLE_TARGET = 200000
+	const sampleStride = Math.max( 1, Math.ceil( nonZeroCount / SAMPLE_TARGET ))
+	const samples = []
+	let nonZeroIndex = 0
+
+	for( const row of matrix ){
+		if( Array.isArray( row ) === false ) continue
+		for( const value of row ){
+			const numeric = Number( value )
+			if( Number.isFinite( numeric ) === false || numeric <= 0 ){
+				continue
+			}
+
+			if(( nonZeroIndex % sampleStride ) === 0 ){
+				samples.push( numeric )
+			}
+			nonZeroIndex += 1
+		}
+	}
+
+	if( samples.length <= 0 ){
+		return {
+			clampMin: 0,
+			clampMax: maximum
+		}
+	}
+
+	samples.sort(( left, right ) => left - right )
+
+	const cutoffPercentile = 0.0005
+	const lowIndex = Math.max( 0, Math.min( samples.length - 1, Math.floor( samples.length * cutoffPercentile )))
+	const highIndex = Math.max( 0, Math.min( samples.length - 1, Math.floor( samples.length * ( 1 - cutoffPercentile ))))
+	const clampMin = samples[lowIndex] ?? 0
+	const clampMax = samples[highIndex] ?? maximum
+
+	if( Number.isFinite( clampMin ) === false ||
+		Number.isFinite( clampMax ) === false ||
+		clampMin === clampMax ){
+		return {
+			clampMin: 0,
+			clampMax: maximum
+		}
+	}
+
+	return {
+		clampMin: Math.max( 0, clampMin ),
+		clampMax: Math.max( Math.max( 0, clampMin ), clampMax )
+	}
+}
+
+const activeZBlendSourceForControls = () => {
+
+	if( heatmapUsesEstimatedRaman.value ){
+		return zBlendEstimatedSource.value ?? zBlendMeasurementSource.value
+	}
+
+	return zBlendMeasurementSource.value ?? zBlendEstimatedSource.value
+}
+
+const activeZBlendIntensityMaximumMap = () => {
+	return heatmapUsesEstimatedRaman.value
+		? zBlendEstimatedIntensityMaximumByLayer.value
+		: zBlendMeasurementIntensityMaximumByLayer.value
+}
+
+const zBlendChannelSliderMaximum = ( index ) => {
+
+	const source = activeZBlendSourceForControls()
+	const channel = Array.isArray( source?.channels ) ? source.channels[index] : null
+	const sourceMaximum = Number( channel?.intensityMaximum )
+	if( Number.isFinite( sourceMaximum ) && sourceMaximum > 0 ){
+		return sourceMaximum
+	}
+
+	const resolvedChannel = Array.isArray( zBlendResolvedChannels.value ) ? zBlendResolvedChannels.value[index] : null
+	const layerKey = String( resolvedChannel?.resolvedLayerIndex ?? "" )
+	const mappedMaximum = Number( activeZBlendIntensityMaximumMap()?.[ layerKey ] )
+
+	return Number.isFinite( mappedMaximum ) && mappedMaximum > 0 ? mappedMaximum : 1
+}
+
+const zBlendChannelSliderStep = ( index ) => {
+
+	const maximum = zBlendChannelSliderMaximum( index )
+	if( maximum <= 1 ){
+		return 0.001
+	}
+
+	return Math.max( maximum / 1000, 0.001 )
+}
+
+const zBlendResolvedChannelLabel = ( index ) => {
+
+	const channel = Array.isArray( zBlendResolvedChannels.value ) ? zBlendResolvedChannels.value[index] : null
+	if( channel === null || typeof channel !== "object" ){
+		return {
+			layerLabel: "0",
+			zLabel: "0"
+		}
+	}
+
+	return {
+		layerLabel: String( channel.resolvedLayerIndex ),
+		zLabel: String( Number.isFinite( channel.resolvedZ ) ? channel.resolvedZ : 0 )
+	}
+}
+
+const zBlendPresetSummaryLabel = computed(() => {
+
+	if( zBlendSaving.value ){
+		return "Saving channels..."
+	}
+
+	if( zBlendPresetStatus.value === "saved" ){
+		return "Channel settings saved"
+	}
+
+	if( zBlendDirty.value ){
+		return "Unsaved channel changes"
+	}
+
+	if( zBlendPresetLoadedFromBackend.value ){
+		return "Project channels loaded"
+	}
+
+	return ""
+})
+
+const zBlendResolvedChannels = computed(() => {
+	const channels = Array.isArray( zBlendChannels.value ) ? zBlendChannels.value : []
+
+	return channels.map(( channel, index ) => {
+		const resolvedLayerIndex = normalizeZBlendLayerIndex( channel?.resolvedLayerIndex, index )
+		const resolvedZ = zValueForLayerIndex( resolvedLayerIndex, resolvedLayerIndex )
+		const clampMin = Math.max( 0, Number( channel?.clampMin ?? 0 ) || 0 )
+		const clampMax = Math.max( clampMin, Number( channel?.clampMax ?? clampMin ) || clampMin )
+
+		return {
+			enabled: channel?.enabled !== false,
+			requestedZ: numericAxisValue( channel?.requestedZ, resolvedZ ),
+			resolvedLayerIndex,
+			resolvedZ,
+			clampMin,
+			clampMax,
+			color: zBlendChannelColorHex( index )
+		}
+	})
+})
+
 const loadingComponentsFromCount = ( value ) => {
 
 	const parsedCount = Number.parseInt( value, 10 )
@@ -1379,61 +2691,48 @@ const isPcaComponentActive = ( componentIndex ) => {
 	return activePcaComponents.value.includes( componentIndex )
 }
 
-const normalizeBoundPercentage = ( value, fallback ) => {
+const normalizeSelectionBoundingBox = ( boundingBox ) => {
 
-	const numeric = Number( value )
-	if( Number.isFinite( numeric ) === false ){
-		return fallback
+	if( boundingBox === null || typeof boundingBox !== "object" ){
+		return null
 	}
 
-	return Math.min( 100, Math.max( 0, numeric ))
-}
+	const minX = Number.parseInt( boundingBox.minX, 10 )
+	const maxX = Number.parseInt( boundingBox.maxX, 10 )
+	const minY = Number.parseInt( boundingBox.minY, 10 )
+	const maxY = Number.parseInt( boundingBox.maxY, 10 )
 
-const uncertaintyPercentages = () => {
+	if(
+		Number.isInteger( minX ) === false ||
+		Number.isInteger( maxX ) === false ||
+		Number.isInteger( minY ) === false ||
+		Number.isInteger( maxY ) === false
+	){
+		return null
+	}
 
-	const lower = normalizeBoundPercentage(
-		settings.value?.hyperspectrumSpectrum?.lowerBoundPercentage,
-		7.5
-	)
-	const upper = normalizeBoundPercentage(
-		settings.value?.hyperspectrumSpectrum?.upperBoundPercentage,
-		97.5
-	)
-
-	if( lower <= upper ){
-		return { lower, upper }
+	if( maxX < minX || maxY < minY ){
+		return null
 	}
 
 	return {
-		lower: upper,
-		upper: lower
+		minX,
+		maxX,
+		minY,
+		maxY,
+		width: maxX - minX + 1,
+		height: maxY - minY + 1
 	}
 }
 
-const normalizeSelectionPoints = ( points ) => {
+const selectionBoundingBoxPixelCount = ( boundingBox ) => {
 
-	if( Array.isArray( points ) === false ){
-		return []
+	const normalizedBoundingBox = normalizeSelectionBoundingBox( boundingBox )
+	if( normalizedBoundingBox === null ){
+		return 0
 	}
 
-	var normalized = []
-	var seen = new Set()
-
-	for( const point of points ){
-
-		const x = Array.isArray( point ) ? Number.parseInt( point[0], 10 ) : Number.parseInt( point?.x, 10 )
-		const y = Array.isArray( point ) ? Number.parseInt( point[1], 10 ) : Number.parseInt( point?.y, 10 )
-
-		if( Number.isInteger( x ) === false || Number.isInteger( y ) === false ) continue
-
-		const key = x + ":" + y
-		if( seen.has( key ) ) continue
-
-		seen.add( key )
-		normalized.push({ x, y })
-	}
-
-	return normalized
+	return normalizedBoundingBox.width * normalizedBoundingBox.height
 }
 
 const normalizeOpacity = ( value, fallback = 0.25 ) => {
@@ -1455,6 +2754,12 @@ const normalizeDisplayMode = ( value ) => {
 
 const normalizeHeatmapInteraction = ( value ) => {
 	return String( value ?? "" ).trim().toLowerCase() === "zoom" ? "zoom" : "select"
+}
+
+const normalizeHeatmapRendererMode = () => "deckgl"
+
+const normalizeHeatmapZoomAspectRatio = ( value ) => {
+	return String( value ?? "" ).trim().toLowerCase() === "free" ? "free" : "square"
 }
 
 const normalizeShowHideMode = ( value, fallback = "hide" ) => {
@@ -1495,6 +2800,12 @@ const defaultHeatmapInteractionMode = () => {
 	return normalizeHeatmapInteraction( settings.value?.hyperspectrumDefaults?.heatmapInteraction )
 }
 
+const defaultHeatmapRendererMode = () => "deckgl"
+
+const defaultHeatmapZoomAspectRatio = () => {
+	return normalizeHeatmapZoomAspectRatio( settings.value?.hyperspectrumDefaults?.heatmapZoomAspectRatio )
+}
+
 const defaultSelectionConfidenceLevel = () => {
 	return normalizeConfidenceLevel( settings.value?.hyperspectrumDefaults?.selectionConfidenceLevel )
 }
@@ -1511,6 +2822,459 @@ const defaultFalseColoringBasis = () => {
 
 const defaultRoiEstimateUncertaintyMode = () => {
 	return normalizeRoiEstimateUncertaintyMode( settings.value?.hyperspectrumDefaults?.roiEstimateUncertainty )
+}
+
+const normalizeHyperspectrumPrioritization = ( value ) => {
+
+	const source = value !== null && typeof value === "object" ? value : {}
+	const normalized = { ...DEFAULT_HYPERSPECTRUM_PRIORITIZATION }
+
+	for( const key of Object.keys( DEFAULT_HYPERSPECTRUM_PRIORITIZATION ) ){
+		if( typeof source[key] === "boolean" ){
+			normalized[key] = source[key]
+			continue
+		}
+
+		if( typeof source[key] === "string" ){
+			normalized[key] = source[key] !== "false"
+		}
+	}
+
+	return normalized
+}
+
+const resolvedHyperspectrumPrioritization = () => {
+	return normalizeHyperspectrumPrioritization( settings.value?.hyperspectrumPrioritization )
+}
+
+const blockingPreparationTargetForDisplayMode = ( displayMode ) => {
+	return normalizeDisplayMode( displayMode ) === "layer" ? "layer_window" : normalizeDisplayMode( displayMode )
+}
+
+const preparationTargetLabel = ( target ) => {
+	return PREPARATION_TARGET_LABELS[target] ?? String( target ?? "" )
+}
+
+const resolvePrioritizedPreparationTargets = ( startingDisplayMode ) => {
+
+	const prioritized = resolvedHyperspectrumPrioritization()
+	const blockingTarget = blockingPreparationTargetForDisplayMode( startingDisplayMode )
+
+	return PREPARATION_TARGET_ORDER.filter(( target ) => {
+		return prioritized[target] === true &&
+			target !== blockingTarget &&
+			target !== "layer_window"
+	})
+}
+
+const resolveDeferredPreparationTargets = ( startingDisplayMode ) => {
+
+	const prioritized = resolvedHyperspectrumPrioritization()
+	const blockingTarget = blockingPreparationTargetForDisplayMode( startingDisplayMode )
+
+	return PREPARATION_TARGET_ORDER.filter(( target ) => {
+		return prioritized[target] !== true &&
+			target !== blockingTarget &&
+			target !== "layer_window"
+	})
+}
+
+const resolveTrailingPreparationTargets = ( startingDisplayMode ) => {
+
+	const blockingTarget = blockingPreparationTargetForDisplayMode( startingDisplayMode )
+	if( blockingTarget === "layer_window" ){
+		return []
+	}
+
+	return [ "layer_window" ]
+}
+
+const pendingPreparationTargets = computed(() => {
+
+	const completed = new Set( completedPreparationTargets.value )
+	const failed = new Set( failedPreparationTargets.value )
+	const orderedTargets = []
+
+	if( typeof currentPreparationTarget.value === "string" && currentPreparationTarget.value.length > 0 ){
+		orderedTargets.push( currentPreparationTarget.value )
+	}
+
+	for( const target of queuedPreparationTargets.value ){
+		orderedTargets.push( target )
+	}
+
+	return orderedTargets.filter(( target, index ) => {
+		return completed.has( target ) === false &&
+			failed.has( target ) === false &&
+			orderedTargets.indexOf( target ) === index
+	})
+})
+
+const showDisplayInfoIcon = computed(() => {
+	return pendingPreparationTargets.value.length > 0
+})
+
+const resetPreparationState = () => {
+	currentPreparationTarget.value = null
+	queuedPreparationTargets.value = []
+	completedPreparationTargets.value = []
+	failedPreparationTargets.value = []
+	viewerLoadedEmitted.value = false
+}
+
+const markPreparationStarted = ( target ) => {
+	currentPreparationTarget.value = target
+}
+
+const markPreparationCompleted = ( target ) => {
+
+	if( typeof target !== "string" || target.length === 0 ){
+		return
+	}
+
+	if( completedPreparationTargets.value.includes( target ) === false ){
+		completedPreparationTargets.value = [ ...completedPreparationTargets.value, target ]
+	}
+
+	queuedPreparationTargets.value = queuedPreparationTargets.value.filter(( entry ) => entry !== target )
+
+	if( currentPreparationTarget.value === target ){
+		currentPreparationTarget.value = null
+	}
+}
+
+const markPreparationFailed = ( target ) => {
+
+	if( typeof target !== "string" || target.length === 0 ){
+		return
+	}
+
+	if( failedPreparationTargets.value.includes( target ) === false ){
+		failedPreparationTargets.value = [ ...failedPreparationTargets.value, target ]
+	}
+
+	queuedPreparationTargets.value = queuedPreparationTargets.value.filter(( entry ) => entry !== target )
+
+	if( currentPreparationTarget.value === target ){
+		currentPreparationTarget.value = null
+	}
+}
+
+const emitLoadedOnce = () => {
+
+	if( viewerLoadedEmitted.value ){
+		return
+	}
+
+	viewerLoadedEmitted.value = true
+	emit("loaded")
+}
+
+const updateDisplayInfoTooltipPosition = () => {
+
+	const triggerElement = displayInfoTrigger.value
+	if( triggerElement === null || typeof triggerElement.getBoundingClientRect !== "function" ){
+		return
+	}
+
+	const triggerRect = triggerElement.getBoundingClientRect()
+	const tooltipWidth = 256
+	const tooltipHeight = 72 + ( pendingPreparationTargets.value.length > 0
+		? 22 + ( pendingPreparationTargets.value.length * 18 )
+		: 0 )
+	const viewportWidth = typeof window !== "undefined" ? window.innerWidth : 0
+	const viewportHeight = typeof window !== "undefined" ? window.innerHeight : 0
+	const gap = 8
+	const padding = 8
+
+	let left = triggerRect.right + gap
+	let top = triggerRect.top + ( triggerRect.height / 2 ) - ( tooltipHeight / 2 )
+
+	if( viewportWidth > 0 ){
+		left = Math.min( left, viewportWidth - tooltipWidth - padding )
+		left = Math.max( padding, left )
+	}
+
+	if( viewportHeight > 0 ){
+		top = Math.min( top, viewportHeight - tooltipHeight - padding )
+		top = Math.max( padding, top )
+	}
+
+	displayInfoTooltipStyle.value = {
+		left: `${Math.round( left )}px`,
+		top: `${Math.round( top )}px`,
+		backgroundColor: "rgb(17 24 39)"
+	}
+}
+
+const showDisplayInfoTooltipOverlay = () => {
+	if( showDisplayInfoIcon.value === false ){
+		showDisplayInfoTooltip.value = false
+		return
+	}
+	updateDisplayInfoTooltipPosition()
+	showDisplayInfoTooltip.value = true
+}
+
+const hideDisplayInfoTooltipOverlay = () => {
+	showDisplayInfoTooltip.value = false
+}
+
+const clampDeckHeatmapPaneWidth = ( width ) => {
+
+	const normalizedWidth = Number( width )
+	const containerWidth = Number( deckLayoutContainer.value?.clientWidth )
+	const minimumWidth = MIN_DECK_HEATMAP_PANE_WIDTH
+
+	if( Number.isFinite( normalizedWidth ) === false ){
+		return minimumWidth
+	}
+
+	if( Number.isFinite( containerWidth ) === false || containerWidth <= 0 ){
+		return Math.max( minimumWidth, Math.round( normalizedWidth ))
+	}
+
+	const dividerAllowance = 20
+	const maximumWidth = Math.max(
+		minimumWidth,
+		Math.round( containerWidth - MIN_DECK_SPECTRA_PANE_WIDTH - dividerAllowance )
+	)
+
+	return Math.max( minimumWidth, Math.min( maximumWidth, Math.round( normalizedWidth )))
+}
+
+const normalizedHeatmapAspectRatio = ( dimensions ) => {
+
+	if( dimensions === null ) return null
+
+	const width = Number( dimensions.width )
+	const height = Number( dimensions.height )
+	if( Number.isFinite( width ) === false || Number.isFinite( height ) === false ){
+		return null
+	}
+	if( width <= 0 || height <= 0 ){
+		return null
+	}
+
+	return width / height
+}
+
+const measuredDeckHeatmapPaneWidthFromPlotly = ( dimensions ) => {
+
+	if( graph.value === null ) return null
+
+	const aspectRatio = normalizedHeatmapAspectRatio( dimensions )
+	if( aspectRatio === null ) return null
+
+	const graphHeight = Number( graph.value.clientHeight )
+	const fullLayout = graph.value._fullLayout
+	const margin = fullLayout?.margin ?? {}
+
+	const marginTop = Number( margin.t )
+	const marginBottom = Number( margin.b )
+	const marginLeft = Number( margin.l )
+	const marginRight = Number( margin.r )
+
+	if( Number.isFinite( graphHeight ) === false || graphHeight <= 0 ){
+		return null
+	}
+	if( Number.isFinite( marginTop ) === false ||
+		Number.isFinite( marginBottom ) === false ||
+		Number.isFinite( marginLeft ) === false ||
+		Number.isFinite( marginRight ) === false ){
+		return null
+	}
+
+	const drawableHeight = graphHeight - marginTop - marginBottom
+	if( Number.isFinite( drawableHeight ) === false || drawableHeight <= 0 ){
+		return null
+	}
+
+	const requiredGraphWidth = marginLeft + marginRight + ( drawableHeight * aspectRatio )
+	return clampDeckHeatmapPaneWidth( requiredGraphWidth + DECK_HEATMAP_PANE_INSET_PX )
+}
+
+const defaultDeckHeatmapPaneWidth = () => {
+
+	const containerHeight = Number( deckLayoutContainer.value?.clientHeight )
+	if( Number.isFinite( containerHeight ) === false || containerHeight <= 0 ){
+		return MIN_DECK_HEATMAP_PANE_WIDTH
+	}
+
+	const dimensions = matrixDimensions( currentMatrix() )
+	const measuredWidth = measuredDeckHeatmapPaneWidthFromPlotly( dimensions )
+	if( Number.isFinite( measuredWidth ) ){
+		return measuredWidth
+	}
+
+	const aspectRatio = normalizedHeatmapAspectRatio( dimensions )
+	if( aspectRatio !== null ){
+		const estimatedGraphHeight = Math.max( 1, containerHeight - DECK_HEATMAP_PANE_INSET_PX )
+		return clampDeckHeatmapPaneWidth( estimatedGraphHeight * aspectRatio + DECK_HEATMAP_PANE_INSET_PX )
+	}
+
+	return clampDeckHeatmapPaneWidth( containerHeight )
+}
+
+const ensureDeckHeatmapPaneWidth = ( options = {} ) => {
+
+	const shouldReset = options?.forceDefault === true
+	const nextWidth = shouldReset || Number.isFinite( Number( deckHeatmapPaneWidth.value )) === false
+		? defaultDeckHeatmapPaneWidth()
+		: clampDeckHeatmapPaneWidth( deckHeatmapPaneWidth.value )
+
+	deckHeatmapPaneWidth.value = nextWidth
+	return nextWidth
+}
+
+const reconcileDeckHeatmapPaneWidthWithPlotlyLayout = ( matrix ) => {
+
+	if( deckHeatmapPaneWidthTouched.value ){
+		return false
+	}
+
+	const dimensions = matrixDimensions( matrix )
+	const measuredWidth = measuredDeckHeatmapPaneWidthFromPlotly( dimensions )
+	if( Number.isFinite( measuredWidth ) === false ){
+		return false
+	}
+
+	const currentWidth = Number( deckHeatmapPaneWidth.value )
+	if( Number.isFinite( currentWidth ) === false ){
+		deckHeatmapPaneWidth.value = measuredWidth
+		return true
+	}
+
+	if( Math.abs( measuredWidth - currentWidth ) <= 2 ){
+		return false
+	}
+
+	deckHeatmapPaneWidth.value = measuredWidth
+	return true
+}
+
+const resolvedDeckHeatmapPaneWidth = computed(() => {
+
+	const configuredWidth = Number( deckHeatmapPaneWidth.value )
+	if( Number.isFinite( configuredWidth ) ){
+		return clampDeckHeatmapPaneWidth( configuredWidth )
+	}
+
+	return defaultDeckHeatmapPaneWidth()
+})
+
+const deckHeatmapPaneStyle = computed(() => {
+	return {
+		width: `${resolvedDeckHeatmapPaneWidth.value}px`
+	}
+})
+
+const deckPanelObjectIDs = new WeakMap()
+let nextDeckPanelObjectID = 1
+
+const deckPanelObjectKey = ( value ) => {
+
+	if( value !== null && typeof value === "object" ){
+		if( deckPanelObjectIDs.has( value ) === false ){
+			deckPanelObjectIDs.set( value, nextDeckPanelObjectID )
+			nextDeckPanelObjectID += 1
+		}
+
+		return "object:" + deckPanelObjectIDs.get( value )
+	}
+
+	return "primitive:" + String( value )
+}
+
+const serializeDeckPanelKeyPart = ( value ) => {
+
+	if( Array.isArray( value ) ){
+		return "[" + value.map(( entry ) => serializeDeckPanelKeyPart( entry )).join( "," ) + "]"
+	}
+
+	if( value !== null && typeof value === "object" ){
+		const keys = Object.keys( value ).sort()
+		return "{" + keys.map(( key ) => key + ":" + serializeDeckPanelKeyPart( value[key] )).join( "," ) + "}"
+	}
+
+	return String( value )
+}
+
+const deckPanelSettingsKey = () => {
+	return JSON.stringify({
+		font: settings.value?.font ?? null,
+		labels: settings.value?.labels ?? null,
+		layout: {
+			heatmapOrigin: settings.value?.layout?.heatmapOrigin ?? null
+		}
+	})
+}
+
+const spectrumPayloadRenderKey = ( payload ) => {
+
+	if( payload === null || payload === undefined ){
+		return "null"
+	}
+
+	if( Array.isArray( payload ) ){
+		return "array:" + deckPanelObjectKey( payload )
+	}
+
+	if( typeof payload !== "object" ){
+		return "primitive:" + String( payload )
+	}
+
+	return [
+		"spectrum=" + deckPanelObjectKey( payload?.spectrum ?? payload?.meanSpectrum ?? null ),
+		"lower=" + deckPanelObjectKey( payload?.lowerBound ?? null ),
+		"upper=" + deckPanelObjectKey( payload?.upperBound ?? null ),
+		"xy=" + deckPanelObjectKey( payload?.xy ?? null ),
+		"length=" + String( payload?.spectrumLength ?? "" )
+	].join( "," )
+}
+
+const upperPanelRenderKey = ( options ) => {
+	return [
+		"settings=" + deckPanelSettingsKey(),
+		"axes=" + deckPanelObjectKey( options?.axes ?? null ),
+		"roi=" + spectrumPayloadRenderKey( options?.topLeftSpectrum?.roi ?? null ),
+		"current=" + spectrumPayloadRenderKey( options?.topLeftSpectrum?.current ?? null ),
+		"showFallback=" + String( options?.topLeftSpectrum?.showFallback === true ),
+		"loadings=" + deckPanelObjectKey( options?.loadings ?? null ),
+		"loadingSeries=" + serializeDeckPanelKeyPart( options?.loadingSeries ?? [] ),
+		"loadingComponents=" + serializeDeckPanelKeyPart( options?.loadingComponents ?? [] )
+	].join( "|" )
+}
+
+const lowerPanelRenderKey = ( options ) => {
+	return [
+		"settings=" + deckPanelSettingsKey(),
+		"axes=" + deckPanelObjectKey( options?.axes ?? null ),
+		"selected=" + spectrumPayloadRenderKey( options?.selectedSpectrum ?? null ),
+		"roi=" + spectrumPayloadRenderKey( options?.bottomLeftSpectrum?.roi ?? null ),
+		"current=" + spectrumPayloadRenderKey( options?.bottomLeftSpectrum?.current ?? null )
+	].join( "|" )
+}
+
+const heatmapPaneLayoutKey = ( matrix, axes ) => {
+
+	const dimensions = matrixDimensions( matrix )
+	if( dimensions === null ){
+		return ""
+	}
+
+	return [
+		"settings=" + deckPanelSettingsKey(),
+		"axes=" + deckPanelObjectKey( axes ?? null ),
+		"width=" + String( dimensions.width ),
+		"height=" + String( dimensions.height )
+	].join( "|" )
+}
+
+const resetDeckPanelRenderKeys = () => {
+	lastDeckUpperPanelKey.value = ""
+	lastDeckLowerPanelKey.value = ""
+	lastDeckHeatmapPaneKey.value = ""
 }
 
 const resolvedDefaultVisualizationDataSource = () => {
@@ -1625,6 +3389,220 @@ const setSelectedConfidenceLevel = ( level ) => {
 
 const setHeatmapInteractionMode = ( mode ) => {
 	heatmapInteractionMode.value = mode === "zoom" ? "zoom" : "select"
+}
+
+const setHeatmapZoomAspectRatio = ( mode ) => {
+	heatmapZoomAspectRatio.value = normalizeHeatmapZoomAspectRatio( mode )
+}
+
+const setActiveDisplayMode = ( nextValue ) => {
+	const normalizedValue = String( nextValue ?? "" ).trim()
+	if( DISPLAY_MODE_OPTIONS.has( normalizedValue ) === false ){
+		return
+	}
+	if( activePlot.value === normalizedValue ){
+		return
+	}
+
+	activePlot.value = normalizedValue
+}
+
+const focusTutorialTarget = async ( targetKey ) => {
+	const element = tutorialTargetElement( targetKey )
+	if( element instanceof HTMLElement ){
+		element.scrollIntoView({
+			block: "nearest",
+			inline: "nearest"
+		})
+	}
+	await nextTick()
+}
+
+const openTutorialSelectMenu = async () => {
+	tutorialDisplaySelectOpen.value = false
+	displaySelectDropdown.value?.close?.()
+	await nextTick()
+	await new Promise(( resolve ) => {
+		window.setTimeout( resolve, 24 )
+	})
+	tutorialDisplaySelectOpen.value = true
+	displaySelectDropdown.value?.open?.()
+}
+
+const closeTutorialTransientUi = () => {
+	tutorialDisplaySelectOpen.value = false
+	displaySelectDropdown.value?.close?.()
+	tutorialDisplayOptionsOpen.value = false
+	tutorialProjectMenuOpen.value = false
+	projectMenuDropdown.value?.close?.()
+}
+
+const restoreViewerTutorialUiState = async () => {
+	closeTutorialTransientUi()
+
+	if( viewerTutorialOriginalDisplayMode.value.length > 0 &&
+		DISPLAY_MODE_OPTIONS.has( viewerTutorialOriginalDisplayMode.value ) &&
+		activePlot.value !== viewerTutorialOriginalDisplayMode.value ){
+		activePlot.value = viewerTutorialOriginalDisplayMode.value
+		await nextTick()
+		await renderCurrentMatrix()
+	}
+
+	if( viewerTutorialOriginalInteractionMode.value.length > 0 ){
+		setHeatmapInteractionMode( viewerTutorialOriginalInteractionMode.value )
+	}
+}
+
+const enterViewerTutorialStep = async ( step ) => {
+	if( step === null ){
+		return
+	}
+
+	closeTutorialTransientUi()
+
+	if( step.id === "display-select" ){
+		await focusTutorialTarget( step.target )
+		await openTutorialSelectMenu()
+		return
+	}
+
+	if( step.id === "display-options" ){
+		await focusTutorialTarget( step.target )
+		tutorialDisplayOptionsOpen.value = true
+		return
+	}
+
+	if( step.id === "heatmap" ){
+		setHeatmapInteractionMode( "select" )
+		await focusTutorialTarget( step.target )
+		return
+	}
+
+	if( step.id === "project-menu" || step.id === "project-sharing-actions" ){
+		await focusTutorialTarget( step.target )
+		tutorialProjectMenuOpen.value = false
+		projectMenuDropdown.value?.close?.()
+		await nextTick()
+		await new Promise(( resolve ) => {
+			window.setTimeout( resolve, 24 )
+		})
+		tutorialProjectMenuOpen.value = true
+		projectMenuDropdown.value?.open?.()
+		return
+	}
+
+	await focusTutorialTarget( step.target )
+}
+
+const activateViewerTutorialStep = async ( nextIndex ) => {
+	if( viewerTutorialVisible.value === false ){
+		activeViewerTutorialTargetElement.value = null
+		return
+	}
+
+	const clampedIndex = Math.max( 0, Math.min( viewerTutorialSteps.value.length - 1, nextIndex ))
+	const nextToken = viewerTutorialRunToken.value + 1
+	viewerTutorialRunToken.value = nextToken
+	viewerTutorialStepIndex.value = clampedIndex
+	await nextTick()
+	refreshActiveViewerTutorialTargetElement()
+	if( nextToken !== viewerTutorialRunToken.value ){
+		return
+	}
+
+	await enterViewerTutorialStep( activeViewerTutorialStep.value )
+	await nextTick()
+	refreshActiveViewerTutorialTargetElement()
+}
+
+const maybeOfferViewerTutorialPrompt = ( requestID = null ) => {
+	if( project.value?.id === "" ) return
+	if( viewerTutorialVisible.value || viewerTutorialPromptVisible.value ) return
+	if( viewerTutorialState.value.completed === true ) return
+	if( viewerTutorialState.value.skipped === true ) return
+	if( viewerTutorialState.value.prompted === true ) return
+
+	persistViewerTutorialState({ prompted: true })
+
+	window.setTimeout(() => {
+		if( requestID !== null && requestID !== activeProjectLoadRequestID.value ) return
+		if( project.value?.id === "" ) return
+		viewerTutorialPromptVisible.value = true
+	}, 0 )
+}
+
+const startViewerTutorial = async () => {
+	viewerTutorialPromptVisible.value = false
+	viewerTutorialOriginalDisplayMode.value = activePlot.value
+	viewerTutorialOriginalInteractionMode.value = heatmapInteractionMode.value
+	viewerTutorialVisible.value = true
+	viewerTutorialStepIndex.value = 0
+	await activateViewerTutorialStep( 0 )
+}
+
+const restartViewerTutorial = async () => {
+	viewerTutorialPromptVisible.value = false
+	if( viewerTutorialVisible.value ){
+		await restoreViewerTutorialUiState()
+	}
+
+	viewerTutorialOriginalDisplayMode.value = activePlot.value
+	viewerTutorialOriginalInteractionMode.value = heatmapInteractionMode.value
+	viewerTutorialVisible.value = true
+	viewerTutorialStepIndex.value = 0
+	await activateViewerTutorialStep( 0 )
+}
+
+const skipViewerTutorialPrompt = () => {
+	viewerTutorialPromptVisible.value = false
+	persistViewerTutorialState({ skipped: true })
+}
+
+const skipActiveViewerTutorial = async () => {
+	if( viewerTutorialVisible.value === false ){
+		return
+	}
+
+	viewerTutorialVisible.value = false
+	activeViewerTutorialTargetElement.value = null
+	viewerTutorialRunToken.value += 1
+	await restoreViewerTutorialUiState()
+
+	if( viewerTutorialState.value.completed !== true ){
+		persistViewerTutorialState({ skipped: true })
+	}
+}
+
+const completeViewerTutorial = async () => {
+	viewerTutorialVisible.value = false
+	activeViewerTutorialTargetElement.value = null
+	viewerTutorialRunToken.value += 1
+	await restoreViewerTutorialUiState()
+	persistViewerTutorialState({
+		completed: true,
+		skipped: false,
+		lastCompletedAt: new Date().toISOString()
+	})
+}
+
+const advanceViewerTutorial = async () => {
+	if( viewerTutorialVisible.value === false ){
+		return
+	}
+
+	if( viewerTutorialStepIndex.value >= viewerTutorialSteps.value.length - 1 ){
+		await completeViewerTutorial()
+		return
+	}
+
+	await activateViewerTutorialStep( viewerTutorialStepIndex.value + 1 )
+}
+
+const rewindViewerTutorial = async () => {
+	if( viewerTutorialVisible.value === false ) return
+	if( viewerTutorialStepIndex.value <= 0 ) return
+
+	await activateViewerTutorialStep( viewerTutorialStepIndex.value - 1 )
 }
 
 const selectedSpectrumPayloadBySource = ( source ) => {
@@ -1820,41 +3798,20 @@ const roiOverlayFromEntry = ( roi ) => {
 
 const currentSelectionOverlay = () => {
 
-	const xIndices = Array.isArray( selectedHeatmapIndices.value?.xIndices )
-		? selectedHeatmapIndices.value.xIndices
-		: []
-	const yIndices = Array.isArray( selectedHeatmapIndices.value?.yIndices )
-		? selectedHeatmapIndices.value.yIndices
-		: []
-
-	if( xIndices.length === 0 || yIndices.length === 0 ){
+	const boundingBox = normalizeSelectionBoundingBox( selectedHeatmapBoundingBox.value )
+	if( boundingBox === null ){
 		return null
 	}
 
-	const normalizedXIndices = xIndices
-		.map(( value ) => Number.parseInt( value, 10 ))
-		.filter(( value ) => Number.isInteger( value ))
-	const normalizedYIndices = yIndices
-		.map(( value ) => Number.parseInt( value, 10 ))
-		.filter(( value ) => Number.isInteger( value ))
-
-	if( normalizedXIndices.length === 0 || normalizedYIndices.length === 0 ){
-		return null
-	}
-
-	const minX = Math.min( ...normalizedXIndices )
-	const maxX = Math.max( ...normalizedXIndices )
-	const minY = Math.min( ...normalizedYIndices )
-	const maxY = Math.max( ...normalizedYIndices )
 	const selectionColor = settings.value?.hyperspectrumColors?.selectionBox ?? "#9ca3af"
 
 	return {
 		name: "",
 		showTitle: false,
-		x0: minX - 0.5,
-		x1: maxX + 0.5,
-		y0: minY - 0.5,
-		y1: maxY + 0.5,
+		x0: boundingBox.minX - 0.5,
+		x1: boundingBox.maxX + 0.5,
+		y0: boundingBox.minY - 0.5,
+		y1: boundingBox.maxY + 0.5,
 		boxColor: selectionColor,
 		titleColor: selectionColor,
 		opacity: normalizeOpacity( settings.value?.hyperspectrumRoi?.overlayOpacity, 0.25 )
@@ -1897,39 +3854,15 @@ const loadRoiList = async ( forceRefresh = false ) => {
 		}
 	}
 
-	await loadRoiStorage( forceRefresh )
 	await loadEstimatedRoiList( forceRefresh )
-	await loadEstimatedRoiStorage( forceRefresh )
-}
-
-const loadRoiStorage = async ( forceRefresh = false ) => {
-
-	if( forceRefresh ){
-		roiStorage.value = []
-	}
-
-	const nextStorage = rois.value
-		.map(( roi ) => {
-			const roiId = String( roi?.roiId ?? "" ).trim()
-			if( roiId.length === 0 ) return null
-
-			const pointsPayload =
-				Array.isArray( roi?.pixels ) ? roi.pixels :
-					( Array.isArray( roi?.points ) ? roi.points : [] )
-
-			return {
-				roiId,
-				pixels: normalizeSelectionPoints( pointsPayload )
-			}
-		})
-		.filter(( roi ) => roi !== null )
-
-	roiStorage.value = nextStorage
 }
 
 const refreshRoisFromBackend = async () => {
 
 	if( refreshingRois.value ) return
+	const startedAt = Date.now()
+	const spinCycleMs = 800
+	const minimumSpinCycles = 1
 	refreshingRois.value = true
 	await nextTick()
 
@@ -1943,6 +3876,18 @@ const refreshRoisFromBackend = async () => {
 	} catch( error ){
 		console.log( error )
 	} finally {
+		const elapsedMs = Date.now() - startedAt
+		const minimumDurationMs = spinCycleMs * minimumSpinCycles
+		const targetDurationMs = Math.max(
+			minimumDurationMs,
+			Math.ceil( elapsedMs / spinCycleMs ) * spinCycleMs
+		)
+		const remainingMs = targetDurationMs - elapsedMs
+		if( remainingMs > 0 ){
+			await new Promise(( resolve ) => {
+				setTimeout( resolve, remainingMs )
+			})
+		}
 		refreshingRois.value = false
 	}
 }
@@ -2080,6 +4025,7 @@ const normalizeEstimatedRoiEntry = ( roi, mode = "" ) => {
 	const spectrum = estimateFromRoi?.spectrum ?? fallbackMeanSpectrum
 	const lowerBound = estimateFromRoi?.lowerBound ?? normalizeRoiBoundsPayload( roi.lowerBound )
 	const upperBound = estimateFromRoi?.upperBound ?? normalizeRoiBoundsPayload( roi.upperBound )
+	const boundingBox = normalizeSelectionBoundingBox( roi.boundingBox )
 
 	return {
 		roiId,
@@ -2088,7 +4034,7 @@ const normalizeEstimatedRoiEntry = ( roi, mode = "" ) => {
 		meanSpectrum: spectrum,
 		lowerBound,
 		upperBound,
-		pixels: normalizeSelectionPoints( Array.isArray( roi.pixels ) ? roi.pixels : [] )
+		boundingBox
 	}
 }
 
@@ -2108,67 +4054,11 @@ const normalizeEstimatedRoiPayload = ( payload, mode = "" ) => {
 	return normalized
 }
 
-const roiPointsFromBoundingBox = ( roi ) => {
-
-	if( roi === null || typeof roi !== "object" ){
-		return []
-	}
-
-	const boundingBox = roi?.boundingBox
-	if( boundingBox === null || typeof boundingBox !== "object" ){
-		return []
-	}
-
-	const minX = Number.parseInt( boundingBox.minX, 10 )
-	const maxX = Number.parseInt( boundingBox.maxX, 10 )
-	const minY = Number.parseInt( boundingBox.minY, 10 )
-	const maxY = Number.parseInt( boundingBox.maxY, 10 )
-
-	if(
-		Number.isInteger( minX ) === false ||
-		Number.isInteger( maxX ) === false ||
-		Number.isInteger( minY ) === false ||
-		Number.isInteger( maxY ) === false
-	){
-		return []
-	}
-
-	if( maxX < minX || maxY < minY ){
-		return []
-	}
-
-	const width = maxX - minX + 1
-	const height = maxY - minY + 1
-	const area = width * height
-
-	if( area <= 0 ){
-		return []
-	}
-
-	const pixelCount = Number.parseInt( roi?.pixelCount, 10 )
-	if( Number.isInteger( pixelCount ) && pixelCount > 0 && pixelCount !== area ){
-		return []
-	}
-
-	const points = []
-
-	for( var y = minY; y <= maxY; y++ ){
-		for( var x = minX; x <= maxX; x++ ){
-			points.push({ x, y })
-		}
-	}
-
-	return points
-}
-
 const resetEstimatedRoiArtifacts = () => {
 
-	estimatedRoiStorage.value = []
 	estimatedRoiList.value = []
 	estimatedRoiListMode.value = ""
-	estimatedRoiStorageMode.value = ""
 	estimatedRoiListAttempted.value = false
-	estimatedRoiStorageAttempted.value = false
 }
 
 const syncEstimatedRoiCachesFromRois = () => {
@@ -2177,11 +4067,8 @@ const syncEstimatedRoiCachesFromRois = () => {
 	const normalized = normalizeEstimatedRoiPayload( payload, "roi/frontend" )
 
 	estimatedRoiList.value = normalized
-	estimatedRoiStorage.value = normalized
 	estimatedRoiListMode.value = normalized.length > 0 ? "roi/frontend" : ""
-	estimatedRoiStorageMode.value = normalized.length > 0 ? "roi/frontend" : ""
 	estimatedRoiListAttempted.value = true
-	estimatedRoiStorageAttempted.value = true
 }
 
 const loadEstimatedRoiList = async ( forceRefresh = false ) => {
@@ -2195,33 +4082,6 @@ const loadEstimatedRoiList = async ( forceRefresh = false ) => {
 	}
 
 	syncEstimatedRoiCachesFromRois()
-}
-
-const loadEstimatedRoiStorage = async ( forceRefresh = false ) => {
-
-	if( forceRefresh ){
-		estimatedRoiStorageAttempted.value = false
-	}
-
-	if( estimatedRoiStorageAttempted.value ){
-		return
-	}
-
-	syncEstimatedRoiCachesFromRois()
-}
-
-const roiPixelsForId = ( roiId, sourceRois = roiStorage.value ) => {
-
-	if( typeof roiId !== "string" || roiId.length === 0 ){
-		return []
-	}
-
-	const collection = Array.isArray( sourceRois ) ? sourceRois : []
-	const matched = collection.find(( roi ) => roi?.roiId === roiId ) ?? null
-	if( matched === null ) return []
-
-	const points = Array.isArray( matched?.pixels ) ? matched.pixels : []
-	return normalizeSelectionPoints( points )
 }
 
 const refreshRamanRoiSpectrum = async () => {
@@ -2255,24 +4115,8 @@ const refreshRamanRoiSpectrum = async () => {
 		return
 	}
 
-	if( estimatedRoiStorage.value.length === 0 && estimatedRoiStorageAttempted.value === false ){
-		await loadEstimatedRoiStorage()
-	}
-
-	var points = roiPixelsForId( roiId, estimatedRoiStorage.value )
-
-	if( points.length === 0 ){
-		if( roiStorage.value.length === 0 ){
-			await loadRoiStorage()
-		}
-		points = roiPixelsForId( roiId, roiStorage.value )
-	}
-
-	if( points.length === 0 ){
-		points = roiPointsFromBoundingBox( selectedRoi.value )
-	}
-
-	if( points.length === 0 ){
+	const boundingBox = normalizeSelectionBoundingBox( selectedRoi.value?.boundingBox )
+	if( boundingBox === null ){
 		ramanRoiSpectrum.value = null
 		return
 	}
@@ -2280,16 +4124,12 @@ const refreshRamanRoiSpectrum = async () => {
 	const requestID = activeRamanRoiRequestID.value + 1
 	activeRamanRoiRequestID.value = requestID
 
-		try{
-			const percentages = uncertaintyPercentages()
-			const response = await hyperspectra.meanSpectrum(
-				project.value,
-				points,
+	try{
+		const response = await hyperspectra.meanSpectrum(
+			project.value,
+			boundingBox,
 			activeGroupID(),
-			true,
 			false,
-			percentages.lower,
-			percentages.upper,
 			dataTypeForSpectrumSource( "raman" ),
 			dataSourceForSpectrumSource( "raman" ),
 			confidenceLevelsForSpectrumSource( "raman" )
@@ -2349,6 +4189,774 @@ const openRoiDescriptionModal = () => {
 
 	if( selectedRoi.value === null ) return
 	roiDescriptionModal.value?.open()
+}
+
+const sanitizeRoiFilenameToken = ( value, fallback = "roi" ) => {
+
+	const normalized = String( value ?? "" )
+		.trim()
+		.toLowerCase()
+		.replace(/[^a-z0-9_-]+/g, "_" )
+		.replace(/^_+|_+$/g, "" )
+
+	return normalized.length > 0 ? normalized : fallback
+}
+
+const numericAxisValue = ( value, fallback ) => {
+
+	const numeric = Number( value )
+	if( Number.isFinite( numeric ) ){
+		return numeric
+	}
+
+	return fallback
+}
+
+const spectrumLengthForRoi = ( roi ) => {
+
+	if( Array.isArray( roi?.meanSpectrum ) && roi.meanSpectrum.length > 0 ){
+		return roi.meanSpectrum.length
+	}
+
+	const parsedLength = Number.parseInt( roi?.spectrumLength, 10 )
+	if( Number.isInteger( parsedLength ) && parsedLength > 0 ){
+		return parsedLength
+	}
+
+	const zValues = Array.isArray( xyzAxes.value?.z ) ? xyzAxes.value.z : []
+	return zValues.length
+}
+
+const currentXAxisForLength = ( length ) => {
+
+	const targetLength = Number.isInteger( length ) && length > 0 ? length : 0
+	if( targetLength <= 0 ){
+		return []
+	}
+
+	const zValues = Array.isArray( xyzAxes.value?.z ) ? xyzAxes.value.z : []
+	var xValues = []
+
+	for( var index = 0; index < targetLength; index++ ){
+		xValues.push( numericAxisValue( zValues[index], index ))
+	}
+
+	return xValues
+}
+
+const normalizeZBlendRequestedZ = ( value, fallback = 0 ) => {
+	return numericAxisValue( value, fallback )
+}
+
+const normalizeZBlendClampValue = ( value, fallback, maximum = Infinity ) => {
+
+	const numeric = Number( value )
+	if( Number.isFinite( numeric ) === false ){
+		return fallback
+	}
+
+	const safeMaximum = Number.isFinite( Number( maximum )) && Number( maximum ) > 0
+		? Number( maximum )
+		: Infinity
+
+	return Math.max( 0, Math.min( safeMaximum, numeric ))
+}
+
+const buildDefaultZBlendChannels = () => {
+
+	const axis = zAxisValues()
+	if( axis.length === 0 ){
+		return [{
+			enabled: true,
+			resolvedLayerIndex: 0,
+			requestedZ: 0,
+			clampMin: 0,
+			clampMax: 1
+		}]
+	}
+
+	const candidateIndices = [ 0, 0.5, 1 ]
+		.map(( fraction ) => Math.max( 0, Math.min( axis.length - 1, Math.round(( axis.length - 1 ) * fraction ))))
+	const uniqueIndices = Array.from( new Set( candidateIndices ))
+
+	return uniqueIndices.map(( index ) => {
+		return {
+			enabled: true,
+			resolvedLayerIndex: index,
+			requestedZ: zValueForLayerIndex( index, axis[index] ),
+			clampMin: 0,
+			clampMax: 1
+		}
+	})
+}
+
+const normalizeZBlendChannels = ( channels, fallbackChannels = [] ) => {
+
+	const source = Array.isArray( channels ) ? channels : []
+	const fallback = Array.isArray( fallbackChannels ) && fallbackChannels.length > 0
+		? fallbackChannels
+		: buildDefaultZBlendChannels()
+	const normalizedChannels = source
+		.slice( 0, MAX_Z_BLEND_CHANNELS )
+		.map(( channel, index ) => {
+			const fallbackChannel = fallback[index] ?? fallback[0] ?? {
+				enabled: true,
+				resolvedLayerIndex: 0,
+				requestedZ: 0,
+				clampMin: 0,
+				clampMax: 1
+			}
+			const fallbackLayerIndex = normalizeZBlendLayerIndex(
+				fallbackChannel?.resolvedLayerIndex,
+				resolveZBlendLayerMatch( fallbackChannel?.requestedZ ?? index ).layerIndex
+			)
+			const resolvedLayerIndex = channel?.resolvedLayerIndex !== undefined && channel?.resolvedLayerIndex !== null
+				? normalizeZBlendLayerIndex( channel.resolvedLayerIndex, fallbackLayerIndex )
+				: normalizeZBlendLayerIndex(
+					resolveZBlendLayerMatch( channel?.requestedZ ?? zValueForLayerIndex( fallbackLayerIndex, fallbackLayerIndex ) ).layerIndex,
+					fallbackLayerIndex
+				)
+			const clampMin = normalizeZBlendClampValue( channel?.clampMin, 0 )
+			const clampMax = normalizeZBlendClampValue( channel?.clampMax, 1 )
+
+			return {
+				enabled: channel?.enabled !== false,
+				resolvedLayerIndex,
+				requestedZ: zValueForLayerIndex(
+					resolvedLayerIndex,
+					channel?.requestedZ ?? fallbackChannel?.requestedZ ?? resolvedLayerIndex
+				),
+				clampMin: Math.min( clampMin, clampMax ),
+				clampMax: Math.max( clampMin, clampMax )
+			}
+		})
+
+	if( normalizedChannels.length > 0 ){
+		return normalizedChannels
+	}
+
+	return fallback.slice( 0, MAX_Z_BLEND_CHANNELS ).map(( channel ) => {
+		const clampMin = normalizeZBlendClampValue( channel?.clampMin, 0 )
+		const clampMax = normalizeZBlendClampValue( channel?.clampMax, 1 )
+		const resolvedLayerIndex = normalizeZBlendLayerIndex(
+			channel?.resolvedLayerIndex,
+			resolveZBlendLayerMatch( channel?.requestedZ ?? 0 ).layerIndex
+		)
+
+		return {
+			enabled: channel?.enabled !== false,
+			resolvedLayerIndex,
+			requestedZ: zValueForLayerIndex( resolvedLayerIndex, channel?.requestedZ ?? 0 ),
+			clampMin: Math.min( clampMin, clampMax ),
+			clampMax: Math.max( clampMin, clampMax )
+		}
+	})
+}
+
+const canonicalizeZBlendChannelsForPersistence = ( channels = zBlendChannels.value ) => {
+
+	const rawChannels = Array.isArray( channels ) ? channels : []
+	const normalizedChannels = normalizeZBlendChannels( rawChannels )
+
+	return normalizedChannels.map(( channel, index ) => {
+		const rawRequestedZ = normalizeZBlendRequestedZ(
+			rawChannels[index]?.requestedZ,
+			channel?.requestedZ ?? zValueForLayerIndex( channel?.resolvedLayerIndex, index )
+		)
+		const match = resolveZBlendLayerMatch( rawRequestedZ )
+		const resolvedLayerIndex = normalizeZBlendLayerIndex(
+			match.layerIndex,
+			channel?.resolvedLayerIndex ?? index
+		)
+
+		return {
+			...channel,
+			resolvedLayerIndex,
+			requestedZ: zValueForLayerIndex( resolvedLayerIndex, match.resolvedZ )
+		}
+	})
+}
+
+const invalidateZBlendSources = () => {
+	activeZBlendMeasurementRequestID.value += 1
+	activeZBlendEstimatedRequestID.value += 1
+	zBlendMeasurementSource.value = null
+	zBlendEstimatedSource.value = null
+}
+
+const applyZBlendState = ( nextState = {}, options = {} ) => {
+
+	const fallbackChannels = buildDefaultZBlendChannels()
+	zBlendChannels.value = normalizeZBlendChannels( nextState?.channels, fallbackChannels )
+	zBlendPresetLoadedFromBackend.value = options.loadedFromBackend === true
+
+	if( options.markDirty === true ){
+		zBlendDirty.value = true
+	} else if( options.markDirty === false ){
+		zBlendDirty.value = false
+	}
+
+	if( typeof options.status === "string" && options.status.length > 0 ){
+		zBlendPresetStatus.value = options.status
+	}
+
+	if( typeof options.message === "string" ){
+		zBlendPresetStatusMessage.value = options.message
+	}
+
+	invalidateZBlendSources()
+}
+
+const canReuseZBlendSource = ( source, resolvedChannels ) => {
+
+	const sourceChannels = Array.isArray( source?.channels ) ? source.channels : []
+	if( sourceChannels.length === 0 || sourceChannels.length !== resolvedChannels.length ){
+		return false
+	}
+
+	for( let index = 0; index < resolvedChannels.length; index++ ){
+		const sourceChannel = sourceChannels[index] ?? {}
+		const resolvedChannel = resolvedChannels[index] ?? {}
+
+		if( normalizeZBlendLayerIndex( sourceChannel?.resolvedLayerIndex, index ) !==
+			normalizeZBlendLayerIndex( resolvedChannel?.resolvedLayerIndex, index ) ){
+			return false
+		}
+
+		if( Array.isArray( sourceChannel?.matrix ) === false || sourceChannel.matrix.length === 0 ){
+			return false
+		}
+	}
+
+	return true
+}
+
+const patchZBlendSourceFromResolvedChannels = ( source, resolvedChannels ) => {
+
+	const sourceChannels = Array.isArray( source?.channels ) ? source.channels : []
+
+	return {
+		...source,
+		palette: resolvedZBlendPalette(),
+		channels: sourceChannels.map(( sourceChannel, index ) => {
+			const resolvedChannel = resolvedChannels[index] ?? {}
+
+			return {
+				...sourceChannel,
+				enabled: resolvedChannel.enabled !== false,
+				requestedZ: resolvedChannel.requestedZ,
+				resolvedLayerIndex: resolvedChannel.resolvedLayerIndex,
+				resolvedZ: resolvedChannel.resolvedZ,
+				clampMin: resolvedChannel.clampMin,
+				clampMax: resolvedChannel.clampMax,
+				color: resolvedChannel.color ?? sourceChannel.color
+			}
+		})
+	}
+}
+
+const ensureDefaultZBlendState = () => {
+
+	if( Array.isArray( zBlendChannels.value ) && zBlendChannels.value.length > 0 ){
+		return
+	}
+
+	applyZBlendState({
+		channels: buildDefaultZBlendChannels()
+	}, {
+		loadedFromBackend: false,
+		markDirty: false,
+		status: "defaulted",
+		message: ""
+	})
+}
+
+const zBlendPresetPayload = () => {
+	return {
+		version: "zblend-v1",
+		projectID: String( project.value?.rawid ?? project.value?.id ?? "" ).trim(),
+		dataType: measurementDataType.toLowerCase() === "raman" ? "raman" : "hypercars",
+		channels: canonicalizeZBlendChannelsForPersistence()
+	}
+}
+
+const loadZBlendPreset = async ( requestID = null ) => {
+
+	ensureDefaultZBlendState()
+	if( project.value?.id === "" ) return
+
+	try{
+		const response = await hyperspectra.loadZBlendSettings( project.value, measurementDataType )
+		if( requestID !== null && requestID !== activeProjectLoadRequestID.value ) return
+		applyZBlendState( response, {
+			loadedFromBackend: true,
+			markDirty: false,
+			status: "loaded",
+			message: ""
+		})
+		scheduleDisplayPayloadPrewarm([ "z_blend" ])
+
+		if( activePlot.value === "z_blend" && graph.value !== null ){
+			await renderCurrentMatrix()
+			await renderZBlendHeatmapOnly()
+		}
+	} catch( error ){
+		if( requestID !== null && requestID !== activeProjectLoadRequestID.value ) return
+		applyZBlendState({
+			channels: zBlendChannels.value
+		}, {
+			loadedFromBackend: false,
+			markDirty: false,
+			status: "defaulted",
+			message: ""
+		})
+		console.log( error )
+	}
+}
+
+const loadZBlendSource = async ( estimated = false, priority = "high" ) => {
+
+	const requestIDRef = estimated ? activeZBlendEstimatedRequestID : activeZBlendMeasurementRequestID
+	const targetSource = estimated ? zBlendEstimatedSource : zBlendMeasurementSource
+	const targetIntensityMaximumMap = estimated
+		? zBlendEstimatedIntensityMaximumByLayer
+		: zBlendMeasurementIntensityMaximumByLayer
+	const currentRequestID = requestIDRef.value + 1
+	requestIDRef.value = currentRequestID
+
+	const resolvedChannels = zBlendResolvedChannels.value
+	if( resolvedChannels.length === 0 ){
+		targetSource.value = null
+		return null
+	}
+
+	if( canReuseZBlendSource( targetSource.value, resolvedChannels ) ){
+		targetSource.value = patchZBlendSourceFromResolvedChannels( targetSource.value, resolvedChannels )
+		return targetSource.value
+	}
+
+	const channelEntries = []
+
+	if( shouldChunkBackgroundLoad( priority ) ){
+		for( const channel of resolvedChannels ){
+			const matrix = estimated
+				? await loadEstimatedArtifact( "layers/" + channel.resolvedLayerIndex, priority )
+				: await hyperspectrumCache.getLayer(
+					project.value,
+					channel.resolvedLayerIndex,
+					{ ...cacheOptions, priority: priority === "low" ? "low" : "high" }
+				)
+
+			channelEntries.push({
+				...channel,
+				intensityMaximum: zBlendChannelIntensityMaximum( matrix ),
+				defaultContrastLimits: zBlendChannelDefaultContrastLimits( matrix ),
+				matrix
+			})
+
+			if( currentRequestID !== requestIDRef.value ){
+				return targetSource.value
+			}
+
+			await yieldToBrowser()
+		}
+	} else {
+		channelEntries.push( ...( await Promise.all( resolvedChannels.map( async ( channel ) => {
+			const matrix = estimated
+				? await loadEstimatedArtifact( "layers/" + channel.resolvedLayerIndex, priority )
+				: await hyperspectrumCache.getLayer(
+					project.value,
+					channel.resolvedLayerIndex,
+					{ ...cacheOptions, priority: priority === "low" ? "low" : "high" }
+				)
+
+			return {
+				...channel,
+				intensityMaximum: zBlendChannelIntensityMaximum( matrix ),
+				defaultContrastLimits: zBlendChannelDefaultContrastLimits( matrix ),
+				matrix
+			}
+		}))))
+	}
+
+	if( currentRequestID !== requestIDRef.value ){
+		return targetSource.value
+	}
+
+	targetIntensityMaximumMap.value = channelEntries.reduce(( aggregate, entry ) => {
+		const layerKey = String( entry?.resolvedLayerIndex ?? "" )
+		const maximum = Number( entry?.intensityMaximum )
+		if( layerKey.length > 0 && Number.isFinite( maximum ) && maximum > 0 ){
+			aggregate[ layerKey ] = maximum
+		}
+		return aggregate
+	}, { ...targetIntensityMaximumMap.value })
+
+	const firstChannel = channelEntries.find(( entry ) => Array.isArray( entry?.matrix ) && entry.matrix.length > 0 ) ?? null
+	if( firstChannel === null ){
+		targetSource.value = null
+		return null
+	}
+
+	const shouldAdoptDefaultWindows = zBlendPresetLoadedFromBackend.value === false &&
+		zBlendDirty.value === false
+	const normalizedUiChannels = normalizeZBlendChannels( zBlendChannels.value )
+	let nextUiChannels = normalizedUiChannels
+	let updatedEntries = channelEntries
+
+	if( shouldAdoptDefaultWindows ){
+		let changed = false
+
+		nextUiChannels = normalizedUiChannels.map(( channel, index ) => {
+			const entry = channelEntries[index]
+			const intensityMaximum = Number( entry?.intensityMaximum )
+			const safeMaximum = Number.isFinite( intensityMaximum ) && intensityMaximum > 0
+				? intensityMaximum
+				: 1
+			const defaultContrastLimits = entry?.defaultContrastLimits ?? {
+				clampMin: 0,
+				clampMax: safeMaximum
+			}
+			const usesDefaultWindow = channel.clampMin === 0 && channel.clampMax === 1
+			if( usesDefaultWindow === false ){
+				return channel
+			}
+
+			if( Math.abs( channel.clampMin - Number( defaultContrastLimits.clampMin ?? 0 )) > 1e-9 ||
+				Math.abs( channel.clampMax - Number( defaultContrastLimits.clampMax ?? safeMaximum )) > 1e-9 ){
+				changed = true
+			}
+
+			return {
+				...channel,
+				clampMin: Number( defaultContrastLimits.clampMin ?? 0 ),
+				clampMax: Number( defaultContrastLimits.clampMax ?? safeMaximum )
+			}
+		})
+
+		if( changed ){
+			zBlendChannels.value = nextUiChannels
+			updatedEntries = channelEntries.map(( entry, index ) => ({
+				...entry,
+				clampMin: nextUiChannels[index]?.clampMin ?? entry.clampMin,
+				clampMax: nextUiChannels[index]?.clampMax ?? entry.clampMax
+			}))
+		}
+	}
+
+	targetSource.value = {
+		kind: "z-blend-source",
+		palette: resolvedZBlendPalette(),
+		width: firstChannel.matrix[0].length,
+		height: firstChannel.matrix.length,
+		channels: updatedEntries
+			.filter(( entry ) => Array.isArray( entry?.matrix ) && entry.matrix.length > 0 )
+			.map(( entry ) => ({
+				enabled: entry.enabled !== false,
+				requestedZ: entry.requestedZ,
+				resolvedLayerIndex: entry.resolvedLayerIndex,
+				resolvedZ: entry.resolvedZ,
+				clampMin: entry.clampMin,
+				clampMax: entry.clampMax,
+				intensityMaximum: entry.intensityMaximum,
+				color: entry.color,
+				matrix: entry.matrix
+			}))
+	}
+
+	return targetSource.value
+}
+
+const ensureZBlendVisualizationMatrix = async ( priority = "high" ) => {
+
+	if( activePlot.value !== "z_blend" ) return
+
+	if( heatmapUsesEstimatedRaman.value ){
+		try{
+			const estimatedSource = await loadZBlendSource( true, priority )
+			if( estimatedSource !== null ){
+				return
+			}
+		} catch( error ){
+			console.log( error )
+		}
+	}
+
+	await loadZBlendSource( false, priority )
+}
+
+const markZBlendDirty = ( invalidateSources = true ) => {
+	if( zBlendSaving.value === false ){
+		zBlendPresetStatus.value = "dirty"
+	}
+	zBlendPresetStatusMessage.value = ""
+	zBlendDirty.value = true
+	if( invalidateSources ){
+		invalidateZBlendSources()
+	}
+}
+
+const queueZBlendRender = ( immediate = false ) => {
+
+	if( activePlot.value !== "z_blend" || graph.value === null ){
+		return
+	}
+
+	if( immediate ){
+		debouncedApplyZBlendChanges.cancel()
+		void renderCurrentMatrix().catch(( error ) => {
+			console.log( error )
+		})
+		return
+	}
+
+	debouncedApplyZBlendChanges()
+}
+
+const renderZBlendHeatmapOnly = async () => {
+
+	if( activePlot.value !== "z_blend" || graph.value === null ){
+		return
+	}
+
+	if( heatmapRendererMode.value !== "deckgl" ){
+		await renderCurrentMatrix()
+		return
+	}
+
+	await ensureZBlendVisualizationMatrix( "high" )
+
+	await syncZBlendHeatmapPayloadFromCurrentSource()
+}
+
+const syncZBlendHeatmapPayloadFromCurrentSource = async () => {
+
+	if( activePlot.value !== "z_blend" || graph.value === null ){
+		return
+	}
+
+	if( heatmapRendererMode.value !== "deckgl" ){
+		return
+	}
+
+	const matrix = currentMatrix()
+	if( matrix === null ){
+		return
+	}
+
+	const payload = hyperspectrum.updateZBlendHeatmapPayload( matrix, graph.value, {
+		heatmapRenderer: heatmapRendererMode.value
+	})
+
+	if( payload === null ){
+		return
+	}
+
+	heatmapRendererPayload.value = payload
+
+	if( heatmapRendererPaneState.value === null ){
+		heatmapRendererPaneState.value = hyperspectrum.getHeatmapPaneState( graph.value )
+	}
+}
+
+const queueZBlendHeatmapOnlyRender = ( immediate = false ) => {
+
+	if( activePlot.value !== "z_blend" || graph.value === null ){
+		return
+	}
+
+	if( immediate ){
+		debouncedApplyZBlendHeatmapOnlyChanges.cancel()
+		void renderZBlendHeatmapOnly().catch(( error ) => {
+			console.log( error )
+		})
+		return
+	}
+
+	debouncedApplyZBlendHeatmapOnlyChanges()
+}
+
+const addZBlendChannel = () => {
+
+	if( zBlendChannels.value.length >= MAX_Z_BLEND_CHANNELS ){
+		return
+	}
+
+	const axis = zAxisValues()
+	const nextIndex = Math.min( axis.length - 1, Math.max( 0, zBlendChannels.value.length ))
+	zBlendChannels.value = [
+		...normalizeZBlendChannels( zBlendChannels.value ),
+		{
+			enabled: true,
+			resolvedLayerIndex: nextIndex,
+			requestedZ: zValueForLayerIndex( nextIndex, axis[nextIndex] ?? nextIndex ),
+			clampMin: 0,
+			clampMax: 1
+		}
+	]
+	markZBlendDirty()
+	queueZBlendRender( true )
+}
+
+const removeZBlendChannel = ( index ) => {
+
+	if( zBlendChannels.value.length <= 1 ){
+		return
+	}
+
+	zBlendChannels.value = normalizeZBlendChannels( zBlendChannels.value )
+		.filter(( _, candidateIndex ) => candidateIndex !== index )
+	markZBlendDirty()
+	queueZBlendRender( true )
+}
+
+const toggleZBlendChannelEnabled = ( index, event ) => {
+
+	const normalizedChannels = normalizeZBlendChannels( zBlendChannels.value )
+	const channel = normalizedChannels[index]
+	if( channel === undefined ){
+		return
+	}
+
+	channel.enabled = event?.target?.checked !== false
+	zBlendChannels.value = normalizedChannels
+	markZBlendDirty( false )
+	queueZBlendHeatmapOnlyRender()
+}
+
+const applyZBlendChannelInput = ( index ) => {
+
+	const normalizedChannels = normalizeZBlendChannels( zBlendChannels.value )
+	const channel = normalizedChannels[index]
+	if( channel === undefined ){
+		return
+	}
+
+	const rawRequestedZ = normalizeZBlendRequestedZ(
+		Array.isArray( zBlendChannels.value ) ? zBlendChannels.value[index]?.requestedZ : channel.requestedZ,
+		channel.requestedZ
+	)
+	const match = resolveZBlendLayerMatch( rawRequestedZ )
+	channel.resolvedLayerIndex = normalizeZBlendLayerIndex( match.layerIndex, channel.resolvedLayerIndex ?? index )
+	channel.requestedZ = zValueForLayerIndex( channel.resolvedLayerIndex, match.resolvedZ )
+	zBlendChannels.value = normalizedChannels
+	markZBlendDirty()
+	queueZBlendRender( true )
+}
+
+const handleZBlendChannelInput = ( index ) => {
+
+	const nextChannels = Array.isArray( zBlendChannels.value )
+		? zBlendChannels.value.map(( channel ) => ({ ...channel }))
+		: []
+	const channel = nextChannels[index]
+	if( channel === undefined ){
+		return
+	}
+
+	channel.requestedZ = normalizeZBlendRequestedZ(
+		channel.requestedZ,
+		zValueForLayerIndex( channel?.resolvedLayerIndex, index )
+	)
+	zBlendChannels.value = nextChannels
+	markZBlendDirty( false )
+}
+
+const updateZBlendClampValue = ( index, field, value ) => {
+
+	const normalizedChannels = normalizeZBlendChannels( zBlendChannels.value )
+	const channel = normalizedChannels[index]
+	if( channel === undefined ){
+		return
+	}
+	const sliderMaximum = zBlendChannelSliderMaximum( index )
+
+	const nextValue = normalizeZBlendClampValue(
+		value,
+		field === "min" ? channel.clampMin : channel.clampMax,
+		sliderMaximum
+	)
+
+	if( field === "min" ){
+		channel.clampMin = Math.min( nextValue, channel.clampMax )
+	} else {
+		channel.clampMax = Math.max( nextValue, channel.clampMin )
+	}
+
+	zBlendChannels.value = normalizedChannels
+	markZBlendDirty( false )
+	queueZBlendHeatmapOnlyRender()
+}
+
+const saveZBlendPreset = async () => {
+
+	if( project.value?.id === "" ){
+		return
+	}
+
+	zBlendSaving.value = true
+	zBlendPresetStatusMessage.value = ""
+
+	try{
+		zBlendChannels.value = canonicalizeZBlendChannelsForPersistence()
+		await hyperspectra.saveZBlendSettings( project.value, zBlendPresetPayload(), measurementDataType )
+		zBlendPresetStatus.value = "saved"
+		zBlendPresetStatusMessage.value = "Channel settings saved."
+		zBlendPresetLoadedFromBackend.value = true
+		zBlendDirty.value = false
+	} catch( error ){
+		zBlendPresetStatus.value = "error"
+		zBlendPresetStatusMessage.value = String( error?.detail ?? error?.message ?? "Failed to save z-blend settings." )
+		console.log( error )
+	} finally {
+		zBlendSaving.value = false
+	}
+}
+
+const roiWithXAxis = ( roi ) => {
+
+	if( roi === null || typeof roi !== "object" ){
+		return roi
+	}
+
+	return {
+		...roi,
+		x: currentXAxisForLength( spectrumLengthForRoi( roi ) )
+	}
+}
+
+const triggerJsonDownload = ( filename, payload ) => {
+
+	const blob = new Blob([ JSON.stringify( payload, null, 2 ) ], { type: "application/json" })
+	const url = URL.createObjectURL( blob )
+	const link = document.createElement( "a" )
+	link.href = url
+	link.download = filename
+	link.click()
+	URL.revokeObjectURL( url )
+}
+
+const downloadSelectedRoi = () => {
+
+	if( selectedRoi.value === null ) return
+
+	const roi = roiWithXAxis( selectedRoi.value )
+	const roiName = sanitizeRoiFilenameToken( selectedRoi.value?.name, "roi" )
+	triggerJsonDownload( `roi_${roiName}.json`, roi )
+}
+
+const downloadAllRois = () => {
+
+	if( Array.isArray( rois.value ) === false || rois.value.length === 0 ) return
+
+	const projectToken = sanitizeRoiFilenameToken( project.value?.id, "project" )
+	const payload = {
+		projectID: project.value?.id ?? "",
+		roiCount: rois.value.length,
+		rois: rois.value.map(( roi ) => roiWithXAxis( roi ))
+	}
+
+	triggerJsonDownload( `rois_${projectToken}.json`, payload )
 }
 
 const openXyzSettingsModal = async () => {
@@ -2462,32 +5070,25 @@ const saveRoi = async ( payload ) => {
 	if( savingRoi.value ) return
 	if( canMutateRois.value === false ) return
 
-	const points = normalizeSelectionPoints( latestSelectedRegionPoints.value )
-	if( points.length === 0 ) return
+	const boundingBox = normalizeSelectionBoundingBox( selectedHeatmapBoundingBox.value )
+	if( boundingBox === null ) return
 
 	savingRoi.value = true
 
 	try{
-		const percentages = points.length > 1 ? uncertaintyPercentages() : null
-
-			await hyperspectra.createRoi( project.value, {
-				name: payload?.name,
-				description: payload?.description ?? "",
-				shapeType: "pixel-list",
-				deduplicate: true,
+		await hyperspectra.createRoi( project.value, {
+			name: payload?.name,
+			description: payload?.description ?? "",
+			shapeType: "bounding-box",
 			strictBounds: false,
-			points
+			boundingBox
 			},
 			activeGroupID(),
-			percentages?.lower,
-			percentages?.upper,
 			estimateConfidenceLevels )
 
 		await loadRoiList( true )
-		await loadRoiStorage( true )
 		resetEstimatedRoiArtifacts()
 		await loadEstimatedRoiList( true )
-		await loadEstimatedRoiStorage( true )
 
 		const matchedRoiId = newestMatchingRoiId( payload?.name, payload?.description ?? "" )
 		if( matchedRoiId.length > 0 ){
@@ -2515,10 +5116,8 @@ const deleteSelectedRoi = async () => {
 		await hyperspectra.deleteRoi( project.value, roiId )
 		selectedRoiId.value = ""
 		await loadRoiList( true )
-		await loadRoiStorage( true )
 		resetEstimatedRoiArtifacts()
 		await loadEstimatedRoiList( true )
-		await loadEstimatedRoiStorage( true )
 		roiDeleteModal.value?.close()
 	} catch( error ){
 		console.log( error )
@@ -2569,12 +5168,13 @@ const updateLatestSingleSpectrum = ( source, x, y, response ) => {
 	latestMeasurementSelectedSpectrum.value = response ?? null
 }
 
-const updateLatestMeanSpectrum = ( source, xIndices, yIndices, points, response ) => {
+const updateLatestMeanSpectrum = ( source, xIndices, yIndices, boundingBox, response ) => {
 
 	const payload = {
 		xIndices: [ ...xIndices ],
 		yIndices: [ ...yIndices ],
-		pointsCount: points.length,
+		pixelCount: selectionBoundingBoxPixelCount( boundingBox ),
+		boundingBox: normalizeSelectionBoundingBox( boundingBox ),
 		response
 	}
 
@@ -2616,7 +5216,7 @@ const queryPointSpectrumForSource = async ( source, x, y ) => {
 	}
 }
 
-const queryMeanSpectrumForSource = async ( source, xIndices, yIndices, points ) => {
+const queryMeanSpectrumForSource = async ( source, xIndices, yIndices, boundingBox ) => {
 
 	const normalizedSource = normalizeSpectrumSource( source )
 	const requestIDRef = normalizedSource === "raman"
@@ -2626,23 +5226,19 @@ const queryMeanSpectrumForSource = async ( source, xIndices, yIndices, points ) 
 	requestIDRef.value = requestID
 
 	try{
-		const percentages = uncertaintyPercentages()
 		const response = await hyperspectra.meanSpectrum(
 			project.value,
-			points,
+			boundingBox,
 			activeGroupID(),
-			true,
 			false,
-				percentages.lower,
-				percentages.upper,
-				dataTypeForSpectrumSource( normalizedSource ),
-				dataSourceForSpectrumSource( normalizedSource ),
-				estimateConfidenceLevels
-			)
+			dataTypeForSpectrumSource( normalizedSource ),
+			dataSourceForSpectrumSource( normalizedSource ),
+			confidenceLevelsForSpectrumSource( normalizedSource )
+		)
 
 		if( requestID !== requestIDRef.value ) return
 
-		updateLatestMeanSpectrum( normalizedSource, xIndices, yIndices, points, response )
+		updateLatestMeanSpectrum( normalizedSource, xIndices, yIndices, boundingBox, response )
 	} catch( error ){
 		console.log( error )
 	}
@@ -2662,7 +5258,12 @@ const handleHeatmapPointSelection = async ( selection ) => {
 		xIndices: [ x ],
 		yIndices: [ y ]
 	}
-	latestSelectedRegionPoints.value = [ { x, y } ]
+	selectedHeatmapBoundingBox.value = normalizeSelectionBoundingBox({
+		minX: x,
+		maxX: x,
+		minY: y,
+		maxY: y
+	})
 
 	const sources = spectrumSourcesToQuery()
 	await Promise.all( sources.map(( source ) => queryPointSpectrumForSource( source, x, y )))
@@ -2676,19 +5277,1241 @@ const handleHeatmapRegionSelection = async ( selection ) => {
 
 	const xIndices = Array.isArray( selection.xIndices ) ? selection.xIndices : []
 	const yIndices = Array.isArray( selection.yIndices ) ? selection.yIndices : []
-	const points = normalizeSelectionPoints( selection.points )
+	const boundingBox = normalizeSelectionBoundingBox( selection.boundingBox )
 
-	if( xIndices.length === 0 || yIndices.length === 0 || points.length === 0 ) return
+	if( xIndices.length === 0 || yIndices.length === 0 || boundingBox === null ) return
 
 	selectedHeatmapIndices.value = {
 		xIndices: [ ...xIndices ],
 		yIndices: [ ...yIndices ]
 	}
-	latestSelectedRegionPoints.value = points.map(( point ) => ({ ...point }))
+	selectedHeatmapBoundingBox.value = boundingBox
 
 	const sources = spectrumSourcesToQuery()
-	await Promise.all( sources.map(( source ) => queryMeanSpectrumForSource( source, xIndices, yIndices, points )))
+	await Promise.all( sources.map(( source ) => queryMeanSpectrumForSource( source, xIndices, yIndices, boundingBox )))
 	await renderCurrentMatrix()
+}
+
+const handleHeatmapZoomRange = async ( payload ) => {
+
+	if( graph.value === null ) return
+	if( payload === null || typeof payload !== "object" ) return
+
+	const xRange = Array.isArray( payload.xRange ) ? payload.xRange : null
+	const yRange = Array.isArray( payload.yRange ) ? payload.yRange : null
+
+	try{
+		await hyperspectrum.relayoutHeatmapViewport( graph.value, xRange, yRange )
+	} catch( error ){
+		console.log( error )
+	}
+}
+
+const handleHeatmapResetZoom = async () => {
+
+	if( graph.value === null ) return
+
+	const width = Number( heatmapRendererPayload.value?.width )
+	const height = Number( heatmapRendererPayload.value?.height )
+	const heatmapOrigin = String( heatmapRendererPaneState.value?.heatmapOrigin ?? "top-left" )
+
+	try{
+		await hyperspectrum.resetHeatmapViewport( graph.value, width, height, heatmapOrigin )
+	} catch( error ){
+		console.log( error )
+	}
+}
+
+const syncExternalHeatmapRenderer = async () => {
+
+	if( graph.value === null ){
+		heatmapRendererPayload.value = null
+		heatmapRendererPaneState.value = null
+		return
+	}
+
+	if( heatmapRendererMode.value !== "deckgl" ){
+		heatmapRendererPayload.value = null
+		heatmapRendererPaneState.value = null
+		return
+	}
+
+	heatmapRendererPayload.value = hyperspectrum.getHeatmapRendererPayload( graph.value )
+	heatmapRendererPaneState.value = hyperspectrum.getHeatmapPaneState( graph.value )
+}
+
+const removeHeatmapViewportSyncListener = () => {
+
+	if( graph.value === null ) return
+	if( heatmapViewportSyncHandler === null ) return
+	if( typeof graph.value.removeListener !== "function" ) return
+
+	graph.value.removeListener( "plotly_relayout", heatmapViewportSyncHandler )
+	heatmapViewportSyncHandler = null
+}
+
+const syncHeatmapViewportSyncListener = () => {
+
+	removeHeatmapViewportSyncListener()
+
+	if( graph.value === null ) return
+	if( heatmapRendererMode.value !== "deckgl" ) return
+	if( typeof graph.value.on !== "function" ) return
+
+	heatmapViewportSyncHandler = () => {
+		void syncExternalHeatmapRenderer()
+	}
+
+	graph.value.on( "plotly_relayout", heatmapViewportSyncHandler )
+}
+
+const handleHeatmapRendererTiming = ( payload ) => {
+
+	const pendingBenchmark = pendingDeckRenderBenchmark.value
+	if( pendingBenchmark === null ){
+		return
+	}
+
+	const payloadToken = Number.parseInt( payload?.benchmarkToken, 10 )
+	if( Number.isInteger( payloadToken ) === false || payloadToken !== pendingBenchmark.token ){
+		return
+	}
+
+	const initialRenderMs = performance.now() - pendingBenchmark.startedAt
+	if( Number.isFinite( initialRenderMs ) === false ){
+		return
+	}
+
+	pendingDeckRenderBenchmark.value = null
+
+	heatmapRenderBenchmark.value = {
+		renderer: typeof payload?.renderer === "string" ? payload.renderer : heatmapRendererMode.value,
+		viewMode: pendingBenchmark.viewMode,
+		initialRenderMs,
+		lastMeasuredAt: new Date().toISOString()
+	}
+}
+
+const layerHeatmapColorscale = () => {
+
+	const configuredColorscale = settings.value?.colormaps?.layer
+	return typeof configuredColorscale === "string" && configuredColorscale.length > 0
+		? configuredColorscale
+		: "Viridis"
+}
+
+const mipHeatmapColorscale = () => {
+
+	const configuredColorscale = settings.value?.colormaps?.mip
+	return typeof configuredColorscale === "string" && configuredColorscale.length > 0
+		? configuredColorscale
+		: "Viridis"
+}
+
+const runWhenBrowserIdle = ( callback, options = {} ) => {
+
+	const delayMs = Math.max( 0, Number( options?.delayMs ) || 0 )
+	const timeoutMs = Number( options?.timeoutMs )
+	const hasTimeout = Number.isFinite( timeoutMs ) && timeoutMs >= 0
+	let cancelled = false
+	let idleHandle = null
+	let delayHandle = null
+
+	const invokeCallback = () => {
+		if( cancelled ) return
+		void callback()
+	}
+
+	const scheduleIdleCallback = () => {
+		if( cancelled ) return
+
+		if( typeof window !== "undefined" && typeof window.requestIdleCallback === "function" ){
+			idleHandle = hasTimeout
+				? window.requestIdleCallback( invokeCallback, { timeout: timeoutMs })
+				: window.requestIdleCallback( invokeCallback )
+			return
+		}
+
+		const timerScope = typeof window !== "undefined" ? window : globalThis
+		idleHandle = timerScope.setTimeout( invokeCallback, 32 )
+	}
+
+	if( delayMs > 0 ){
+		const timerScope = typeof window !== "undefined" ? window : globalThis
+		delayHandle = timerScope.setTimeout( scheduleIdleCallback, delayMs )
+	} else {
+		scheduleIdleCallback()
+	}
+
+	return () => {
+		cancelled = true
+
+		if( delayHandle !== null ){
+			const timerScope = typeof window !== "undefined" ? window : globalThis
+			timerScope.clearTimeout( delayHandle )
+		}
+
+		if( idleHandle !== null ){
+			if( typeof window !== "undefined" && typeof window.cancelIdleCallback === "function" ){
+				window.cancelIdleCallback( idleHandle )
+			} else {
+				const timerScope = typeof window !== "undefined" ? window : globalThis
+				timerScope.clearTimeout( idleHandle )
+			}
+		}
+	}
+}
+
+const normalizedLoadPriority = ( priority ) => {
+	return priority === "low" ? "low" : "high"
+}
+
+const shouldChunkBackgroundLoad = ( priority ) => {
+	return normalizedLoadPriority( priority ) === "low"
+}
+
+const yieldToBrowser = async () => {
+	await new Promise(( resolve ) => {
+		if( typeof window !== "undefined" && typeof window.requestAnimationFrame === "function" ){
+			window.requestAnimationFrame(() => resolve() )
+			return
+		}
+
+		const timerScope = typeof window !== "undefined" ? window : globalThis
+		timerScope.setTimeout( resolve, 0 )
+	})
+}
+
+const PROJECT_BACKGROUND_HYDRATION_GRACE_MS = 500
+const PROJECT_BACKGROUND_INTERACTION_COOLDOWN_MS = 500
+const PROJECT_BACKGROUND_BETWEEN_TASK_DELAY_MS = 120
+const PREPARATION_SPINNER_MIN_VISIBLE_MS = 140
+
+let cancelScheduledDisplayPayloadPrewarm = null
+const scheduledDisplayPayloadPrewarmTargets = new Set()
+let displayPayloadPrewarmRequestID = 0
+let cancelScheduledProjectBackgroundWork = null
+const projectBackgroundTasks = []
+let projectBackgroundWorkRequestID = 0
+let projectBackgroundGraceUntil = 0
+let projectBackgroundNextAllowedAt = 0
+let lastProjectBackgroundInteractionAt = 0
+let removeProjectBackgroundInteractionListeners = null
+
+const recordProjectBackgroundInteraction = ( eventType = "" ) => {
+
+	const now = Date.now()
+	if( eventType === "pointermove" &&
+		( now - lastProjectBackgroundInteractionAt ) < 160 ){
+		return
+	}
+
+	lastProjectBackgroundInteractionAt = now
+}
+
+const projectBackgroundBlockedUntil = () => {
+
+	let blockedUntil = projectBackgroundGraceUntil
+	blockedUntil = Math.max( blockedUntil, projectBackgroundNextAllowedAt )
+
+	if( lastProjectBackgroundInteractionAt > 0 ){
+		blockedUntil = Math.max(
+			blockedUntil,
+			lastProjectBackgroundInteractionAt + PROJECT_BACKGROUND_INTERACTION_COOLDOWN_MS
+		)
+	}
+
+	return blockedUntil
+}
+
+const waitForProjectBackgroundIdleWindow = async ( requestID = null ) => {
+
+	while( true ){
+		if( requestID !== null && requestID !== activeProjectLoadRequestID.value ){
+			return false
+		}
+
+		const blockedUntil = projectBackgroundBlockedUntil()
+		const remainingMs = blockedUntil - Date.now()
+		if( remainingMs <= 0 ){
+			await yieldToBrowser()
+			if( requestID !== null && requestID !== activeProjectLoadRequestID.value ){
+				return false
+			}
+			return true
+		}
+
+		const waitMs = Math.max( 32, Math.min( remainingMs, 200 ))
+		await new Promise(( resolve ) => {
+			const timerScope = typeof window !== "undefined" ? window : globalThis
+			timerScope.setTimeout( resolve, waitMs )
+		})
+	}
+}
+
+const installProjectBackgroundInteractionListeners = () => {
+
+	if( typeof window === "undefined" ) return
+	if( typeof removeProjectBackgroundInteractionListeners === "function" ) return
+
+	const onPointerDown = () => {
+		recordProjectBackgroundInteraction()
+	}
+
+	const onPointerMove = () => {
+		recordProjectBackgroundInteraction( "pointermove" )
+	}
+
+	const onKeyDown = () => {
+		recordProjectBackgroundInteraction()
+	}
+
+	const onWheel = () => {
+		recordProjectBackgroundInteraction()
+	}
+
+	const onTouchStart = () => {
+		recordProjectBackgroundInteraction()
+	}
+
+	window.addEventListener( "pointerdown", onPointerDown, { passive: true })
+	window.addEventListener( "pointermove", onPointerMove, { passive: true })
+	window.addEventListener( "keydown", onKeyDown, { passive: true })
+	window.addEventListener( "wheel", onWheel, { passive: true })
+	window.addEventListener( "touchstart", onTouchStart, { passive: true })
+
+	removeProjectBackgroundInteractionListeners = () => {
+		window.removeEventListener( "pointerdown", onPointerDown )
+		window.removeEventListener( "pointermove", onPointerMove )
+		window.removeEventListener( "keydown", onKeyDown )
+		window.removeEventListener( "wheel", onWheel )
+		window.removeEventListener( "touchstart", onTouchStart )
+		removeProjectBackgroundInteractionListeners = null
+	}
+}
+
+const clearProjectBackgroundWork = () => {
+
+	projectBackgroundTasks.length = 0
+	projectBackgroundWorkRequestID += 1
+	projectBackgroundGraceUntil = 0
+	projectBackgroundNextAllowedAt = 0
+
+	if( typeof cancelScheduledProjectBackgroundWork === "function" ){
+		cancelScheduledProjectBackgroundWork()
+		cancelScheduledProjectBackgroundWork = null
+	}
+}
+
+const scheduleProjectBackgroundWork = () => {
+
+	if( projectBackgroundTasks.length === 0 ) return
+	if( typeof cancelScheduledProjectBackgroundWork === "function" ) return
+
+	const requestID = projectBackgroundWorkRequestID
+	const delayMs = Math.max( 0, projectBackgroundBlockedUntil() - Date.now() )
+
+	cancelScheduledProjectBackgroundWork = runWhenBrowserIdle( async () => {
+
+		cancelScheduledProjectBackgroundWork = null
+		if( requestID !== projectBackgroundWorkRequestID ) return
+		if( projectBackgroundTasks.length === 0 ) return
+
+		if( projectBackgroundBlockedUntil() > Date.now() ){
+			scheduleProjectBackgroundWork()
+			return
+		}
+
+		const task = projectBackgroundTasks.shift()
+		if( typeof task === "function" ){
+			try{
+				await task()
+			} catch( error ){
+				console.log( error )
+			}
+		}
+
+		if( requestID !== projectBackgroundWorkRequestID ) return
+		projectBackgroundNextAllowedAt = Date.now() + PROJECT_BACKGROUND_BETWEEN_TASK_DELAY_MS
+		if( projectBackgroundTasks.length > 0 ){
+			scheduleProjectBackgroundWork()
+		}
+	}, { delayMs } )
+}
+
+const enqueueProjectBackgroundTask = ( task ) => {
+
+	if( typeof task !== "function" ) return
+
+	projectBackgroundTasks.push( task )
+	scheduleProjectBackgroundWork()
+}
+
+const loadVisualizationTargetData = async ( target, initialLayerIndex, priority = "high" ) => {
+
+	if( target === "mip" ){
+		if( heatmapUsesEstimatedRaman.value ){
+			try{
+				const estimatedMipMatrix = await loadEstimatedMip( priority )
+				if( estimatedMipMatrix !== null ){
+					return
+				}
+			} catch( error ){
+				console.log( error )
+			}
+		}
+
+		if( mip.value === null ){
+			mip.value = await hyperspectrumCache.getMip( project.value, {
+				...cacheOptions,
+				priority: normalizedLoadPriority( priority )
+			} )
+		}
+		return
+	}
+
+	if( target === "mip_hsv" ){
+		if( heatmapUsesEstimatedRaman.value ){
+			try{
+				const estimatedMipHsvMatrix = await loadEstimatedMipHsv( priority )
+				if( estimatedMipHsvMatrix !== null ){
+					return
+				}
+			} catch( error ){
+				console.log( error )
+			}
+		}
+
+		await loadMipHsv( priority )
+		return
+	}
+
+	if( target === "umap" ){
+		if( heatmapUsesEstimatedRaman.value ){
+			try{
+				const estimatedUmapMatrix = await loadEstimatedUmap( priority )
+				if( estimatedUmapMatrix !== null ){
+					return
+				}
+			} catch( error ){
+				console.log( error )
+			}
+		}
+
+		await loadUmap( priority )
+		return
+	}
+
+	if( target === "z_blend" ){
+		if( heatmapUsesEstimatedRaman.value ){
+			try{
+				const estimatedSource = await loadZBlendSource( true, priority )
+				if( estimatedSource !== null ){
+					return
+				}
+			} catch( error ){
+				console.log( error )
+			}
+		}
+
+		await loadZBlendSource( false, priority )
+		return
+	}
+
+	if( target === "layer_window" ){
+		const layerIndex = Number.isInteger( initialLayerIndex ) ? initialLayerIndex : normalizeLayerInput( layerInput.value )
+
+		if( heatmapUsesEstimatedRaman.value ){
+			try{
+				await loadEstimatedLayer( layerIndex, priority )
+				await ensureEstimatedLayerWindowReady( layerIndex, priority )
+				return
+			} catch( error ){
+				console.log( error )
+			}
+		}
+
+		await loadLayer( layerIndex, priority )
+		await ensureMeasurementLayerWindowReady( layerIndex, priority )
+		return
+	}
+
+	if( target === "pca" ){
+		resetActivePcaComponents( pcaClassificationComponentCount.value )
+
+		if( heatmapUsesEstimatedRaman.value ){
+			try{
+				const estimatedClassificationMip = await loadEstimatedPcaClassificationMip( activePcaClassificationCount(), priority )
+				if( estimatedClassificationMip !== null ){
+					return
+				}
+			} catch( error ){
+				console.log( error )
+			}
+		}
+
+		await loadPcaClassificationMip( pcaClassificationComponentCount.value, priority )
+		return
+	}
+
+	if( target === "pca_mip" ){
+		resetActivePcaComponents( pcaMipComponentCount.value )
+
+		if( heatmapUsesEstimatedRaman.value ){
+			try{
+				const estimatedPcaMipMatrix = await loadEstimatedPcaMip( pcaMipComponentCount.value, priority )
+				if( estimatedPcaMipMatrix !== null ){
+					return
+				}
+			} catch( error ){
+				console.log( error )
+			}
+		}
+
+		await loadPcaMip( pcaMipComponentCount.value, priority )
+		return
+	}
+
+	if( target === "pca_rgb" ){
+		if( heatmapUsesEstimatedRaman.value ){
+			try{
+				const estimatedClassification = await loadEstimatedPcaClassification( priority )
+				if( estimatedClassification !== null ){
+					return
+				}
+			} catch( error ){
+				console.log( error )
+			}
+		}
+
+		await loadPcaClassification( priority )
+		return
+	}
+
+	if( target === "rpca" ){
+		resetActivePcaComponents( pcaClassificationComponentCount.value )
+
+		if( heatmapUsesEstimatedRaman.value ){
+			try{
+				const estimatedClassificationMip = await loadEstimatedRpcaClassificationMip( activePcaClassificationCount(), priority )
+				if( estimatedClassificationMip !== null ){
+					return
+				}
+			} catch( error ){
+				console.log( error )
+			}
+		}
+
+		await loadRpcaClassificationMip( pcaClassificationComponentCount.value, priority )
+		return
+	}
+
+	if( target === "rpca_mip" ){
+		resetActivePcaComponents( pcaMipComponentCount.value )
+
+		if( heatmapUsesEstimatedRaman.value ){
+			try{
+				const estimatedMipMatrix = await loadEstimatedRpcaMip( pcaMipComponentCount.value, priority )
+				if( estimatedMipMatrix !== null ){
+					return
+				}
+			} catch( error ){
+				console.log( error )
+			}
+		}
+
+		await loadRpcaMip( pcaMipComponentCount.value, priority )
+		return
+	}
+
+	if( target === "rpca_rgb" ){
+		if( heatmapUsesEstimatedRaman.value ){
+			try{
+				const estimatedClassification = await loadEstimatedRpcaClassification( priority )
+				if( estimatedClassification !== null ){
+					return
+				}
+			} catch( error ){
+				console.log( error )
+			}
+		}
+
+		await loadRpcaClassification( priority )
+	}
+}
+
+const loadBackgroundVisualizationTargetData = async ( target, initialLayerIndex, priority = "low" ) => {
+
+	if( target === "mip" ){
+		if( heatmapUsesEstimatedRaman.value ){
+			try{
+				const estimatedMipMatrix = await loadEstimatedArtifact( "mip", priority )
+				if( estimatedMipMatrix !== null ){
+					return estimatedMipMatrix
+				}
+			} catch( error ){
+				console.log( error )
+			}
+		}
+
+		return await hyperspectrumCache.getMip( project.value, {
+			...cacheOptions,
+			priority: normalizedLoadPriority( priority )
+		} )
+	}
+
+	if( target === "mip_hsv" ){
+		if( heatmapUsesEstimatedRaman.value ){
+			try{
+				const estimatedMipHsvMatrix = await loadEstimatedArtifact( "mip_hsv", priority )
+				if( estimatedMipHsvMatrix !== null ){
+					return estimatedMipHsvMatrix
+				}
+			} catch( error ){
+				console.log( error )
+			}
+		}
+
+		return await hyperspectrumCache.getMipHsv( project.value, {
+			...cacheOptions,
+			priority: normalizedLoadPriority( priority )
+		} )
+	}
+
+	if( target === "umap" ){
+		if( heatmapUsesEstimatedRaman.value ){
+			try{
+				const estimatedUmap = {
+					r: await loadEstimatedArtifact( "umap/r", priority ),
+					g: await loadEstimatedArtifact( "umap/g", priority ),
+					b: await loadEstimatedArtifact( "umap/b", priority )
+				}
+				return estimatedUmap
+			} catch( error ){
+				console.log( error )
+			}
+		}
+
+		return {
+			r: await hyperspectrumCache.getArtifact( project.value, "umap/r", {
+				...cacheOptions,
+				priority: normalizedLoadPriority( priority )
+			} ),
+			g: await hyperspectrumCache.getArtifact( project.value, "umap/g", {
+				...cacheOptions,
+				priority: normalizedLoadPriority( priority )
+			} ),
+			b: await hyperspectrumCache.getArtifact( project.value, "umap/b", {
+				...cacheOptions,
+				priority: normalizedLoadPriority( priority )
+			} )
+		}
+	}
+
+	if( target === "z_blend" ){
+		if( heatmapUsesEstimatedRaman.value ){
+			try{
+				const estimatedSource = await loadZBlendSource( true, priority )
+				if( estimatedSource !== null ){
+					return estimatedSource
+				}
+			} catch( error ){
+				console.log( error )
+			}
+		}
+
+		return await loadZBlendSource( false, priority )
+	}
+
+	if( target === "layer_window" ){
+		const layerIndex = Number.isInteger( initialLayerIndex ) ? initialLayerIndex : normalizeLayerInput( layerInput.value )
+		const indices = resolveLayerWindowIndices( layerIndex, true )
+
+		if( heatmapUsesEstimatedRaman.value ){
+			try{
+				for( const candidateIndex of indices ){
+					await loadEstimatedArtifact( "layers/" + candidateIndex, priority )
+					await yieldToBrowser()
+				}
+				return { estimated: true, layerIndex }
+			} catch( error ){
+				console.log( error )
+			}
+		}
+
+		for( const candidateIndex of indices ){
+			await hyperspectrumCache.getLayer( project.value, candidateIndex, {
+				...layerCacheOptions(),
+				priority: normalizedLoadPriority( priority )
+			} )
+			await yieldToBrowser()
+		}
+
+		return { estimated: false, layerIndex }
+	}
+
+	if( target === "pca" ){
+		if( heatmapUsesEstimatedRaman.value ){
+			try{
+				const estimatedClassificationMip = await loadEstimatedArtifact(
+					decompositionMipMode( "pca", activePcaClassificationCount() ),
+					priority
+				)
+				if( estimatedClassificationMip !== null ){
+					return estimatedClassificationMip
+				}
+			} catch( error ){
+				console.log( error )
+			}
+		}
+
+		return await hyperspectrumCache.getPcaMip( project.value, {
+			...cacheOptions,
+			componentCount: normalizePcaComponentInput( pcaClassificationComponentCount.value ),
+			priority: normalizedLoadPriority( priority )
+		} )
+	}
+
+	if( target === "pca_mip" ){
+		if( heatmapUsesEstimatedRaman.value ){
+			try{
+				const estimatedPcaMipMatrix = await loadEstimatedArtifact(
+					decompositionMipMode( "pca", pcaMipComponentCount.value ),
+					priority
+				)
+				if( estimatedPcaMipMatrix !== null ){
+					return estimatedPcaMipMatrix
+				}
+			} catch( error ){
+				console.log( error )
+			}
+		}
+
+		return await hyperspectrumCache.getPcaMip( project.value, {
+			...cacheOptions,
+			componentCount: normalizePcaComponentInput( pcaMipComponentCount.value ),
+			priority: normalizedLoadPriority( priority )
+		} )
+	}
+
+	if( target === "pca_rgb" ){
+		const combinedScores = {}
+
+		if( heatmapUsesEstimatedRaman.value ){
+			try{
+				for( const componentIndex of pcaComponentIndices ){
+					combinedScores[ componentIndex ] = await loadEstimatedArtifact(
+						decompositionScoreMode( "pca", componentIndex ),
+						priority
+					)
+					await yieldToBrowser()
+				}
+				return combinedScores
+			} catch( error ){
+				console.log( error )
+			}
+		}
+
+		for( const componentIndex of pcaComponentIndices ){
+			combinedScores[ componentIndex ] = await hyperspectrumCache.getPcaScore( project.value, componentIndex, {
+				...cacheOptions,
+				priority: normalizedLoadPriority( priority )
+			} )
+			await yieldToBrowser()
+		}
+
+		return combinedScores
+	}
+
+	if( target === "rpca" ){
+		if( heatmapUsesEstimatedRaman.value ){
+			try{
+				const estimatedClassificationMip = await loadEstimatedArtifact(
+					decompositionMipMode( "rpca", activePcaClassificationCount() ),
+					priority
+				)
+				if( estimatedClassificationMip !== null ){
+					return estimatedClassificationMip
+				}
+			} catch( error ){
+				console.log( error )
+			}
+		}
+
+		return await hyperspectrumCache.getRpcaMip( project.value, {
+			...cacheOptions,
+			componentCount: normalizePcaComponentInput( pcaClassificationComponentCount.value ),
+			priority: normalizedLoadPriority( priority )
+		} )
+	}
+
+	if( target === "rpca_mip" ){
+		if( heatmapUsesEstimatedRaman.value ){
+			try{
+				const estimatedRpcaMipMatrix = await loadEstimatedArtifact(
+					decompositionMipMode( "rpca", pcaMipComponentCount.value ),
+					priority
+				)
+				if( estimatedRpcaMipMatrix !== null ){
+					return estimatedRpcaMipMatrix
+				}
+			} catch( error ){
+				console.log( error )
+			}
+		}
+
+		return await hyperspectrumCache.getRpcaMip( project.value, {
+			...cacheOptions,
+			componentCount: normalizePcaComponentInput( pcaMipComponentCount.value ),
+			priority: normalizedLoadPriority( priority )
+		} )
+	}
+
+	if( target === "rpca_rgb" ){
+		const combinedScores = {}
+
+		if( heatmapUsesEstimatedRaman.value ){
+			try{
+				for( const componentIndex of pcaComponentIndices ){
+					combinedScores[ componentIndex ] = await loadEstimatedArtifact(
+						decompositionScoreMode( "rpca", componentIndex ),
+						priority
+					)
+					await yieldToBrowser()
+				}
+				return combinedScores
+			} catch( error ){
+				console.log( error )
+			}
+		}
+
+		for( const componentIndex of pcaComponentIndices ){
+			combinedScores[ componentIndex ] = await hyperspectrumCache.getRpcaScore( project.value, componentIndex, {
+				...cacheOptions,
+				priority: normalizedLoadPriority( priority )
+			} )
+			await yieldToBrowser()
+		}
+
+		return combinedScores
+	}
+
+	return null
+}
+
+const prewarmVisualizationTargetPayload = async ( target, loadedData = null ) => {
+
+	if( heatmapRendererMode.value !== "deckgl" ) return
+	if( graph.value === null ) return
+
+	if( target === "mip" ){
+		const matrix = loadedData ?? ( heatmapUsesEstimatedRaman.value ? estimatedMip.value : mip.value )
+		if( matrix === null ) return
+		hyperspectrum.prewarmScalarHeatmapRendererPayload( graph.value, matrix, {
+			colorscale: mipHeatmapColorscale()
+		} )
+		return
+	}
+
+	if( target === "mip_hsv" ){
+		const matrix = loadedData ?? ( heatmapUsesEstimatedRaman.value ? estimatedMipHsv.value : mipHsv.value )
+		if( matrix === null ) return
+		await hyperspectrum.prewarmRgbHeatmapRendererPayloadAsync( graph.value, matrix )
+		return
+	}
+
+	if( target === "umap" ){
+		const matrix = loadedData ?? ( heatmapUsesEstimatedRaman.value ? estimatedUmap.value : umap.value )
+		if( matrix === null ) return
+		await hyperspectrum.prewarmUmapHeatmapRendererPayloadAsync( graph.value, matrix, {
+			channelColors: resolvedUmapChannelColors()
+		} )
+		return
+	}
+
+	if( target === "z_blend" ){
+		const source = loadedData ?? ( heatmapUsesEstimatedRaman.value ? zBlendEstimatedSource.value : zBlendMeasurementSource.value )
+		if( source === null ) return
+		hyperspectrum.prewarmZBlendHeatmapRendererPayload( graph.value, source )
+		return
+	}
+
+	if( target === "pca" ){
+		const matrix = loadedData ?? ( heatmapUsesEstimatedRaman.value ? estimatedPcaClassificationMip.value : pcaClassificationMip.value )
+		if( matrix === null ) return
+		await hyperspectrum.prewarmPcaClassificationHeatmapRendererPayloadAsync( graph.value, matrix )
+		return
+	}
+
+	if( target === "pca_mip" ){
+		const matrix = loadedData ?? ( heatmapUsesEstimatedRaman.value ? estimatedPcaMip.value : pcaMip.value )
+		if( matrix === null ) return
+		await hyperspectrum.prewarmPcaMipHeatmapRendererPayloadAsync( graph.value, matrix )
+		return
+	}
+
+	if( target === "pca_rgb" ){
+		const matrix = loadedData ?? ( heatmapUsesEstimatedRaman.value ? estimatedPcaClassification.value : pcaClassification.value )
+		if( matrix === null ) return
+		await hyperspectrum.prewarmPcaRgbHeatmapRendererPayloadAsync( graph.value, matrix, {
+			channels: { ...pcaRgbChannels.value }
+		} )
+		return
+	}
+
+	if( target === "rpca" ){
+		const matrix = loadedData ?? ( heatmapUsesEstimatedRaman.value ? estimatedRpcaClassificationMip.value : rpcaClassificationMip.value )
+		if( matrix === null ) return
+		await hyperspectrum.prewarmPcaClassificationHeatmapRendererPayloadAsync( graph.value, matrix )
+		return
+	}
+
+	if( target === "rpca_mip" ){
+		const matrix = loadedData ?? ( heatmapUsesEstimatedRaman.value ? estimatedRpcaMip.value : rpcaMip.value )
+		if( matrix === null ) return
+		await hyperspectrum.prewarmPcaMipHeatmapRendererPayloadAsync( graph.value, matrix )
+		return
+	}
+
+	if( target === "rpca_rgb" ){
+		const matrix = loadedData ?? ( heatmapUsesEstimatedRaman.value ? estimatedRpcaClassification.value : rpcaClassification.value )
+		if( matrix === null ) return
+		await hyperspectrum.prewarmPcaRgbHeatmapRendererPayloadAsync( graph.value, matrix, {
+			channels: { ...pcaRgbChannels.value }
+		} )
+	}
+}
+
+const prepareBackgroundVisualizationTarget = async ( target, initialLayerIndex ) => {
+
+	const loadedData = await loadBackgroundVisualizationTargetData( target, initialLayerIndex, "low" )
+
+	if( target === "layer_window" ){
+		if( heatmapUsesEstimatedRaman.value ){
+			prefetchEstimatedLayerWindow( initialLayerIndex )
+			scheduleLayerPayloadPrewarm( initialLayerIndex, true )
+		} else {
+			prefetchMeasurementLayerWindow( initialLayerIndex )
+			scheduleLayerPayloadPrewarm( initialLayerIndex, false )
+		}
+		return
+	}
+
+	const idleWindowAvailable = await waitForProjectBackgroundIdleWindow( activeProjectLoadRequestID.value )
+	if( idleWindowAvailable === false ){
+		return
+	}
+
+	await prewarmVisualizationTargetPayload( target, loadedData )
+}
+
+const queueProjectBackgroundHydration = ( requestID, initialLayerIndex, startingDisplayMode ) => {
+
+	projectBackgroundGraceUntil = Date.now() + PROJECT_BACKGROUND_HYDRATION_GRACE_MS
+
+	const prioritizedTargets = resolvePrioritizedPreparationTargets( startingDisplayMode )
+	const deferredTargets = resolveDeferredPreparationTargets( startingDisplayMode )
+	const trailingTargets = resolveTrailingPreparationTargets( startingDisplayMode )
+	queuedPreparationTargets.value = [ ...prioritizedTargets, ...deferredTargets, ...trailingTargets ]
+
+	const enqueueHydrationTask = ( callback ) => {
+		enqueueProjectBackgroundTask( async () => {
+			if( requestID !== activeProjectLoadRequestID.value ) return
+			await callback()
+			if( requestID !== activeProjectLoadRequestID.value ) return
+		})
+	}
+
+	for( const target of [ ...prioritizedTargets, ...deferredTargets, ...trailingTargets ] ){
+		enqueueHydrationTask( async () => {
+			markPreparationStarted( target )
+			const spinnerStartedAt = typeof performance !== "undefined"
+				? performance.now()
+				: Date.now()
+			await nextTick()
+			await yieldToBrowser()
+
+			try{
+				await prepareBackgroundVisualizationTarget( target, initialLayerIndex )
+				const now = typeof performance !== "undefined"
+					? performance.now()
+					: Date.now()
+				const remainingVisibleMs = PREPARATION_SPINNER_MIN_VISIBLE_MS - ( now - spinnerStartedAt )
+				if( remainingVisibleMs > 0 ){
+					await new Promise(( resolve ) => {
+						const timerScope = typeof window !== "undefined" ? window : globalThis
+						timerScope.setTimeout( resolve, remainingVisibleMs )
+					})
+				}
+				markPreparationCompleted( target )
+			} catch( error ){
+				console.log( error )
+				markPreparationFailed( target )
+			}
+		})
+	}
+}
+
+const prewarmLoadedDisplayPayload = async ( target ) => {
+	await prewarmVisualizationTargetPayload( target, null )
+}
+
+const scheduleDisplayPayloadPrewarm = ( targets = [] ) => {
+
+	if( heatmapRendererMode.value !== "deckgl" ) return
+	if( graph.value === null ) return
+
+	for( const target of Array.isArray( targets ) ? targets : [ targets ] ){
+		if( typeof target !== "string" || target.length === 0 ) continue
+		scheduledDisplayPayloadPrewarmTargets.add( target )
+	}
+
+	if( scheduledDisplayPayloadPrewarmTargets.size === 0 ) return
+
+	if( typeof cancelScheduledDisplayPayloadPrewarm === "function" ){
+		cancelScheduledDisplayPayloadPrewarm()
+		cancelScheduledDisplayPayloadPrewarm = null
+	}
+
+	const requestID = displayPayloadPrewarmRequestID + 1
+	displayPayloadPrewarmRequestID = requestID
+
+	cancelScheduledDisplayPayloadPrewarm = runWhenBrowserIdle( async () => {
+
+		const iterator = scheduledDisplayPayloadPrewarmTargets.values().next()
+		if( iterator.done ){
+			cancelScheduledDisplayPayloadPrewarm = null
+			return
+		}
+
+		const target = iterator.value
+		scheduledDisplayPayloadPrewarmTargets.delete( target )
+
+		if( requestID !== displayPayloadPrewarmRequestID ) return
+
+		try{
+			await prewarmLoadedDisplayPayload( target )
+		} catch( error ){
+			console.log( error )
+		}
+
+		if( requestID === displayPayloadPrewarmRequestID ){
+			cancelScheduledDisplayPayloadPrewarm = null
+		}
+
+		if( scheduledDisplayPayloadPrewarmTargets.size > 0 ){
+			scheduleDisplayPayloadPrewarm()
+		}
+	}, { delayMs: 250 } )
+}
+
+let cancelScheduledLayerPayloadPrewarm = null
+
+const resolveLayerWindowIndices = ( centerIndex, includeCenter = true ) => {
+
+	if( Number.isInteger( centerIndex ) === false ){
+		return []
+	}
+
+	const maximumIndex = Number.isInteger( maxLayerIndex.value ) &&
+		maxLayerIndex.value >= 0 &&
+		maxLayerIndex.value < Number.MAX_SAFE_INTEGER
+		? maxLayerIndex.value
+		: null
+	const center = maximumIndex === null
+		? Math.max( 0, centerIndex )
+		: Math.max( 0, Math.min( maximumIndex, centerIndex ))
+
+	let start = Math.max( 0, center - LAYER_CACHE_WINDOW_RADIUS )
+	let end = maximumIndex === null
+		? center + LAYER_CACHE_WINDOW_RADIUS
+		: Math.min( maximumIndex, center + LAYER_CACHE_WINDOW_RADIUS )
+
+	if( maximumIndex !== null ){
+		const targetCount = Math.min( maximumIndex + 1, ( LAYER_CACHE_WINDOW_RADIUS * 2 ) + 1 )
+
+		while(( end - start + 1 ) < targetCount ){
+			if( start > 0 ){
+				start -= 1
+				continue
+			}
+
+			if( end < maximumIndex ){
+				end += 1
+				continue
+			}
+
+			break
+		}
+	}
+
+	const indices = includeCenter ? [ center ] : []
+	for( let distance = 1; distance <= ( end - start ); distance++ ){
+		const left = center - distance
+		const right = center + distance
+
+		if( left >= start ){
+			indices.push( left )
+		}
+
+		if( right <= end ){
+			indices.push( right )
+		}
+	}
+
+	return indices
+}
+
+const prefetchMeasurementLayerWindow = ( centerIndex ) => {
+
+	if( Number.isInteger( centerIndex ) === false ){
+		return
+	}
+
+	void hyperspectrumCache.prefetchWindow(
+		project.value,
+		centerIndex,
+		LAYER_CACHE_WINDOW_RADIUS,
+		layerCacheOptions()
+	)
+}
+
+const prefetchEstimatedLayerWindow = ( centerIndex ) => {
+
+	if( Number.isInteger( centerIndex ) === false ){
+		return
+	}
+
+	hyperspectrumCache.setActiveLayer( project.value, centerIndex, layerCacheOptions() )
+
+	for( const layerIndex of resolveLayerWindowIndices( centerIndex, false ) ){
+		void loadEstimatedArtifact( "layers/" + layerIndex, "low" ).catch(() => null)
+	}
+}
+
+const ensureMeasurementLayerWindowReady = async ( centerIndex, priority = "high" ) => {
+
+	if( Number.isInteger( centerIndex ) === false ){
+		return
+	}
+
+	const requestPriority = normalizedLoadPriority( priority )
+	const indices = resolveLayerWindowIndices( centerIndex, true )
+
+	if( shouldChunkBackgroundLoad( priority ) ){
+		for( const layerIndex of indices ){
+			await hyperspectrumCache.getLayer( project.value, layerIndex, {
+				...layerCacheOptions(),
+				priority: requestPriority
+			} )
+			await yieldToBrowser()
+		}
+		return
+	}
+
+	await Promise.all( indices.map(( layerIndex ) => {
+		return hyperspectrumCache.getLayer( project.value, layerIndex, {
+			...layerCacheOptions(),
+			priority: requestPriority
+		} )
+	}) )
+}
+
+const ensureEstimatedLayerWindowReady = async ( centerIndex, priority = "high" ) => {
+
+	if( Number.isInteger( centerIndex ) === false ){
+		return
+	}
+
+	const indices = resolveLayerWindowIndices( centerIndex, true )
+	if( shouldChunkBackgroundLoad( priority ) ){
+		for( const layerIndex of indices ){
+			await loadEstimatedArtifact( "layers/" + layerIndex, priority )
+			await yieldToBrowser()
+		}
+		return
+	}
+
+	await Promise.all( indices.map(( layerIndex ) => {
+		return loadEstimatedArtifact( "layers/" + layerIndex, priority )
+	}) )
+}
+
+const scheduleLayerPayloadPrewarm = ( centerIndex, estimated = false ) => {
+
+	if( heatmapRendererMode.value !== "deckgl" ) return
+	if( activePlot.value !== "layer" ) return
+	if( graph.value === null ) return
+	if( Number.isInteger( centerIndex ) === false ) return
+
+	const candidateIndices = resolveLayerWindowIndices( centerIndex, false )
+
+	if( candidateIndices.length === 0 ) return
+
+	if( typeof cancelScheduledLayerPayloadPrewarm === "function" ){
+		cancelScheduledLayerPayloadPrewarm()
+		cancelScheduledLayerPayloadPrewarm = null
+	}
+
+	const requestID = activeLayerPayloadPrewarmRequestID.value + 1
+	activeLayerPayloadPrewarmRequestID.value = requestID
+	const colorscale = layerHeatmapColorscale()
+	const remainingCandidateIndices = [ ...candidateIndices ]
+
+	const runNextCandidate = () => {
+
+		cancelScheduledLayerPayloadPrewarm = runWhenBrowserIdle( async () => {
+
+			cancelScheduledLayerPayloadPrewarm = null
+			if( requestID !== activeLayerPayloadPrewarmRequestID.value ) return
+
+			const candidateIndex = remainingCandidateIndices.shift()
+			if( Number.isInteger( candidateIndex ) === false ){
+				return
+			}
+
+			try{
+				const candidateLayer = estimated
+					? await loadEstimatedArtifact( "layers/" + candidateIndex, "low" )
+					: await hyperspectrumCache.getLayer(
+						project.value,
+						candidateIndex,
+						{ ...cacheOptions, priority: "low" }
+					)
+
+				if( requestID !== activeLayerPayloadPrewarmRequestID.value ) return
+				if( Array.isArray( candidateLayer ) && candidateLayer.length > 0 ){
+					hyperspectrum.prewarmScalarHeatmapRendererPayload( graph.value, candidateLayer, { colorscale } )
+				}
+			} catch( error ){
+				console.log( error )
+			}
+
+			if( requestID !== activeLayerPayloadPrewarmRequestID.value ) return
+			if( remainingCandidateIndices.length > 0 ){
+				runNextCandidate()
+			}
+		}, { delayMs: 150 } )
+	}
+
+	runNextCandidate()
+}
+
+const finalizeHeatmapRender = async ( renderStartedAt = null ) => {
+	if( heatmapRendererMode.value !== "deckgl" || heatmapInteractionMode.value === "zoom" ){
+		await applyHeatmapInteraction()
+	}
+	syncHeatmapViewportSyncListener()
+	await syncExternalHeatmapRenderer()
+
+	if( heatmapRendererMode.value === "plotly" && Number.isFinite( renderStartedAt ) ){
+		heatmapRenderBenchmark.value = {
+			renderer: "plotly",
+			viewMode: activePlot.value,
+			initialRenderMs: performance.now() - renderStartedAt,
+			lastMeasuredAt: new Date().toISOString()
+		}
+	}
 }
 
 const applyHeatmapInteraction = async () => {
@@ -2700,6 +6523,7 @@ const applyHeatmapInteraction = async () => {
 
 	await hyperspectrum.configureHeatmapInteraction( graph.value, {
 		mode: heatmapInteractionMode.value,
+		rendererMode: heatmapRendererMode.value,
 		width: dimensions.width,
 		height: dimensions.height,
 		onPointSelect: ( selection ) => {
@@ -2709,6 +6533,278 @@ const applyHeatmapInteraction = async () => {
 			void handleHeatmapRegionSelection( selection )
 		}
 	})
+}
+
+const stopDeckPaneResize = () => {
+
+	if( deckPaneResizeSession === null ){
+		return
+	}
+
+	window.removeEventListener( "pointermove", deckPaneResizeSession.onPointerMove )
+	window.removeEventListener( "pointerup", deckPaneResizeSession.onPointerUp )
+	window.removeEventListener( "pointercancel", deckPaneResizeSession.onPointerUp )
+	deckPaneResizeSession = null
+}
+
+const resizePlotlyContainer = async ( graphContainer ) => {
+
+	try{
+		await hyperspectrum.resizeGraph( graphContainer )
+	} catch( error ){
+		console.log( error )
+	}
+}
+
+const queueDeckPaneResponsiveResize = () => {
+
+	if( heatmapRendererMode.value !== "deckgl" ){
+		return
+	}
+
+	if( deckPaneResponsiveResizeQueued ){
+		return
+	}
+
+	deckPaneResponsiveResizeQueued = true
+
+	requestAnimationFrame( async () => {
+
+		deckPaneResponsiveResizeQueued = false
+
+		await Promise.all([
+			resizePlotlyContainer( deckTopPanelGraph.value ),
+			resizePlotlyContainer( deckBottomPanelGraph.value ),
+			resizePlotlyContainer( graph.value )
+		])
+
+		await syncExternalHeatmapRenderer()
+	} )
+}
+
+const startDeckPaneResize = ( event ) => {
+
+	if( heatmapRendererMode.value !== "deckgl" ){
+		return
+	}
+
+	stopDeckPaneResize()
+
+	const startWidth = ensureDeckHeatmapPaneWidth()
+	const startX = Number( event.clientX )
+
+	if( Number.isFinite( startX ) === false ){
+		return
+	}
+
+	const onPointerMove = ( moveEvent ) => {
+
+		const currentX = Number( moveEvent.clientX )
+		if( Number.isFinite( currentX ) === false ){
+			return
+		}
+
+		deckHeatmapPaneWidth.value = clampDeckHeatmapPaneWidth( startWidth - ( currentX - startX ))
+		queueDeckPaneResponsiveResize()
+	}
+
+	const onPointerUp = () => {
+		stopDeckPaneResize()
+		queueDeckPaneResponsiveResize()
+	}
+
+	deckPaneResizeSession = {
+		onPointerMove,
+		onPointerUp
+	}
+
+	deckHeatmapPaneWidthTouched.value = true
+
+	window.addEventListener( "pointermove", onPointerMove )
+	window.addEventListener( "pointerup", onPointerUp )
+	window.addEventListener( "pointercancel", onPointerUp )
+
+	event.preventDefault()
+}
+
+const plotlyGraphHasData = ( graphContainer ) => {
+	return Array.isArray( graphContainer?.data ) && graphContainer.data.length > 0
+}
+
+const resolveCurrentPlotRenderSpec = ( sharedOptions ) => {
+
+	if( activePlot.value === "pca" ){
+		return {
+			initialize: hyperspectrum.initializePcaClassification,
+			update: hyperspectrum.updatePcaClassification,
+			options: {
+				...sharedOptions,
+				loadings: resolvedPcaLoadings(),
+				loadingComponents: pcaClassificationLoadingComponents()
+			}
+		}
+	}
+
+	if( activePlot.value === "rpca" ){
+		return {
+			initialize: hyperspectrum.initializePcaClassification,
+			update: hyperspectrum.updatePcaClassification,
+			options: {
+				...sharedOptions,
+				loadings: resolvedRpcaLoadings(),
+				loadingComponents: pcaClassificationLoadingComponents()
+			}
+		}
+	}
+
+	if( activePlot.value === "pca_mip" ){
+		return {
+			initialize: hyperspectrum.initializePcaMip,
+			update: hyperspectrum.updatePcaMip,
+			options: {
+				...sharedOptions,
+				loadings: resolvedPcaLoadings(),
+				loadingComponents: pcaMipLoadingComponents()
+			}
+		}
+	}
+
+	if( activePlot.value === "rpca_mip" ){
+		return {
+			initialize: hyperspectrum.initializePcaMip,
+			update: hyperspectrum.updatePcaMip,
+			options: {
+				...sharedOptions,
+				loadings: resolvedRpcaLoadings(),
+				loadingComponents: pcaMipLoadingComponents()
+			}
+		}
+	}
+
+	if( activePlot.value === "pca_rgb" || activePlot.value === "rpca_rgb" ){
+		const redComponentLabel = String( pcaRgbChannels.value.r ).padStart( 2, "0" )
+		const greenComponentLabel = String( pcaRgbChannels.value.g ).padStart( 2, "0" )
+		const blueComponentLabel = String( pcaRgbChannels.value.b ).padStart( 2, "0" )
+
+		return {
+			initialize: hyperspectrum.initializePcaRgb,
+			update: hyperspectrum.updatePcaRgb,
+			options: {
+				...sharedOptions,
+				channels: { ...pcaRgbChannels.value },
+				loadings: activePlot.value === "pca_rgb" ? resolvedPcaLoadings() : resolvedRpcaLoadings(),
+				loadingSeries: [
+					{
+						componentIndex: pcaRgbChannels.value.r,
+						label: "R - PC" + redComponentLabel,
+						color: "rgb(239, 68, 68)"
+					},
+					{
+						componentIndex: pcaRgbChannels.value.g,
+						label: "G - PC" + greenComponentLabel,
+						color: "rgb(34, 197, 94)"
+					},
+					{
+						componentIndex: pcaRgbChannels.value.b,
+						label: "B - PC" + blueComponentLabel,
+						color: "rgb(59, 130, 246)"
+					}
+				]
+			}
+		}
+	}
+
+	if( activePlot.value === "umap" ){
+		return {
+			initialize: hyperspectrum.initializeUmap,
+			update: hyperspectrum.updateUmap,
+			options: {
+				...sharedOptions,
+				channelColors: resolvedUmapChannelColors()
+			}
+		}
+	}
+
+	if( activePlot.value === "z_blend" ){
+		return {
+			initialize: hyperspectrum.initializeZBlend,
+			update: hyperspectrum.updateZBlend,
+			options: sharedOptions
+		}
+	}
+
+	if( activePlot.value === "mip_hsv" ){
+		return {
+			initialize: hyperspectrum.initializeRgb,
+			update: hyperspectrum.updateRgb,
+			options: sharedOptions
+		}
+	}
+
+	const scalarColorscale = activePlot.value === "layer"
+		? settings.value?.colormaps?.layer
+		: settings.value?.colormaps?.mip
+	const colorscale = typeof scalarColorscale === "string" && scalarColorscale.length > 0
+		? scalarColorscale
+		: "Viridis"
+
+	return {
+		initialize: hyperspectrum.initialize,
+		update: hyperspectrum.update,
+		options: {
+			...sharedOptions,
+			colorscale
+		}
+	}
+}
+
+const renderDeckSidePanels = async ( plotOptions, initialize = false ) => {
+
+	if( deckTopPanelGraph.value === null || deckBottomPanelGraph.value === null ){
+		return
+	}
+
+	const nextUpperKey = upperPanelRenderKey( plotOptions )
+	const nextLowerKey = lowerPanelRenderKey( plotOptions )
+	const shouldRenderUpper = initialize ||
+		nextUpperKey !== lastDeckUpperPanelKey.value ||
+		plotlyGraphHasData( deckTopPanelGraph.value ) === false
+	const shouldRenderLower = initialize ||
+		nextLowerKey !== lastDeckLowerPanelKey.value ||
+		plotlyGraphHasData( deckBottomPanelGraph.value ) === false
+
+	if( shouldRenderUpper ){
+		const upperRenderer = plotlyGraphHasData( deckTopPanelGraph.value ) ? hyperspectrum.updateUpperPanel : hyperspectrum.initializeUpperPanel
+		await upperRenderer( deckTopPanelGraph.value, settings.value, plotOptions )
+		lastDeckUpperPanelKey.value = nextUpperKey
+	}
+
+	if( shouldRenderLower ){
+		const lowerRenderer = plotlyGraphHasData( deckBottomPanelGraph.value ) ? hyperspectrum.updateLowerPanel : hyperspectrum.initializeLowerPanel
+		await lowerRenderer( deckBottomPanelGraph.value, settings.value, plotOptions )
+		lastDeckLowerPanelKey.value = nextLowerKey
+	}
+}
+
+const renderDeckHeatmapPane = async ( matrix, plotSpec, initialize = false ) => {
+
+	if( graph.value === null ) return
+
+	const nextPaneKey = heatmapPaneLayoutKey( matrix, plotSpec.options?.axes )
+	const shouldRenderPaneFigure = initialize ||
+		nextPaneKey !== lastDeckHeatmapPaneKey.value ||
+		plotlyGraphHasData( graph.value ) === false
+	const renderOptions = {
+		...plotSpec.options,
+		panelMode: "heatmap-only",
+		skipFigureRender: shouldRenderPaneFigure === false
+	}
+	const renderFunction = shouldRenderPaneFigure || plotlyGraphHasData( graph.value ) === false
+		? plotSpec.initialize
+		: plotSpec.update
+
+	await renderFunction( matrix, graph.value, settings.value, renderOptions )
+	lastDeckHeatmapPaneKey.value = nextPaneKey
 }
 
 const togglePcaComponent = async ( componentIndex ) => {
@@ -2738,241 +6834,96 @@ const togglePcaComponent = async ( componentIndex ) => {
 
 const renderCurrentMatrix = async ( initialize = false ) => {
 
-	if( heatmapUsesEstimatedRaman.value ){
+	if( activePlot.value === "z_blend" ){
+		await ensureZBlendVisualizationMatrix( "high" )
+	} else if( heatmapUsesEstimatedRaman.value ){
 		await ensureEstimatedVisualizationMatrix( "high" )
 	}
 
 	await ensureActivePlotLoadings( "high" )
 
+	if( heatmapRendererMode.value === "deckgl" &&
+		( graph.value === null || deckTopPanelGraph.value === null || deckBottomPanelGraph.value === null )){
+		await nextTick()
+	}
+
 	const matrix = currentMatrix()
 	if( matrix === null || graph.value === null ) return
+	if( heatmapRendererMode.value === "deckgl" && deckHeatmapPaneWidthTouched.value === false ){
+		deckHeatmapPaneWidth.value = defaultDeckHeatmapPaneWidth()
+	}
+	const renderStartedAt = performance.now()
+	if( heatmapRendererMode.value === "deckgl" ){
+		const benchmarkToken = heatmapRenderBenchmarkToken.value + 1
+		heatmapRenderBenchmarkToken.value = benchmarkToken
+		pendingDeckRenderBenchmark.value = {
+			token: benchmarkToken,
+			startedAt: renderStartedAt,
+			viewMode: activePlot.value
+		}
+	} else {
+		pendingDeckRenderBenchmark.value = null
+	}
 	const bottomLeftOptions = bottomLeftSpectrumOptions()
 	const sharedOptions = {
 		selectedSpectrum: bottomLeftOptions.selectedSpectrum,
 		bottomLeftSpectrum: bottomLeftOptions.bottomLeftSpectrum,
 		topLeftSpectrum: topLeftSpectrumOptions(),
 		roiOverlays: activeRoiOverlays(),
-		axes: plotAxes()
+		axes: plotAxes(),
+		heatmapRenderer: heatmapRendererMode.value
 	}
+	const plotSpec = resolveCurrentPlotRenderSpec( sharedOptions )
 
-	if( activePlot.value === "pca" ){
-		const options = {
-			...sharedOptions,
-			loadings: resolvedPcaLoadings(),
-			loadingComponents: pcaClassificationLoadingComponents()
+	if( heatmapRendererMode.value === "deckgl" ){
+		await renderDeckSidePanels( plotSpec.options, initialize )
+		await renderDeckHeatmapPane( matrix, plotSpec, initialize )
+		await finalizeHeatmapRender( renderStartedAt )
+		if( reconcileDeckHeatmapPaneWidthWithPlotlyLayout( matrix ) ){
+			queueDeckPaneResponsiveResize()
 		}
-
-		if( initialize ){
-			await hyperspectrum.initializePcaClassification( matrix, graph.value, settings.value, options )
-			await applyHeatmapInteraction()
-			return
-		}
-
-		await hyperspectrum.updatePcaClassification( matrix, graph.value, settings.value, options )
-		await applyHeatmapInteraction()
 		return
 	}
 
-	if( activePlot.value === "rpca" ){
-		const options = {
-			...sharedOptions,
-			loadings: resolvedRpcaLoadings(),
-			loadingComponents: pcaClassificationLoadingComponents()
-		}
-
-		if( initialize ){
-			await hyperspectrum.initializePcaClassification( matrix, graph.value, settings.value, options )
-			await applyHeatmapInteraction()
-			return
-		}
-
-		await hyperspectrum.updatePcaClassification( matrix, graph.value, settings.value, options )
-		await applyHeatmapInteraction()
-		return
-	}
-
-	if( activePlot.value === "pca_mip" ){
-		const options = {
-			...sharedOptions,
-			loadings: resolvedPcaLoadings(),
-			loadingComponents: pcaMipLoadingComponents()
-		}
-
-		if( initialize ){
-			await hyperspectrum.initializePcaMip( matrix, graph.value, settings.value, options )
-			await applyHeatmapInteraction()
-			return
-		}
-
-		await hyperspectrum.updatePcaMip( matrix, graph.value, settings.value, options )
-		await applyHeatmapInteraction()
-		return
-	}
-
-	if( activePlot.value === "rpca_mip" ){
-		const options = {
-			...sharedOptions,
-			loadings: resolvedRpcaLoadings(),
-			loadingComponents: pcaMipLoadingComponents()
-		}
-
-		if( initialize ){
-			await hyperspectrum.initializePcaMip( matrix, graph.value, settings.value, options )
-			await applyHeatmapInteraction()
-			return
-		}
-
-		await hyperspectrum.updatePcaMip( matrix, graph.value, settings.value, options )
-		await applyHeatmapInteraction()
-		return
-	}
-
-	if( activePlot.value === "pca_rgb" ){
-		const redComponentLabel = String( pcaRgbChannels.value.r ).padStart( 2, "0" )
-		const greenComponentLabel = String( pcaRgbChannels.value.g ).padStart( 2, "0" )
-		const blueComponentLabel = String( pcaRgbChannels.value.b ).padStart( 2, "0" )
-
-		const options = {
-			...sharedOptions,
-			channels: { ...pcaRgbChannels.value },
-			loadings: resolvedPcaLoadings(),
-			loadingSeries: [
-				{
-					componentIndex: pcaRgbChannels.value.r,
-					label: "R - PC" + redComponentLabel,
-					color: "rgb(239, 68, 68)"
-				},
-				{
-					componentIndex: pcaRgbChannels.value.g,
-					label: "G - PC" + greenComponentLabel,
-					color: "rgb(34, 197, 94)"
-				},
-				{
-					componentIndex: pcaRgbChannels.value.b,
-					label: "B - PC" + blueComponentLabel,
-					color: "rgb(59, 130, 246)"
-				}
-			]
-		}
-
-		if( initialize ){
-			await hyperspectrum.initializePcaRgb( matrix, graph.value, settings.value, options )
-			await applyHeatmapInteraction()
-			return
-		}
-
-		await hyperspectrum.updatePcaRgb( matrix, graph.value, settings.value, options )
-		await applyHeatmapInteraction()
-		return
-	}
-
-	if( activePlot.value === "rpca_rgb" ){
-		const redComponentLabel = String( pcaRgbChannels.value.r ).padStart( 2, "0" )
-		const greenComponentLabel = String( pcaRgbChannels.value.g ).padStart( 2, "0" )
-		const blueComponentLabel = String( pcaRgbChannels.value.b ).padStart( 2, "0" )
-
-		const options = {
-			...sharedOptions,
-			channels: { ...pcaRgbChannels.value },
-			loadings: resolvedRpcaLoadings(),
-			loadingSeries: [
-				{
-					componentIndex: pcaRgbChannels.value.r,
-					label: "R - PC" + redComponentLabel,
-					color: "rgb(239, 68, 68)"
-				},
-				{
-					componentIndex: pcaRgbChannels.value.g,
-					label: "G - PC" + greenComponentLabel,
-					color: "rgb(34, 197, 94)"
-				},
-				{
-					componentIndex: pcaRgbChannels.value.b,
-					label: "B - PC" + blueComponentLabel,
-					color: "rgb(59, 130, 246)"
-				}
-			]
-		}
-
-		if( initialize ){
-			await hyperspectrum.initializePcaRgb( matrix, graph.value, settings.value, options )
-			await applyHeatmapInteraction()
-			return
-		}
-
-		await hyperspectrum.updatePcaRgb( matrix, graph.value, settings.value, options )
-		await applyHeatmapInteraction()
-		return
-	}
-
-	if( activePlot.value === "umap" ){
-		const options = {
-			...sharedOptions,
-			channelColors: resolvedUmapChannelColors()
-		}
-
-		if( initialize ){
-			await hyperspectrum.initializeUmap( matrix, graph.value, settings.value, options )
-			await applyHeatmapInteraction()
-			return
-		}
-
-		await hyperspectrum.updateUmap( matrix, graph.value, settings.value, options )
-		await applyHeatmapInteraction()
-		return
-	}
-
-	if( activePlot.value === "mip_hsv" ){
-		if( initialize ){
-			await hyperspectrum.initializeRgb( matrix, graph.value, settings.value, sharedOptions )
-			await applyHeatmapInteraction()
-			return
-		}
-
-		await hyperspectrum.updateRgb( matrix, graph.value, settings.value, sharedOptions )
-		await applyHeatmapInteraction()
-		return
-	}
-
-	const scalarColorscale = activePlot.value === "layer"
-		? settings.value?.colormaps?.layer
-		: settings.value?.colormaps?.mip
-	const colorscale = typeof scalarColorscale === "string" && scalarColorscale.length > 0
-		? scalarColorscale
-		: "Viridis"
-	const scalarOptions = {
-		...sharedOptions,
-		colorscale
-	}
-
-	if( initialize ){
-		await hyperspectrum.initialize( matrix, graph.value, settings.value, scalarOptions )
-		await applyHeatmapInteraction()
-		return
-	}
-
-	await hyperspectrum.update( matrix, graph.value, settings.value, scalarOptions )
-	await applyHeatmapInteraction()
+	const renderFunction = initialize ? plotSpec.initialize : plotSpec.update
+	await renderFunction( matrix, graph.value, settings.value, plotSpec.options )
+	await finalizeHeatmapRender( renderStartedAt )
 }
 
-const loadLayer = async ( layerIndex ) => {
+const loadLayer = async ( layerIndex, priority = "high" ) => {
 
 	if( layer.value !== null && layerIndex === activeLayerIndex.value ){
 		if( activePlot.value === "layer" ){
 			await renderCurrentMatrix()
 		}
-		void hyperspectrumCache.prefetchWindow( project.value, layerIndex, 2, cacheOptions )
+		if( shouldChunkBackgroundLoad( priority ) === false || activePlot.value === "layer" ){
+			prefetchMeasurementLayerWindow( layerIndex )
+		}
 		return
 	}
 
 	const requestID = activeLayerRequestID.value + 1
 	activeLayerRequestID.value = requestID
 
-	hyperspectrumCache.setActiveLayer( project.value, layerIndex, cacheOptions )
+	hyperspectrumCache.setActiveLayer( project.value, layerIndex, layerCacheOptions() )
+
+	const immediateLayer = hyperspectrumCache.peekLayer( project.value, layerIndex, layerCacheOptions() )
+	if( immediateLayer !== null ){
+		layer.value = immediateLayer
+		activeLayerIndex.value = layerIndex
+
+		if( activePlot.value === "layer" ){
+			await renderCurrentMatrix()
+		}
+
+		prefetchMeasurementLayerWindow( layerIndex )
+		scheduleLayerPayloadPrewarm( layerIndex, false )
+		return
+	}
 
 	const loadedLayer = await hyperspectrumCache.getLayer( project.value,
 														layerIndex,
-														{ ...cacheOptions, priority: "high" })
+														{ ...layerCacheOptions(), priority: normalizedLoadPriority( priority ) })
 
 	if( requestID !== activeLayerRequestID.value ) return
 
@@ -2983,7 +6934,10 @@ const loadLayer = async ( layerIndex ) => {
 		await renderCurrentMatrix()
 	}
 
-	void hyperspectrumCache.prefetchWindow( project.value, layerIndex, 2, cacheOptions )
+	if( shouldChunkBackgroundLoad( priority ) === false || activePlot.value === "layer" ){
+		prefetchMeasurementLayerWindow( layerIndex )
+		scheduleLayerPayloadPrewarm( layerIndex, false )
+	}
 }
 
 const loadEstimatedArtifact = async ( mode, priority = "high" ) => {
@@ -3033,11 +6987,27 @@ const loadEstimatedUmap = async ( priority = "high" ) => {
 	const requestID = activeEstimatedUmapRequestID.value + 1
 	activeEstimatedUmapRequestID.value = requestID
 
-	const [ redChannel, greenChannel, blueChannel ] = await Promise.all([
-		loadEstimatedArtifact( "umap/r", priority ),
-		loadEstimatedArtifact( "umap/g", priority ),
-		loadEstimatedArtifact( "umap/b", priority )
-	])
+	let redChannel = null
+	let greenChannel = null
+	let blueChannel = null
+
+	if( shouldChunkBackgroundLoad( priority ) ){
+		redChannel = await loadEstimatedArtifact( "umap/r", priority )
+		if( requestID !== activeEstimatedUmapRequestID.value ) return estimatedUmap.value
+		await yieldToBrowser()
+
+		greenChannel = await loadEstimatedArtifact( "umap/g", priority )
+		if( requestID !== activeEstimatedUmapRequestID.value ) return estimatedUmap.value
+		await yieldToBrowser()
+
+		blueChannel = await loadEstimatedArtifact( "umap/b", priority )
+	} else {
+		[ redChannel, greenChannel, blueChannel ] = await Promise.all([
+			loadEstimatedArtifact( "umap/r", priority ),
+			loadEstimatedArtifact( "umap/g", priority ),
+			loadEstimatedArtifact( "umap/b", priority )
+		])
+	}
 
 	if( requestID !== activeEstimatedUmapRequestID.value ) return estimatedUmap.value
 
@@ -3051,7 +7021,23 @@ const loadEstimatedUmap = async ( priority = "high" ) => {
 
 const loadEstimatedLayer = async ( layerIndex, priority = "high" ) => {
 
+	hyperspectrumCache.setActiveLayer( project.value, layerIndex, layerCacheOptions() )
+
 	if( estimatedLayer.value !== null && activeEstimatedLayerIndex.value === layerIndex ){
+		if( shouldChunkBackgroundLoad( priority ) === false || activePlot.value === "layer" ){
+			prefetchEstimatedLayerWindow( layerIndex )
+		}
+		return estimatedLayer.value
+	}
+
+	const immediateLayer = hyperspectrumCache.peekArtifact( project.value, "estimate/layers/" + layerIndex, layerCacheOptions() )
+	if( immediateLayer !== null ){
+		estimatedLayer.value = immediateLayer
+		activeEstimatedLayerIndex.value = layerIndex
+		if( shouldChunkBackgroundLoad( priority ) === false || activePlot.value === "layer" ){
+			prefetchEstimatedLayerWindow( layerIndex )
+			scheduleLayerPayloadPrewarm( layerIndex, true )
+		}
 		return estimatedLayer.value
 	}
 
@@ -3059,6 +7045,10 @@ const loadEstimatedLayer = async ( layerIndex, priority = "high" ) => {
 
 	estimatedLayer.value = loadedLayer
 	activeEstimatedLayerIndex.value = layerIndex
+	if( shouldChunkBackgroundLoad( priority ) === false || activePlot.value === "layer" ){
+		prefetchEstimatedLayerWindow( layerIndex )
+		scheduleLayerPayloadPrewarm( layerIndex, true )
+	}
 
 	return estimatedLayer.value
 }
@@ -3087,7 +7077,17 @@ const loadEstimatedPcaClassification = async ( priority = "high" ) => {
 	activeEstimatedPcaClassificationRequestID.value = requestID
 
 	const modes = pcaComponentIndices.map(( componentIndex ) => decompositionScoreMode( "pca", componentIndex ))
-	const scores = await Promise.all( modes.map(( mode ) => loadEstimatedArtifact( mode, priority )))
+	const scores = []
+
+	if( shouldChunkBackgroundLoad( priority ) ){
+		for( const mode of modes ){
+			scores.push( await loadEstimatedArtifact( mode, priority ) )
+			if( requestID !== activeEstimatedPcaClassificationRequestID.value ) return estimatedPcaClassification.value
+			await yieldToBrowser()
+		}
+	} else {
+		scores.push( ...( await Promise.all( modes.map(( mode ) => loadEstimatedArtifact( mode, priority )))))
+	}
 
 	if( requestID !== activeEstimatedPcaClassificationRequestID.value ) return estimatedPcaClassification.value
 
@@ -3151,7 +7151,17 @@ const loadEstimatedRpcaClassification = async ( priority = "high" ) => {
 	activeEstimatedRpcaClassificationRequestID.value = requestID
 
 	const modes = pcaComponentIndices.map(( componentIndex ) => decompositionScoreMode( "rpca", componentIndex ))
-	const scores = await Promise.all( modes.map(( mode ) => loadEstimatedArtifact( mode, priority )))
+	const scores = []
+
+	if( shouldChunkBackgroundLoad( priority ) ){
+		for( const mode of modes ){
+			scores.push( await loadEstimatedArtifact( mode, priority ) )
+			if( requestID !== activeEstimatedRpcaClassificationRequestID.value ) return estimatedRpcaClassification.value
+			await yieldToBrowser()
+		}
+	} else {
+		scores.push( ...( await Promise.all( modes.map(( mode ) => loadEstimatedArtifact( mode, priority )))))
+	}
 
 	if( requestID !== activeEstimatedRpcaClassificationRequestID.value ) return estimatedRpcaClassification.value
 
@@ -3304,6 +7314,11 @@ const ensureEstimatedVisualizationMatrix = async ( priority = "high" ) => {
 			return
 		}
 
+		if( activePlot.value === "z_blend" ){
+			await loadZBlendSource( true, priority )
+			return
+		}
+
 			if( activePlot.value === "layer" ){
 				const layerIndex = normalizeLayerInput( layerInput.value )
 				layerInput.value = layerIndex
@@ -3372,8 +7387,38 @@ const loadUmap = async ( priority = "high" ) => {
 	const requestID = activeUmapRequestID.value + 1
 	activeUmapRequestID.value = requestID
 
-	const loadedUmap = await hyperspectrumCache.getUmap( project.value,
+	let loadedUmap = null
+
+	if( shouldChunkBackgroundLoad( priority ) ){
+		const requestPriority = priority === "low" ? "low" : "high"
+		const redChannel = await hyperspectrumCache.getArtifact( project.value, "umap/r", {
+			...cacheOptions,
+			priority: requestPriority
+		} )
+		if( requestID !== activeUmapRequestID.value ) return umap.value
+		await yieldToBrowser()
+
+		const greenChannel = await hyperspectrumCache.getArtifact( project.value, "umap/g", {
+			...cacheOptions,
+			priority: requestPriority
+		} )
+		if( requestID !== activeUmapRequestID.value ) return umap.value
+		await yieldToBrowser()
+
+		const blueChannel = await hyperspectrumCache.getArtifact( project.value, "umap/b", {
+			...cacheOptions,
+			priority: requestPriority
+		} )
+
+		loadedUmap = {
+			r: redChannel,
+			g: greenChannel,
+			b: blueChannel
+		}
+	} else {
+		loadedUmap = await hyperspectrumCache.getUmap( project.value,
 													{ ...cacheOptions, priority: priority === "low" ? "low" : "high" })
+	}
 
 	if( requestID !== activeUmapRequestID.value ) return umap.value
 
@@ -3399,38 +7444,65 @@ const loadXyz = async ( priority = "high" ) => {
 	return xyzAxes.value
 }
 
-const loadPcaClassification = async () => {
+const loadPcaClassification = async ( priority = "high" ) => {
 
-	const requestID = activePcaClassificationRequestID.value + 1
-	activePcaClassificationRequestID.value = requestID
+	const requestPriority = normalizedLoadPriority( priority )
 
-	hyperspectrumCache.setActivePca( project.value, 5, cacheOptions )
-
-	const scores = await Promise.all( pcaComponentIndices.map(( componentIndex ) => {
-		return hyperspectrumCache.getPcaScore( project.value,
-											componentIndex,
-											{ ...cacheOptions, priority: "high" })
-	}))
-
-	if( requestID !== activePcaClassificationRequestID.value ) return
-
-	var combinedScores = {}
-	for( var ii = 0; ii < pcaComponentIndices.length; ii++ ){
-		combinedScores[ pcaComponentIndices[ii] ] = scores[ii]
+	if( pcaClassification.value !== null ){
+		return pcaClassification.value
+	}
+	if( pcaClassificationLoadPromise !== null ){
+		return pcaClassificationLoadPromise
 	}
 
-	pcaClassification.value = combinedScores
+	pcaClassificationLoadPromise = ( async () => {
 
-	if( activePlot.value === "pca" || activePlot.value === "pca_rgb" ){
-		if( activePlot.value === "pca_rgb" ){
-			await renderCurrentMatrix()
+		const requestID = activePcaClassificationRequestID.value + 1
+		activePcaClassificationRequestID.value = requestID
+
+		hyperspectrumCache.setActivePca( project.value, 5, cacheOptions )
+
+		const scores = []
+
+		if( shouldChunkBackgroundLoad( priority ) ){
+			for( const componentIndex of pcaComponentIndices ){
+				scores.push( await hyperspectrumCache.getPcaScore( project.value,
+												componentIndex,
+												{ ...cacheOptions, priority: requestPriority }))
+				if( requestID !== activePcaClassificationRequestID.value ) return pcaClassification.value
+				await yieldToBrowser()
+			}
+		} else {
+			scores.push( ...( await Promise.all( pcaComponentIndices.map(( componentIndex ) => {
+				return hyperspectrumCache.getPcaScore( project.value,
+												componentIndex,
+												{ ...cacheOptions, priority: requestPriority })
+			}))))
 		}
+
+		if( requestID !== activePcaClassificationRequestID.value ) return pcaClassification.value
+
+		var combinedScores = {}
+		for( var ii = 0; ii < pcaComponentIndices.length; ii++ ){
+			combinedScores[ pcaComponentIndices[ii] ] = scores[ii]
+		}
+
+		pcaClassification.value = combinedScores
+
+		return pcaClassification.value
+	})()
+
+	try{
+		return await pcaClassificationLoadPromise
+	} finally {
+		pcaClassificationLoadPromise = null
 	}
 }
 
-const loadPcaClassificationMip = async ( componentCount = activePcaClassificationCount() ) => {
+const loadPcaClassificationMip = async ( componentCount = activePcaClassificationCount(), priority = "high" ) => {
 
 	const normalizedComponentCount = normalizePcaComponentInput( componentCount )
+	const requestPriority = normalizedLoadPriority( priority )
 
 	if( pcaClassificationMip.value !== null &&
 		activePcaClassificationComponentCount.value === normalizedComponentCount ){
@@ -3443,7 +7515,7 @@ const loadPcaClassificationMip = async ( componentCount = activePcaClassificatio
 	const loadedPcaClassificationMip = await hyperspectrumCache.getPcaMip( project.value, {
 		...cacheOptions,
 		componentCount: normalizedComponentCount,
-		priority: "high"
+		priority: requestPriority
 	})
 
 	if( requestID !== activePcaClassificationMipRequestID.value ) return pcaClassificationMip.value
@@ -3454,9 +7526,10 @@ const loadPcaClassificationMip = async ( componentCount = activePcaClassificatio
 	return pcaClassificationMip.value
 }
 
-const loadPcaMip = async ( componentCount = pcaMipComponentCount.value ) => {
+const loadPcaMip = async ( componentCount = pcaMipComponentCount.value, priority = "high" ) => {
 
 	const normalizedComponentCount = normalizePcaComponentInput( componentCount )
+	const requestPriority = normalizedLoadPriority( priority )
 	pcaMipComponentCount.value = normalizedComponentCount
 
 	if( pcaMip.value !== null && activePcaMipComponentCount.value === normalizedComponentCount ){
@@ -3469,7 +7542,7 @@ const loadPcaMip = async ( componentCount = pcaMipComponentCount.value ) => {
 	const loadedPcaMip = await hyperspectrumCache.getPcaMip( project.value, {
 		...cacheOptions,
 		componentCount: normalizedComponentCount,
-		priority: "high"
+		priority: requestPriority
 	})
 
 	if( requestID !== activePcaMipRequestID.value ) return pcaMip.value
@@ -3484,7 +7557,7 @@ const loadPcaMip = async ( componentCount = pcaMipComponentCount.value ) => {
 	return pcaMip.value
 }
 
-const loadPcaLoadings = async () => {
+const loadPcaLoadings = async ( priority = "high" ) => {
 
 	if( pcaLoadings.value !== null ){
 		return pcaLoadings.value
@@ -3493,7 +7566,10 @@ const loadPcaLoadings = async () => {
 	const requestID = activePcaLoadingsRequestID.value + 1
 	activePcaLoadingsRequestID.value = requestID
 
-	const loadedLoadings = await hyperspectrumCache.getLoadings( project.value, { ...cacheOptions, priority: "high" })
+	const loadedLoadings = await hyperspectrumCache.getLoadings( project.value, {
+		...cacheOptions,
+		priority: normalizedLoadPriority( priority )
+	})
 
 	if( requestID !== activePcaLoadingsRequestID.value ) return pcaLoadings.value
 
@@ -3502,36 +7578,65 @@ const loadPcaLoadings = async () => {
 	return pcaLoadings.value
 }
 
-const loadRpcaClassification = async () => {
+const loadRpcaClassification = async ( priority = "high" ) => {
 
-	const requestID = activeRpcaClassificationRequestID.value + 1
-	activeRpcaClassificationRequestID.value = requestID
+	const requestPriority = normalizedLoadPriority( priority )
 
-	hyperspectrumCache.setActiveRpca( project.value, 5, cacheOptions )
-
-	const scores = await Promise.all( pcaComponentIndices.map(( componentIndex ) => {
-		return hyperspectrumCache.getRpcaScore( project.value,
-											componentIndex,
-											{ ...cacheOptions, priority: "high" })
-	}))
-
-	if( requestID !== activeRpcaClassificationRequestID.value ) return
-
-	var combinedScores = {}
-	for( var ii = 0; ii < pcaComponentIndices.length; ii++ ){
-		combinedScores[ pcaComponentIndices[ii] ] = scores[ii]
+	if( rpcaClassification.value !== null ){
+		return rpcaClassification.value
+	}
+	if( rpcaClassificationLoadPromise !== null ){
+		return rpcaClassificationLoadPromise
 	}
 
-	rpcaClassification.value = combinedScores
+	rpcaClassificationLoadPromise = ( async () => {
 
-	if( activePlot.value === "rpca_rgb" ){
-		await renderCurrentMatrix()
+		const requestID = activeRpcaClassificationRequestID.value + 1
+		activeRpcaClassificationRequestID.value = requestID
+
+		hyperspectrumCache.setActiveRpca( project.value, 5, cacheOptions )
+
+		const scores = []
+
+		if( shouldChunkBackgroundLoad( priority ) ){
+			for( const componentIndex of pcaComponentIndices ){
+				scores.push( await hyperspectrumCache.getRpcaScore( project.value,
+												componentIndex,
+												{ ...cacheOptions, priority: requestPriority }))
+				if( requestID !== activeRpcaClassificationRequestID.value ) return rpcaClassification.value
+				await yieldToBrowser()
+			}
+		} else {
+			scores.push( ...( await Promise.all( pcaComponentIndices.map(( componentIndex ) => {
+				return hyperspectrumCache.getRpcaScore( project.value,
+												componentIndex,
+												{ ...cacheOptions, priority: requestPriority })
+			}))))
+		}
+
+		if( requestID !== activeRpcaClassificationRequestID.value ) return rpcaClassification.value
+
+		var combinedScores = {}
+		for( var ii = 0; ii < pcaComponentIndices.length; ii++ ){
+			combinedScores[ pcaComponentIndices[ii] ] = scores[ii]
+		}
+
+		rpcaClassification.value = combinedScores
+
+		return rpcaClassification.value
+	})()
+
+	try{
+		return await rpcaClassificationLoadPromise
+	} finally {
+		rpcaClassificationLoadPromise = null
 	}
 }
 
-const loadRpcaClassificationMip = async ( componentCount = activePcaClassificationCount() ) => {
+const loadRpcaClassificationMip = async ( componentCount = activePcaClassificationCount(), priority = "high" ) => {
 
 	const normalizedComponentCount = normalizePcaComponentInput( componentCount )
+	const requestPriority = normalizedLoadPriority( priority )
 
 	if( rpcaClassificationMip.value !== null &&
 		activeRpcaClassificationComponentCount.value === normalizedComponentCount ){
@@ -3544,7 +7649,7 @@ const loadRpcaClassificationMip = async ( componentCount = activePcaClassificati
 	const loadedRpcaClassificationMip = await hyperspectrumCache.getRpcaMip( project.value, {
 		...cacheOptions,
 		componentCount: normalizedComponentCount,
-		priority: "high"
+		priority: requestPriority
 	})
 
 	if( requestID !== activeRpcaClassificationMipRequestID.value ) return rpcaClassificationMip.value
@@ -3555,9 +7660,10 @@ const loadRpcaClassificationMip = async ( componentCount = activePcaClassificati
 	return rpcaClassificationMip.value
 }
 
-const loadRpcaMip = async ( componentCount = pcaMipComponentCount.value ) => {
+const loadRpcaMip = async ( componentCount = pcaMipComponentCount.value, priority = "high" ) => {
 
 	const normalizedComponentCount = normalizePcaComponentInput( componentCount )
+	const requestPriority = normalizedLoadPriority( priority )
 	pcaMipComponentCount.value = normalizedComponentCount
 
 	if( rpcaMip.value !== null && activeRpcaMipComponentCount.value === normalizedComponentCount ){
@@ -3570,7 +7676,7 @@ const loadRpcaMip = async ( componentCount = pcaMipComponentCount.value ) => {
 	const loadedRpcaMip = await hyperspectrumCache.getRpcaMip( project.value, {
 		...cacheOptions,
 		componentCount: normalizedComponentCount,
-		priority: "high"
+		priority: requestPriority
 	})
 
 	if( requestID !== activeRpcaMipRequestID.value ) return rpcaMip.value
@@ -3581,7 +7687,7 @@ const loadRpcaMip = async ( componentCount = pcaMipComponentCount.value ) => {
 	return rpcaMip.value
 }
 
-const loadRpcaLoadings = async () => {
+const loadRpcaLoadings = async ( priority = "high" ) => {
 
 	if( rpcaLoadings.value !== null ){
 		return rpcaLoadings.value
@@ -3590,7 +7696,10 @@ const loadRpcaLoadings = async () => {
 	const requestID = activeRpcaLoadingsRequestID.value + 1
 	activeRpcaLoadingsRequestID.value = requestID
 
-	const loadedLoadings = await hyperspectrumCache.getRpcaLoadings( project.value, { ...cacheOptions, priority: "high" })
+	const loadedLoadings = await hyperspectrumCache.getRpcaLoadings( project.value, {
+		...cacheOptions,
+		priority: normalizedLoadPriority( priority )
+	})
 
 	if( requestID !== activeRpcaLoadingsRequestID.value ) return rpcaLoadings.value
 
@@ -3607,6 +7716,25 @@ const normalizeLayerInput = ( value ) => {
 	}
 
 	return Math.max( 0, Math.min( maxLayerIndex.value, parsed ))
+}
+
+const canStepLayerInput = ( delta ) => {
+	const currentValue = normalizeLayerInput( layerInput.value )
+	const nextValue = currentValue + Number( delta )
+	return nextValue >= 0 && nextValue <= maxLayerIndex.value
+}
+
+const stepLayerInput = async ( delta ) => {
+
+	const currentValue = normalizeLayerInput( layerInput.value )
+	const nextValue = Math.max( 0, Math.min( maxLayerIndex.value, currentValue + Number( delta )))
+
+	if( nextValue === currentValue ){
+		return
+	}
+
+	layerInput.value = nextValue
+	await applyLayerInput()
 }
 
 const applyLayerInput = async () => {
@@ -3631,6 +7759,64 @@ const normalizePcaComponentInput = ( value ) => {
 	}
 
 	return Math.max( 1, Math.min( 10, parsed ))
+}
+
+const pcaRgbComponentInputRef = ( channel ) => {
+	if( channel === "r" ) return pcaRgbRedInput
+	if( channel === "g" ) return pcaRgbGreenInput
+	return pcaRgbBlueInput
+}
+
+const canStepPcaRgbComponent = ( channel, delta ) => {
+	const componentRef = pcaRgbComponentInputRef( channel )
+	const currentValue = normalizePcaComponentInput( componentRef.value )
+	const nextValue = currentValue + Number( delta )
+	return nextValue >= 1 && nextValue <= 10
+}
+
+const stepPcaRgbComponent = async ( channel, delta ) => {
+
+	const componentRef = pcaRgbComponentInputRef( channel )
+	const currentValue = normalizePcaComponentInput( componentRef.value )
+	const nextValue = Math.max( 1, Math.min( 10, currentValue + Number( delta )))
+
+	if( nextValue === currentValue ){
+		return
+	}
+
+	componentRef.value = nextValue
+	await applyPcaRgbInput()
+}
+
+const pcaComponentCountRef = ( kind ) => {
+	return kind === "classification" ? pcaClassificationComponentCount : pcaMipComponentCount
+}
+
+const canStepPcaComponentCount = ( kind, delta ) => {
+	const countRef = pcaComponentCountRef( kind )
+	const currentValue = normalizePcaComponentInput( countRef.value )
+	const nextValue = currentValue + Number( delta )
+	return nextValue >= 1 && nextValue <= 10
+}
+
+const stepPcaComponentCount = async ( kind, delta ) => {
+
+	const countRef = pcaComponentCountRef( kind )
+	const currentValue = normalizePcaComponentInput( countRef.value )
+	const nextValue = Math.max( 1, Math.min( 10, currentValue + Number( delta )))
+
+	if( nextValue === currentValue ){
+		return
+	}
+
+	countRef.value = nextValue
+
+	if( kind === "classification" ){
+		await applyPcaClassificationComponentCount()
+		return
+	}
+
+	await applyPcaMipComponentCount()
 }
 
 const applyPcaRgbInput = async () => {
@@ -3693,6 +7879,11 @@ const applyPcaClassificationComponentCount = async () => {
 
 const refreshOnResize = debounce( async () => {
 	if( graph.value === null ) return
+	if( heatmapRendererMode.value === "deckgl" ){
+		ensureDeckHeatmapPaneWidth()
+		queueDeckPaneResponsiveResize()
+		return
+	}
 	await renderCurrentMatrix()
 }, 100 )
 
@@ -3702,16 +7893,97 @@ const debouncedApplyLayerInput = debounce( async () => {
 	await applyLayerInput()
 }, 120 )
 
+const debouncedApplyZBlendChanges = debounce( async () => {
+
+	if( activePlot.value !== "z_blend" ) return
+	if( graph.value === null ) return
+
+	try{
+		await renderCurrentMatrix()
+	} catch( error ){
+		console.log( error )
+	}
+}, 16 )
+
+const debouncedApplyZBlendHeatmapOnlyChanges = debounce( async () => {
+
+	if( activePlot.value !== "z_blend" ) return
+	if( graph.value === null ) return
+
+	try{
+		await renderZBlendHeatmapOnly()
+	} catch( error ){
+		console.log( error )
+	}
+}, 16 )
+
 const debouncedApplyPcaRgbInput = debounce( async () => {
 
 	if( activePlot.value !== "pca_rgb" && activePlot.value !== "rpca_rgb" ) return
 	await applyPcaRgbInput()
 }, 120 )
 
+const debouncedApplyPcaClassificationComponentCount = debounce( async () => {
+
+	if( activePlot.value !== "pca" && activePlot.value !== "rpca" ) return
+	await applyPcaClassificationComponentCount()
+}, 120 )
+
+const debouncedApplyPcaMipComponentCount = debounce( async () => {
+
+	if( activePlot.value !== "pca_mip" && activePlot.value !== "rpca_mip" ) return
+	await applyPcaMipComponentCount()
+}, 120 )
+
 const resetViewerState = () => {
 
 	stopGpuInferenceStatusPolling()
 	gpuStatusPollInFlight = false
+	removeHeatmapViewportSyncListener()
+	stopDeckPaneResize()
+	if( typeof cancelScheduledLayerPayloadPrewarm === "function" ){
+		cancelScheduledLayerPayloadPrewarm()
+		cancelScheduledLayerPayloadPrewarm = null
+	}
+	if( typeof cancelScheduledDisplayPayloadPrewarm === "function" ){
+		cancelScheduledDisplayPayloadPrewarm()
+		cancelScheduledDisplayPayloadPrewarm = null
+	}
+	clearProjectBackgroundWork()
+	scheduledDisplayPayloadPrewarmTargets.clear()
+	displayPayloadPrewarmRequestID += 1
+	activeLayerRequestID.value += 1
+	activeLayerPayloadPrewarmRequestID.value += 1
+	activeMipHsvRequestID.value += 1
+	activeUmapRequestID.value += 1
+	activeXyzRequestID.value += 1
+	activePcaClassificationRequestID.value += 1
+	activePcaClassificationMipRequestID.value += 1
+	activePcaMipRequestID.value += 1
+	activePcaLoadingsRequestID.value += 1
+	activeRpcaClassificationRequestID.value += 1
+	activeRpcaClassificationMipRequestID.value += 1
+	activeRpcaMipRequestID.value += 1
+	activeRpcaLoadingsRequestID.value += 1
+	activeEstimatedMipRequestID.value += 1
+	activeEstimatedMipHsvRequestID.value += 1
+	activeEstimatedUmapRequestID.value += 1
+	activeZBlendMeasurementRequestID.value += 1
+	activeZBlendEstimatedRequestID.value += 1
+	pcaClassificationLoadPromise = null
+	rpcaClassificationLoadPromise = null
+	pendingDeckRenderBenchmark.value = null
+	resetDeckPanelRenderKeys()
+	deckHeatmapPaneWidth.value = null
+	deckHeatmapPaneWidthTouched.value = false
+	resetPreparationState()
+	viewerTutorialPromptVisible.value = false
+	viewerTutorialVisible.value = false
+	viewerTutorialStepIndex.value = 0
+	viewerTutorialRunToken.value += 1
+	tutorialDisplayOptionsOpen.value = false
+	viewerTutorialOriginalDisplayMode.value = ""
+	viewerTutorialOriginalInteractionMode.value = ""
 
 	project.value = { id: "" }
 	gpuInferenceJobId.value = ""
@@ -3722,6 +7994,24 @@ const resetViewerState = () => {
 	primarySpectrumSource.value = "measurement"
 	activePlot.value = defaultDisplayMode()
 	heatmapInteractionMode.value = defaultHeatmapInteractionMode()
+	heatmapRendererMode.value = defaultHeatmapRendererMode()
+	heatmapZoomAspectRatio.value = defaultHeatmapZoomAspectRatio()
+	zBlendChannels.value = []
+	zBlendSaving.value = false
+	zBlendPresetStatus.value = "idle"
+	zBlendPresetStatusMessage.value = ""
+	zBlendPresetLoadedFromBackend.value = false
+	zBlendDirty.value = false
+	zBlendMeasurementIntensityMaximumByLayer.value = {}
+	zBlendEstimatedIntensityMaximumByLayer.value = {}
+	heatmapRendererPayload.value = null
+	heatmapRendererPaneState.value = null
+	heatmapRenderBenchmark.value = {
+		renderer: heatmapRendererMode.value,
+		viewMode: "",
+		initialRenderMs: null,
+		lastMeasuredAt: null
+	}
 	selectedConfidenceLevel.value = defaultSelectionConfidenceLevel()
 	roiEstimateUncertaintyMode.value = defaultRoiEstimateUncertaintyMode()
 	mip.value = null
@@ -3733,6 +8023,8 @@ const resetViewerState = () => {
 	estimatedMipHsv.value = null
 	estimatedUmap.value = null
 	estimatedLayer.value = null
+	zBlendMeasurementSource.value = null
+	zBlendEstimatedSource.value = null
 	estimatedPcaClassification.value = null
 	estimatedPcaClassificationMip.value = null
 	estimatedPcaMip.value = null
@@ -3753,12 +8045,11 @@ const resetViewerState = () => {
 	showPcaLoadings.value = defaultShowPcaLoadings()
 	showSelectedSpectra.value = true
 	rois.value = []
-	roiStorage.value = []
 	resetEstimatedRoiArtifacts()
 	selectedRoiId.value = ""
 	showAllRoiOverlays.value = false
 	selectedHeatmapIndices.value = { xIndices: [], yIndices: [] }
-	latestSelectedRegionPoints.value = []
+	selectedHeatmapBoundingBox.value = null
 	latestMeasurementSingleSpectrum.value = null
 	latestMeasurementMeanSpectrum.value = null
 	latestMeasurementSelectedSpectrum.value = null
@@ -3866,7 +8157,6 @@ const initializeProjectView = async () => {
 		hyperspectrumCache.setActivePca( project.value, 5, cacheOptions )
 		hyperspectrumCache.setActiveRpca( project.value, 5, cacheOptions )
 		await loadRoiList()
-		await loadRoiStorage()
 		if( requestID !== activeProjectLoadRequestID.value ) return
 
 		try{
@@ -3877,77 +8167,34 @@ const initializeProjectView = async () => {
 
 		if( requestID !== activeProjectLoadRequestID.value ) return
 
+		const initialLayerIndex = Math.floor( maxLayerIndex.value / 2 )
+		layerInput.value = initialLayerIndex
+		hyperspectrumCache.setActiveLayer( project.value, initialLayerIndex, layerCacheOptions() )
+		hyperspectrumCache.setInitialLayerWindow( project.value, initialLayerIndex, layerCacheOptions() )
+		ensureDefaultZBlendState()
+		void loadZBlendPreset( requestID )
+		const startingDisplayMode = activePlot.value
+		const blockingPreparationTarget = blockingPreparationTargetForDisplayMode( startingDisplayMode )
+		markPreparationStarted( blockingPreparationTarget )
+
 		const loadedMip = await hyperspectrumCache.getMip( project.value, cacheOptions )
 		if( requestID !== activeProjectLoadRequestID.value ) return
 		mip.value = loadedMip
 
-		if( activePlot.value === "mip_hsv" ){
-			await loadMipHsv( "high" )
-		} else if( activePlot.value === "umap" ){
-			await loadUmap( "high" )
-		} else if( activePlot.value === "layer" ){
-			const initialIndex = Math.floor( maxLayerIndex.value / 2 )
-			layerInput.value = initialIndex
-			await loadLayer( initialIndex )
-			} else if( activePlot.value === "pca_mip" ){
-				resetActivePcaComponents( pcaMipComponentCount.value )
-				await loadPcaMip( pcaMipComponentCount.value )
-				if( showPcaLoadings.value ){
-					try{
-						await loadPcaLoadings()
-					} catch( loadingsError ){
-						console.log( loadingsError )
-					}
-				}
-			} else if( activePlot.value === "pca" ){
-				resetActivePcaComponents( pcaClassificationComponentCount.value )
-				await loadPcaClassificationMip()
-				if( showPcaLoadings.value ){
-					try{
-						await loadPcaLoadings()
-					} catch( loadingsError ){
-						console.log( loadingsError )
-					}
-				}
-			} else if( activePlot.value === "pca_rgb" ){
-				await loadPcaClassification()
-				if( showPcaLoadings.value ){
-					try{
-						await loadPcaLoadings()
-					} catch( loadingsError ){
-						console.log( loadingsError )
-					}
-				}
-			} else if( activePlot.value === "rpca_mip" ){
-				resetActivePcaComponents( pcaMipComponentCount.value )
-				await loadRpcaMip( pcaMipComponentCount.value )
-				if( showPcaLoadings.value ){
-					try{
-						await loadRpcaLoadings()
-					} catch( loadingsError ){
-						console.log( loadingsError )
-					}
-				}
-			} else if( activePlot.value === "rpca" ){
-				resetActivePcaComponents( pcaClassificationComponentCount.value )
-				await loadRpcaClassificationMip()
-				if( showPcaLoadings.value ){
-					try{
-						await loadRpcaLoadings()
-					} catch( loadingsError ){
-						console.log( loadingsError )
-					}
-				}
-			} else if( activePlot.value === "rpca_rgb" ){
-				await loadRpcaClassification()
-				if( showPcaLoadings.value ){
-					try{
-						await loadRpcaLoadings()
-					} catch( loadingsError ){
-						console.log( loadingsError )
-					}
-				}
+		try{
+			await loadVisualizationTargetData( blockingPreparationTarget, initialLayerIndex, "high" )
+		} catch( blockingError ){
+			console.log( blockingError )
+
+			if( startingDisplayMode !== "mip" ){
+				markPreparationFailed( blockingPreparationTarget )
+				activePlot.value = "mip"
+				markPreparationStarted( "mip" )
+				await loadVisualizationTargetData( "mip", initialLayerIndex, "high" )
+			} else {
+				throw blockingError
 			}
+		}
 
 		if( requestID !== activeProjectLoadRequestID.value ) return
 
@@ -3955,58 +8202,10 @@ const initializeProjectView = async () => {
 		if( requestID !== activeProjectLoadRequestID.value ) return
 
 		await renderCurrentMatrix( true )
-
-		if( activePlot.value !== "layer" ){
-			void ( async () => {
-				try{
-					const initialIndex = Math.floor( maxLayerIndex.value / 2 )
-					layerInput.value = initialIndex
-					await loadLayer( initialIndex )
-				} catch( layerError ){
-					console.log( layerError )
-				}
-			})()
-		}
-
-		if( activePlot.value !== "mip_hsv" ){
-			void loadMipHsv( "low" ).catch(( mipHsvError ) => {
-				console.log( mipHsvError )
-			})
-		}
-
-		if( activePlot.value !== "umap" ){
-			void loadUmap( "low" ).catch(( umapError ) => {
-				console.log( umapError )
-			})
-		}
-
-		void hyperspectrumCache.prefetchWindow( project.value, 0, 2, cacheOptions )
-
-		void hyperspectrumCache.prefetchPcaScores( project.value, cacheOptions )
-		void loadPcaClassification().catch(( classificationError ) => {
-			console.log( classificationError )
-		})
-		void loadPcaClassificationMip().catch(( classificationMipError ) => {
-			console.log( classificationMipError )
-		})
-		void loadPcaMip( pcaMipComponentCount.value ).catch(( pcaMipError ) => {
-			console.log( pcaMipError )
-		})
-		void loadPcaLoadings().catch(( loadingsError ) => {
-			console.log( loadingsError )
-		})
-		void loadRpcaClassification().catch(( classificationError ) => {
-			console.log( classificationError )
-		})
-		void loadRpcaClassificationMip().catch(( classificationMipError ) => {
-			console.log( classificationMipError )
-		})
-		void loadRpcaMip( pcaMipComponentCount.value ).catch(( rpcaMipError ) => {
-			console.log( rpcaMipError )
-		})
-		void loadRpcaLoadings().catch(( loadingsError ) => {
-			console.log( loadingsError )
-		})
+		markPreparationCompleted( blockingPreparationTargetForDisplayMode( activePlot.value ) )
+		emitLoadedOnce()
+		maybeOfferViewerTutorialPrompt( requestID )
+		queueProjectBackgroundHydration( requestID, initialLayerIndex, activePlot.value )
 
 		if( resizeObserver === null && typeof ResizeObserver !== "undefined" && graph.value ){
 			resizeObserver = new ResizeObserver(() => {
@@ -4014,8 +8213,6 @@ const initializeProjectView = async () => {
 			})
 			resizeObserver.observe( graph.value )
 		}
-
-		emit("loaded")
 	} catch( error ){
 		if( requestID !== activeProjectLoadRequestID.value ) return
 		console.log( error )
@@ -4026,6 +8223,7 @@ const initializeProjectView = async () => {
 onMounted( async () => {
 
     try{
+		installProjectBackgroundInteractionListeners()
 
         var savedSettings = await settingslib.get()
 		var savedBilling = await settingslib.getBilling()
@@ -4094,6 +8292,13 @@ watch( activePlot, async ( plotMode ) => {
 				await loadUmap( "high" )
 			}
 			await renderCurrentMatrix()
+			return
+		}
+
+		if( plotMode === "z_blend" ){
+			await ensureZBlendVisualizationMatrix( "high" )
+			await renderCurrentMatrix()
+			await renderZBlendHeatmapOnly()
 			return
 		}
 
@@ -4170,8 +8375,80 @@ watch( activePlot, async ( plotMode ) => {
 	}
 })
 
+watch(
+	[
+		() => zBlendMeasurementSource.value,
+		() => zBlendEstimatedSource.value,
+		() => heatmapUsesEstimatedRaman.value,
+		() => heatmapRendererMode.value,
+		() => activePlot.value
+	],
+	() => {
+		if( activePlot.value !== "z_blend" ){
+			return
+		}
+
+		if( heatmapRendererMode.value !== "deckgl" ){
+			return
+		}
+
+		if( graph.value === null ){
+			return
+		}
+
+		void syncZBlendHeatmapPayloadFromCurrentSource().catch(( error ) => {
+			console.log( error )
+		})
+	},
+	{ flush: "post" }
+)
+
 watch( heatmapInteractionMode, async () => {
 	try{
+		await applyHeatmapInteraction()
+		syncHeatmapViewportSyncListener()
+		await syncExternalHeatmapRenderer()
+	} catch( error ){
+		console.log( error )
+	}
+})
+
+watch( heatmapRendererMode, async () => {
+
+	if( typeof cancelScheduledLayerPayloadPrewarm === "function" ){
+		cancelScheduledLayerPayloadPrewarm()
+		cancelScheduledLayerPayloadPrewarm = null
+	}
+	activeLayerPayloadPrewarmRequestID.value += 1
+	displayPayloadPrewarmRequestID += 1
+	if( typeof cancelScheduledDisplayPayloadPrewarm === "function" ){
+		cancelScheduledDisplayPayloadPrewarm()
+		cancelScheduledDisplayPayloadPrewarm = null
+	}
+	scheduledDisplayPayloadPrewarmTargets.clear()
+	resetDeckPanelRenderKeys()
+	removeHeatmapViewportSyncListener()
+
+	await nextTick()
+
+	if( heatmapRendererMode.value === "deckgl" ){
+		ensureDeckHeatmapPaneWidth()
+		scheduleDisplayPayloadPrewarm([ "mip", "mip_hsv", "umap", "z_blend", "pca", "pca_mip", "pca_rgb", "rpca", "rpca_mip", "rpca_rgb" ])
+	}
+
+	if( graph.value === null ){
+		heatmapRendererPayload.value = null
+		heatmapRendererPaneState.value = null
+		return
+	}
+
+	if( currentMatrix() === null ){
+		await syncExternalHeatmapRenderer()
+		return
+	}
+
+	try{
+		await renderCurrentMatrix()
 		await applyHeatmapInteraction()
 	} catch( error ){
 		console.log( error )
@@ -4188,6 +8465,12 @@ watch( selectedRoiId, async () => {
 		await renderCurrentMatrix()
 	} catch( error ){
 		console.log( error )
+	}
+})
+
+watch( showDisplayInfoIcon, ( nextVisible ) => {
+	if( nextVisible === false ){
+		showDisplayInfoTooltip.value = false
 	}
 })
 
@@ -4356,27 +8639,65 @@ onBeforeUnmount( () => {
 
 	stopGpuInferenceStatusPolling()
 	gpuStatusPollInFlight = false
+	removeHeatmapViewportSyncListener()
+	stopDeckPaneResize()
+	clearProjectBackgroundWork()
+	if( typeof removeProjectBackgroundInteractionListeners === "function" ){
+		removeProjectBackgroundInteractionListeners()
+	}
 
 	if( resizeObserver !== null ){
 		resizeObserver.disconnect()
 		resizeObserver = null
 	}
 
+	if( typeof cancelScheduledLayerPayloadPrewarm === "function" ){
+		cancelScheduledLayerPayloadPrewarm()
+		cancelScheduledLayerPayloadPrewarm = null
+	}
+
 	refreshOnResize.cancel()
 	debouncedApplyLayerInput.cancel()
+	debouncedApplyZBlendChanges.cancel()
+	debouncedApplyZBlendHeatmapOnlyChanges.cancel()
 	debouncedApplyPcaRgbInput.cancel()
+	debouncedApplyPcaClassificationComponentCount.cancel()
+	debouncedApplyPcaMipComponentCount.cancel()
+	viewerTutorialPromptVisible.value = false
+	viewerTutorialVisible.value = false
+	tutorialDisplayOptionsOpen.value = false
 })
 
 </script>
 
 <style scoped>
-.roi-refresh-spin {
-	animation: roi-refresh-spin 0.9s linear infinite;
-	display: inline-block;
-	transform-origin: center center;
+.viewer-stepper,
+.z-blend-value-stepper {
+	display: flex;
+	align-items: center;
+	gap: 0.25rem;
 }
 
-@keyframes roi-refresh-spin {
+.viewer-stepper-input,
+.z-blend-value-input {
+	appearance: textfield;
+	-moz-appearance: textfield;
+}
+
+.viewer-stepper-input::-webkit-inner-spin-button,
+.viewer-stepper-input::-webkit-outer-spin-button,
+.z-blend-value-input::-webkit-inner-spin-button,
+.z-blend-value-input::-webkit-outer-spin-button {
+	-webkit-appearance: none;
+	margin: 0;
+}
+
+.roi-refresh-spin {
+	animation: roi-refresh-rotate 0.8s linear infinite;
+	transform-origin: center;
+}
+
+@keyframes roi-refresh-rotate {
 	from {
 		transform: rotate( 0deg );
 	}

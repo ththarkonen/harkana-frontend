@@ -18,7 +18,8 @@ import { computed } from "vue"
 
 const props = defineProps({
     disabled: { type: Boolean, default: false },
-    tooltip: { type: String, default: "" }
+    tooltip: { type: String, default: "" },
+    dimmed: { type: Boolean, default: false }
 })
 
 const emit = defineEmits([ "select" ])
@@ -26,6 +27,10 @@ const emit = defineEmits([ "select" ])
 const buttonClass = computed(() => {
     if( props.disabled ){
         return "text-white/45 cursor-not-allowed hover:bg-transparent hover:text-white/45"
+    }
+
+    if( props.dimmed ){
+        return "text-white/35 hover:bg-transparent hover:text-white/35"
     }
 
     return "text-white hover:bg-brand hover:text-white"
