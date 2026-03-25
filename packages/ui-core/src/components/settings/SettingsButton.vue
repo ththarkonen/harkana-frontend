@@ -1,7 +1,7 @@
 <template>
-<button class="inline-flex items-center justify-center px-4 py-2 rounded-full w-auto bg-brand text-white 
-                font-semibold cursor-pointer hover:bg-brand-dark transition shadow-md shadow-black"
-          :class="{ 'opacity-50 cursor-not-allowed': loading }">
+<button
+    :disabled="loading"
+    class="inline-flex w-auto items-center justify-center rounded-full border border-black/10 bg-black/[0.03] px-3 py-1.5 text-xs font-semibold text-black/75 transition-colors duration-150 hover:border-brand hover:bg-brand hover:text-white disabled:cursor-not-allowed disabled:opacity-50">
     <div class="relative">
         <span :class="{ invisible: loading }">
             <slot></slot>

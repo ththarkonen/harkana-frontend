@@ -1,183 +1,176 @@
 <template>
-<div class = "prose prose-gray max-w-none">
-    <div class = "border-2 border-brand rounded-lg p-4 mb-8 shadow-black shadow-lg">
-        <p>
-            <strong>Compute tokens</strong> allow you to manage usage and collaboration within the platform. 
-            Tokens are the internal currency used to perform analyses and computations. 
-            Each user begins with a free balance, and tokens are deducted automatically 
-            whenever an analysis completes successfully. After a purchase, please refresh
-            the page or navigate back to the project menu from the left. It can take a few
-            seconds for the purchased tokens to get processed and get updated upon page refresh.
-        </p>
-        <br></br>
-        <ul>
-            <li>
-            <strong>Billing source:</strong>  
-            Choose whether analyses are billed from your <em>personal balance</em> or from a 
-            <em>token group</em>. Token groups allow multiple users to share a common pool 
-            of tokens for collaborative work.
-            </li>
-            <br></br>
-            <li>
-            <strong>Token groups:</strong>  
-            View and manage your owned token groups. Each group lists its owner or members along with their 
-            <em>names</em> and <em>email addresses</em>.  
-            As a group owner, you can invite or remove members as needed.
-            </li>
-            <br></br>
-            <li>
-            <strong>Create new token group:</strong>  
-            Create a new shared token group by specifying a unique name.  
-            As the owner, you control group membership and manage the shared token balance.
-            </li>
-        </ul>
-
-        <p>
-            Token groups make it easy to share resources and collaborate with your team while maintaining 
-            clear ownership and spending control.
-        </p>
+<div class = "prose prose-gray flex h-full min-h-0 max-w-none flex-col">
+    <div class = "mb-6 flex w-full max-w-2xl flex-none flex-wrap gap-2 rounded-lg border border-black/10 bg-black/[0.03] p-2 not-prose"
+         role = "tablist"
+         aria-label = "Compute token sections">
+        <button v-for = "tab in tokenTabs"
+                :key = "tab.id"
+                type = "button"
+                role = "tab"
+                :aria-selected = "activeTokenTab === tab.id ? 'true' : 'false'"
+                :tabindex = "activeTokenTab === tab.id ? 0 : -1"
+                @click = "activeTokenTab = tab.id"
+                class = "inline-flex items-center justify-center rounded-full px-3 py-1.5 text-xs font-semibold transition-colors"
+                :class = "activeTokenTab === tab.id
+                    ? 'bg-brand text-white'
+                    : 'bg-transparent text-black/70 hover:bg-black/5 hover:text-black'">
+            {{ tab.label }}
+        </button>
     </div>
 
-    <hr class="h-0.5 bg-gray border-0 my-4">
+    <div v-show = "activeTokenTab === 'overview'" role = "tabpanel" class = "max-w-2xl space-y-10">
+        <div class = "space-y-4">
+            <p>
+                <strong>Compute tokens</strong> allow you to manage usage and collaboration within the platform.
+                Tokens are the internal currency used to perform analyses and computations.
+                Each user begins with a free balance, and tokens are deducted automatically
+                whenever an analysis completes successfully. After a purchase, please refresh
+                the page or navigate back to the project menu from the left. It can take a few
+                seconds for the purchased tokens to get processed and get updated upon page refresh.
+            </p>
 
-    <h3 class = "text-lg font-bold ml-0 mb-4">Active compute token source</h3>
-    <div class = "border-2 border-brand rounded-lg p-4 mb-8 shadow-black shadow-lg bg-black/5">
+            <p>
+                <strong>Billing source:</strong>
+                Choose whether analyses are billed from your <em>personal balance</em> or from a
+                <em>token group</em>. Token groups allow multiple users to share a common pool
+                of tokens for collaborative work.
+            </p>
 
-        <select
-            v-model = "billingSettings.groupID"
-            id = "projectSelect"
-            class = "w-full border border-gray-600 rounded px-3 py-2 bg-white
-                    text-black focus:outline-none focus:ring-2 focus:ring-brand">
+            <p>
+                <strong>Token groups:</strong>
+                View and manage your owned token groups. Each group lists its owner or members along with their
+                <em>names</em> and <em>email addresses</em>.
+                As a group owner, you can invite or remove members as needed.
+            </p>
 
-            <option value = "">Personal balance</option>
-            <option v-for  = "group in tokenGroups"
-                    :key   = "group.groupId"
-                    :value = "group.groupId">
-                {{ group.groupName || group.groupId }}
-            </option>
+            <p>
+                <strong>Create new token group:</strong>
+                Create a new shared token group by specifying a unique name.
+                As the owner, you control group membership and manage the shared token balance.
+            </p>
+            <p>
+                Token groups make it easy to share resources and collaborate with your team while maintaining
+                clear ownership and spending control.
+            </p>
+        </div>
 
-        </select>
+        <div class = "border-4 border-brand rounded-lg p-4 space-y-2">
+            <div class = "text-xs font-semibold uppercase tracking-wide text-black/70">Active compute token source</div>
 
-        <SettingsButton @click = "updateTokenSource" :loading = "updatingTokenSource" class = "mt-4" >
-            Update active token source
-        </SettingsButton>
+            <select
+                v-model = "billingSettings.groupID"
+                id = "projectSelect"
+                class = "w-full border-0 border-b border-black/35 bg-transparent px-0 py-1 text-sm font-medium text-slate-900 focus:border-brand focus:outline-none focus-visible:border-brand">
 
+                <option value = "">Personal balance</option>
+                <option v-for  = "group in tokenGroups"
+                        :key   = "group.groupId"
+                        :value = "group.groupId">
+                    {{ group.groupName || group.groupId }}
+                </option>
+
+            </select>
+
+            <SettingsButton @click = "updateTokenSource" :loading = "updatingTokenSource" class = "!mt-3" >
+                Update active token source
+            </SettingsButton>
+        </div>
+
+        <div class = "border-4 border-brand rounded-lg p-4 mb-4 space-y-2">
+            <div class = "text-xs font-semibold uppercase tracking-wide text-black/70">Personal token balance</div>
+
+            <p class = "m-0 text-sm text-black/75">
+                Balance: <span class = "font-bold text-black">{{ balance }}</span> compute tokens
+            </p>
+
+            <SettingsButton @click = "buy('')" class = "mt-3">
+                Purchase tokens
+            </SettingsButton>
+        </div>
     </div>
 
-    <hr class = "h-0.5 bg-gray border-0 my-4">
+    <div v-show = "activeTokenTab === 'history'"
+         role = "tabpanel"
+         class = "flex min-h-0 flex-1 flex-col gap-8 max-w-2xl">
+        <div class = "flex-none space-y-6">
 
-    <h3 class = "text-lg font-bold ml-0 mb-4">Personal token balance</h3>
-    <div class = "border-2 border-brand rounded-lg p-4 mb-8 shadow-black shadow-lg">
+            <div class = "space-y-5">
+                <label class = "block">
+                    <div class = "mb-1 text-xs font-semibold uppercase tracking-wide text-black/70">Token source</div>
+                    <select v-model = "historySourceID"
+                            class = "w-full border-0 border-b border-black/35 bg-transparent px-0 py-1 text-sm font-medium text-slate-900 focus:border-brand focus:outline-none focus-visible:border-brand">
+                        <option value = "">Personal token balance</option>
+                        <option v-for = "group in availableHistoryGroups"
+                                :key = "'history-source-' + group.groupId"
+                                :value = "group.groupId">
+                            {{ group.groupName }}
+                        </option>
+                    </select>
+                </label>
 
-        Balance: <span class = "font-bold">{{ balance }}</span> compute tokens
-        <hr class="h-0.5 bg-gray border-0 my-4"></hr>
-        <SettingsButton @click = "buy('')">
-            Purchase tokens
-        </SettingsButton>
+                <div class = "grid grid-cols-2 gap-4">
+                    <label class = "block">
+                        <div class = "mb-1 text-xs font-semibold uppercase tracking-wide text-black/70">From</div>
+                        <input v-model = "historyFrom"
+                               type = "datetime-local"
+                               class = "w-full border-0 border-b border-black/35 bg-transparent px-0 py-1 text-sm font-medium text-slate-900 focus:border-brand focus:outline-none focus-visible:border-brand"/>
+                    </label>
 
-    </div>
-    
-    <hr class="h-0.5 bg-gray border-0 my-4">
-
-    <h3 class = "text-lg font-bold ml-0 mb-4">Compute token usage history</h3>
-    <div class = "border-2 border-brand rounded-lg p-4 mb-8 shadow-black shadow-lg bg-black/5">
-
-        <div class = "grid grid-cols-1 gap-4 md:grid-cols-2">
-            <div class = "flex flex-col gap-2">
-                <label class = "font-semibold text-black">History scope</label>
-                <select v-model = "historyScope"
-                        class = "w-full border border-gray-600 rounded px-3 py-2 bg-white text-black focus:outline-none focus:ring-2 focus:ring-brand">
-                    <option value = "personal">Personal</option>
-                    <option value = "group">Owned group</option>
-                </select>
+                    <label class = "block">
+                        <div class = "mb-1 text-xs font-semibold uppercase tracking-wide text-black/70">To</div>
+                        <input v-model = "historyTo"
+                               type = "datetime-local"
+                               class = "w-full border-0 border-b border-black/35 bg-transparent px-0 py-1 text-sm font-medium text-slate-900 focus:border-brand focus:outline-none focus-visible:border-brand"/>
+                    </label>
+                </div>
             </div>
 
-            <div v-if = "historyScope === 'group'" class = "flex flex-col gap-2">
-                <label class = "font-semibold text-black">Owned group</label>
-                <select v-model = "historyGroupID"
-                        class = "w-full border border-gray-600 rounded px-3 py-2 bg-white text-black focus:outline-none focus:ring-2 focus:ring-brand">
-                    <option value = "">Select an owned group</option>
-                    <option v-for = "group in availableHistoryGroups"
-                            :key = "'history-group-' + group.groupId"
-                            :value = "group.groupId">
-                        {{ group.groupName }}
-                    </option>
-                </select>
+            <p v-if = "ownedHistoryGroupsError.length > 0"
+               class = "text-xs text-red-600">
+                {{ ownedHistoryGroupsError }}
+            </p>
+
+            <p v-if = "historyDateRangeError.length > 0"
+               class = "text-xs text-red-600">
+                {{ historyDateRangeError }}
+            </p>
+
+            <div class = "flex flex-wrap gap-3">
+                <SettingsButton @click = "loadHistory( true )"
+                                :disabled = "historyLoading || historyDateRangeError.length > 0">
+                    Load history
+                </SettingsButton>
+                <SettingsButton @click = "resetHistoryFilters">
+                    Reset filters
+                </SettingsButton>
             </div>
 
-            <div class = "flex flex-col gap-2">
-                <label class = "font-semibold text-black">From</label>
-                <input v-model = "historyFrom"
-                       type = "datetime-local"
-                       class = "w-full rounded border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand"/>
+            <div v-if = "selectedHistoryGroupSummary !== null" class = "space-y-1 text-sm text-black/75">
+                <div>Group balance: <span class = "font-bold text-black">{{ selectedHistoryGroupSummary.tokenBalance }}</span> compute tokens</div>
+                <div>Last event: <span class = "font-bold text-black">{{ selectedHistoryGroupSummary.lastEvent ? formatHistoryTimestamp( selectedHistoryGroupSummary.lastEvent.createdAt ) : "No events yet" }}</span></div>
             </div>
 
-            <div class = "flex flex-col gap-2">
-                <label class = "font-semibold text-black">To</label>
-                <input v-model = "historyTo"
-                       type = "datetime-local"
-                       class = "w-full rounded border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand"/>
+            <p v-if = "historyError.length > 0"
+               class = "text-sm text-red-600">
+                {{ historyError }}
+            </p>
+
+            <div v-if = "historyLoading"
+                 class = "text-sm text-black/70">
+                Loading token history...
             </div>
 
-            <div class = "flex flex-col gap-2">
-                <label class = "font-semibold text-black">Page size</label>
-                <select v-model.number = "historyLimit"
-                        class = "w-full border border-gray-600 rounded px-3 py-2 bg-white text-black focus:outline-none focus:ring-2 focus:ring-brand">
-                    <option :value = "25">25</option>
-                    <option :value = "50">50</option>
-                    <option :value = "100">100</option>
-                    <option :value = "200">200</option>
-                </select>
+            <div v-if = "historyLoading === false && historyItems.length === 0 && historyError.length === 0"
+                 class = "text-sm text-black/70">
+                No token history events for the selected filters.
             </div>
         </div>
 
-        <p v-if = "ownedHistoryGroupsError.length > 0"
-           class = "text-xs text-red-600 mt-3">
-            {{ ownedHistoryGroupsError }}
-        </p>
-
-        <p v-if = "historyDateRangeError.length > 0"
-           class = "text-xs text-red-600 mt-3">
-            {{ historyDateRangeError }}
-        </p>
-
-        <div class = "flex flex-wrap gap-3 mt-4">
-            <button @click = "loadHistory( true )"
-                    :disabled = "historyLoading || historyDateRangeError.length > 0"
-                    class = "inline-flex items-center justify-center px-4 py-2 rounded-full bg-brand text-white font-semibold transition shadow-md shadow-black hover:bg-brand-dark disabled:opacity-50 disabled:cursor-not-allowed">
-                Load history
-            </button>
-            <button @click = "resetHistoryFilters"
-                    class = "inline-flex items-center justify-center px-4 py-2 rounded-full bg-gray-700 text-white font-semibold transition shadow-md shadow-black hover:bg-gray-800">
-                Reset filters
-            </button>
-        </div>
-
-        <div v-if = "selectedHistoryGroupSummary !== null"
-             class = "mt-4 rounded border border-brand/40 bg-white/70 p-3 text-sm">
-            <div>Group balance: <span class = "font-bold">{{ selectedHistoryGroupSummary.tokenBalance }}</span> compute tokens</div>
-            <div>Last event: <span class = "font-bold">{{ selectedHistoryGroupSummary.lastEvent ? formatHistoryTimestamp( selectedHistoryGroupSummary.lastEvent.createdAt ) : "No events yet" }}</span></div>
-        </div>
-
-        <p v-if = "historyError.length > 0"
-           class = "text-sm text-red-600 mt-4">
-            {{ historyError }}
-        </p>
-
-        <div v-if = "historyLoading"
-             class = "mt-4 text-sm text-black/70">
-            Loading token history...
-        </div>
-
-        <div v-if = "historyLoading === false && historyItems.length === 0 && historyError.length === 0"
-             class = "mt-4 text-sm text-black/70">
-            No token history events for the selected filters.
-        </div>
-
-        <div v-if = "historyItems.length > 0" class = "mt-4 space-y-3">
+        <div v-if = "historyItems.length > 0"
+             class = "min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
             <div v-for = "event in historyItems"
                  :key = "event.eventId"
-                 class = "rounded border border-brand/40 bg-white/80 p-3 text-sm text-black">
+                 class = "rounded-lg border border-black/10 bg-white/70 p-3 text-sm text-black">
                 <div class = "flex flex-wrap items-center justify-between gap-2">
                     <div class = "font-semibold">{{ formatHistoryTimestamp( event.createdAt ) }}</div>
                     <div class = "font-bold"
@@ -186,116 +179,131 @@
                     </div>
                 </div>
 
-                <div class = "mt-1">
-                    <span class = "font-semibold">{{ event.eventType }}</span>
-                    <span class = "mx-1 text-black/50">|</span>
-                    <span>{{ event.source || "Unknown source" }}</span>
-                    <span v-if = "event.reason" class = "mx-1 text-black/50">|</span>
-                    <span v-if = "event.reason">{{ event.reason }}</span>
+                <div class = "mt-1 flex items-center justify-between gap-3">
+                    <div class = "min-w-0">
+                        {{ formatHistorySummaryLine( event ) }}
+                    </div>
+                    <button type = "button"
+                            @click = "toggleHistoryEventExpanded( event.eventId )"
+                            class = "inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-black/55 transition hover:bg-black/5 hover:text-black"
+                            :aria-expanded = "isHistoryEventExpanded( event.eventId ) ? 'true' : 'false'"
+                            :aria-label = "isHistoryEventExpanded( event.eventId ) ? 'Collapse token history details' : 'Expand token history details'">
+                        <i class = "fas"
+                           :class = "isHistoryEventExpanded( event.eventId ) ? 'fa-chevron-up' : 'fa-chevron-down'"
+                           aria-hidden = "true"></i>
+                    </button>
                 </div>
 
-                <div class = "mt-1 text-black/70">
-                    Scope: {{ event.scopeType }}<span v-if = "event.groupId"> ({{ event.groupId }})</span>
-                </div>
+                <div v-if = "isHistoryEventExpanded( event.eventId )"
+                     class = "mt-2 space-y-1 text-black/70">
+                    <div>{{ formatHistoryBillingLabel( event ) }}</div>
 
-                <div v-if = "event.projectName || event.fileName || event.jobId"
-                     class = "mt-1 text-black/70">
-                    <span v-if = "event.projectName">Project: {{ event.projectName }}</span>
-                    <span v-if = "event.fileName" class = "ml-2">File: {{ event.fileName }}</span>
-                    <span v-if = "event.jobId" class = "ml-2">Job: {{ event.jobId }}</span>
+                    <div v-if = "formatHistoryActor( event ).length > 0">
+                        {{ formatHistoryActor( event ) }}
+                    </div>
+
+                    <div v-if = "event.projectName">
+                        Project: {{ event.projectName }}
+                    </div>
+
+                    <div v-if = "event.fileName">
+                        File: {{ event.fileName }}
+                    </div>
                 </div>
             </div>
         </div>
 
-        <div v-if = "historyNextToken && historyItems.length > 0"
-             class = "mt-4">
-            <button @click = "loadMoreHistory"
-                    :disabled = "historyLoadingMore"
-                    class = "inline-flex items-center justify-center px-4 py-2 rounded-full bg-gray-700 text-white font-semibold transition shadow-md shadow-black hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed">
+        <div v-if = "historyNextToken && historyItems.length > 0" class = "flex-none">
+            <SettingsButton @click = "loadMoreHistory"
+                            :disabled = "historyLoadingMore">
                 {{ historyLoadingMore ? "Loading..." : "Load more" }}
-            </button>
+            </SettingsButton>
         </div>
     </div>
 
-    <hr class="h-0.5 bg-gray border-0 my-4">
+    <div v-show = "activeTokenTab === 'owned'" role = "tabpanel" class = "space-y-8">
+        <div>
+            <div>
 
-    <h3 class = "text-lg font-bold ml-0 mb-4">Your owned compute token groups</h3>
-    <div>
+                <div v-if = "ownedGroups.length === 0">
+                    You do not own any token groups yet.
+                </div>
 
-        <div v-if = "ownedGroups.length === 0">
-            You do not own any token groups yet.
-        </div>
+                <ul v-else>
+                    <div v-for = "group in ownedGroups" class = "border-4 border-brand rounded-lg p-4 mb-4 shadow-black">
 
-        <ul v-else>
-            <div v-for = "group in ownedGroups" class = "border-2 border-brand rounded-lg p-4 mb-4 shadow-black shadow-lg">
+                        <div>Group name: <span class = "font-bold">{{ group.groupName }}</span></div>
+                        <div>Balance: <span class = "font-bold">{{ group.tokenBalance }}</span> compute tokens</div>
+                        <div>Members:</div>
 
-                <div>Group name: <span class = "font-bold">{{ group.groupName }}</span></div>
-                <div>Balance: <span class = "font-bold">{{ group.tokenBalance }}</span> compute tokens</div>
-                <div>Members:</div>
+                        <ul class = "ml-8">
+                            <li v-for = "member in group.members" class="flex items-center justify-between text-black">
 
-                <ul class = "ml-8">
-                    <li v-for = "member in group.members" class="flex items-center justify-between text-black">
+                                <div v-if = "group.owner.sub == member.sub">
+                                    You
+                                </div>
 
-                        <div v-if = "group.owner.sub == member.sub">
-                            You
-                        </div>
+                                <span v-if = "group.owner.sub != member.sub">
+                                    {{ member.given_name }} {{ member.family_name }} - {{ member.email }}
+                                </span>
 
-                        <span v-if = "group.owner.sub != member.sub">
-                            {{ member.given_name }} {{ member.family_name }} - {{ member.email }}
-                        </span>
+                                <button v-if = "group.owner.sub != member.sub"
+                                    @click = "removeGroupMember( group, member)"
+                                    :title="'Remove ' + member.given_name + ' ' + member.family_name + ' - ' + member.email"
+                                    class="ml-2 text-black transition-colors hover:text-brand">
+                                    <i class="fas fa-trash"></i>
+                                </button>
 
-                        <button v-if = "group.owner.sub != member.sub"
-                            @click = "removeGroupMember( group, member)"
-                            :title="'Remove ' + member.given_name + ' ' + member.family_name + ' - ' + member.email"
-                            class="ml-2 text-black transition-colors hover:text-brand">
-                            <i class="fas fa-trash"></i>
-                        </button>
+                            </li>
+                        </ul>
 
-                    </li>
+                        <hr class="h-0.5 bg-gray border-0 my-4"></hr>
+                        <SettingsButton @click = "open( memberModal, group)">Add member</SettingsButton>
+                        <SettingsButton @click = "buy( group.groupId )" class = "mx-2">Purchase tokens</SettingsButton>
+                        <SettingsButton @click = "open( deleteGroupModal, group)" class = "float-right">Delete group</SettingsButton>
+                    </div>
                 </ul>
-
-                <hr class="h-0.5 bg-gray border-0 my-4"></hr>
-                <SettingsButton @click = "open( memberModal, group)">Add member</SettingsButton>
-                <SettingsButton @click = "buy( group.groupId )" class = "mx-2">Purchase tokens</SettingsButton>
-                <SettingsButton @click = "open( deleteGroupModal, group)" class = "float-right">Delete group</SettingsButton>
             </div>
-        </ul>
-
-    </div>
-
-    <hr class="h-0.5 bg-gray border-0 my-4">
-
-    <h3 class = "text-lg font-bold ml-0 mb-4">Compute token groups shared with you</h3>
-    <div>
-
-        <div v-if="sharedGroups.length === 0">You do not have any shared token groups yet.</div>
-
-        <ul v-else>
-            <div v-for = "group in sharedGroups" class = "border-2 border-brand rounded-lg p-4 mb-4
-                  shadow-black shadow-lg">
-
-                <div>Owner: <span class = "font-bold">{{ group.owner.given_name }} {{ group.owner.family_name }} - {{ group.owner.email }}</span></div>
-                <div>Group name: <span class = "font-bold">{{ group.groupName }}</span></div>
-                <div>Balance: <span class = "font-bold">{{ group.tokenBalance }}</span> compute tokens</div>
-            </div>
-        </ul>
-
-    </div>
-
-    <hr class="h-0.5 bg-gray border-0 my-4">
-
-    <h3 class = "text-lg font-bold ml-0 mb-4">Create a new token group</h3>
-
-    
-    <TextField description = "Please enter a token group name:" placeholder = "Token group name" v-model = "newTokenGroupName">
-        <SettingsButton @click = "createTokenGroup" :loading = "creatingTokenGroup" class = "mt-4" >
-            Create compute token group
-        </SettingsButton>
-        <div v-show = 'groupCreationErrorMessage !== ""' class = "text-red-600 mt-4">
-            <i class="fa fa-exclamation-triangle fa-lg mt-1"></i>
-            {{ groupCreationErrorMessage }}
         </div>
-    </TextField>
+
+        <div class = "max-w-2xl space-y-4 pt-2">
+            <div class = "text-xs font-semibold uppercase tracking-wide text-black/70">Create a new token group</div>
+
+            <label class = "block">
+                <div class = "mb-1 text-xs font-semibold uppercase tracking-wide text-black/70">Token group name</div>
+                <input type = "text"
+                       v-model = "newTokenGroupName"
+                       placeholder = "Token group name"
+                       class = "w-full border-0 border-b border-black/35 bg-transparent px-0 py-1 text-sm font-medium text-slate-900 caret-brand transition-[border-color,color] duration-150 ease-out placeholder:text-black/40 focus:border-brand focus:outline-none focus-visible:border-brand focus-visible:outline-none" />
+            </label>
+
+            <SettingsButton @click = "createTokenGroup" :loading = "creatingTokenGroup" class = "mt-3" >
+                Create compute token group
+            </SettingsButton>
+
+            <div v-show = 'groupCreationErrorMessage !== ""' class = "text-red-600 mt-4">
+                <i class="fa fa-exclamation-triangle fa-lg mt-1"></i>
+                {{ groupCreationErrorMessage }}
+            </div>
+        </div>
+    </div>
+
+    <div v-show = "activeTokenTab === 'shared'" role = "tabpanel">
+        <h3 class = "text-lg font-bold ml-0 mb-4">Compute token groups shared with you</h3>
+        <div>
+
+            <div v-if="sharedGroups.length === 0">You do not have any shared token groups yet.</div>
+
+            <ul v-else>
+                <div v-for = "group in sharedGroups" class = "border-2 border-brand rounded-lg p-4 mb-4">
+
+                    <div>Owner: <span class = "font-bold">{{ group.owner.given_name }} {{ group.owner.family_name }} - {{ group.owner.email }}</span></div>
+                    <div>Group name: <span class = "font-bold">{{ group.groupName }}</span></div>
+                    <div>Balance: <span class = "font-bold">{{ group.tokenBalance }}</span> compute tokens</div>
+                </div>
+            </ul>
+        </div>
+    </div>
 
     <TokenGroupMemberModal ref = "memberModal" :group = "activeGroup" @updateTokenGroups = "updateGroups"></TokenGroupMemberModal>
     <DeleteTokenGroupModal ref = "deleteGroupModal" :group = "activeGroup" @updateTokenGroups = "updateGroups"></DeleteTokenGroupModal>
@@ -311,7 +319,6 @@ import { ref, computed, nextTick, onMounted} from "vue"
 import { initializePaddle } from '@paddle/paddle-js';
 import { settings as settingslib, tokens, utils} from "@harkana/tools"
 
-import TextField from "../settings/TextField.vue"
 import SettingsButton from "../settings/SettingsButton.vue"
 
 import TokenGroupMemberModal from "../modals/TokenGroupMemberModal.vue"
@@ -324,6 +331,13 @@ const balance = ref(0)
 const activeGroup = ref({})
 const tokenGroups = ref([])
 const newTokenGroupName = ref("")
+const activeTokenTab = ref("overview")
+const tokenTabs = [
+    { id: "overview", label: "Overview" },
+    { id: "owned", label: "Owned token groups" },
+    { id: "shared", label: "Shared token groups" },
+    { id: "history", label: "Token history" }
+]
 
 const paddle = ref(null)
 const billingSettings = ref({})
@@ -331,9 +345,7 @@ const updatingTokenSource = ref(false)
 
 const creatingTokenGroup = ref(false)
 const groupCreationErrorMessage = ref("")
-const historyScope = ref("personal")
-const historyGroupID = ref("")
-const historyLimit = ref(50)
+const historySourceID = ref("")
 const historyFrom = ref("")
 const historyTo = ref("")
 const historyItems = ref([])
@@ -341,9 +353,11 @@ const historyNextToken = ref(null)
 const historyLoading = ref(false)
 const historyLoadingMore = ref(false)
 const historyError = ref("")
+const expandedHistoryEventIDs = ref(new Set())
 const ownedHistoryGroups = ref([])
 const ownedHistoryGroupsLoading = ref(false)
 const ownedHistoryGroupsError = ref("")
+const HISTORY_PAGE_SIZE = 50
 
 const ownedGroups = computed(() => {
 	return tokenGroups.value.filter( group => { return group.owned })
@@ -351,6 +365,17 @@ const ownedGroups = computed(() => {
 
 const sharedGroups = computed(() => {
 	return tokenGroups.value.filter( group => {return !group.owned })
+})
+
+const tokenGroupNameByID = computed(() => {
+    const entries = tokenGroups.value.map(( group ) => {
+        return [
+            String( group.groupId ?? "" ),
+            String( group.groupName ?? group.groupId ?? "" )
+        ]
+    }).filter(( entry ) => entry[0].length > 0 )
+
+    return new Map( entries )
 })
 
 const availableHistoryGroups = computed(() => {
@@ -373,7 +398,7 @@ const availableHistoryGroups = computed(() => {
 })
 
 const selectedHistoryGroupSummary = computed(() => {
-    const groupID = String( historyGroupID.value ?? "" ).trim()
+    const groupID = String( historySourceID.value ?? "" ).trim()
     if( groupID.length === 0 ) return null
 
     const match = ownedHistoryGroups.value.find(( group ) => String( group.groupId ?? "" ) === groupID )
@@ -418,7 +443,13 @@ const formatHistoryTimestamp = ( value ) => {
         return "Unknown timestamp"
     }
 
-    return new Date( parsed ).toLocaleString()
+    return new Date( parsed ).toLocaleString( undefined, {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit"
+    })
 }
 
 const formatTokenDelta = ( value ) => {
@@ -432,6 +463,101 @@ const formatTokenDelta = ( value ) => {
     }
 
     return String( numeric )
+}
+
+const formatHistoryActor = ( event ) => {
+
+    const actor = event?.actor ?? null
+    const givenName = String( actor?.givenName ?? "" ).trim()
+    const familyName = String( actor?.familyName ?? "" ).trim()
+    const email = String( actor?.email ?? "" ).trim()
+    const sub = String( actor?.sub ?? "" ).trim()
+    const fallbackSub = String( event?.actorUserSub ?? "" ).trim()
+
+    const fullName = [ givenName, familyName ].filter(( value ) => value.length > 0 ).join( " " )
+    if( fullName.length > 0 && email.length > 0 ){
+        return `${fullName} - ${email}`
+    }
+
+    if( fullName.length > 0 ){
+        return fullName
+    }
+
+    if( email.length > 0 ){
+        return email
+    }
+
+    if( sub.length > 0 ){
+        return sub
+    }
+
+    return fallbackSub
+}
+
+const formatHistoryDataType = ( event ) => {
+    return String( event?.dataType ?? "" ).trim().toUpperCase()
+}
+
+const formatHistoryActionLabel = ( event ) => {
+
+    const source = String( event?.source ?? "" ).trim()
+    const reason = String( event?.reason ?? "" ).trim()
+
+    if( source === "hyperspectrum.parse" ){
+        return "Project creation"
+    }
+
+    if( source === "hyperspectrum.estimate" ){
+        return "Raman inference"
+    }
+
+    if( reason.length > 0 ){
+        return reason
+    }
+
+    if( source.length > 0 ){
+        return source
+    }
+
+    return "Unknown source"
+}
+
+const formatHistorySummaryLine = ( event ) => {
+
+    const parts = [
+        String( event?.eventType ?? "" ).trim(),
+        formatHistoryActionLabel( event ),
+        formatHistoryDataType( event )
+    ].filter(( value ) => value.length > 0 )
+
+    return parts.join( " | " )
+}
+
+const formatHistoryBillingLabel = ( event ) => {
+
+    const groupID = String( event?.groupId ?? "" ).trim()
+    if( groupID.length === 0 ){
+        return "Personal token balance"
+    }
+
+    return tokenGroupNameByID.value.get( groupID ) ?? "DELETED TOKEN GROUP"
+}
+
+const isHistoryEventExpanded = ( eventId ) => {
+    return expandedHistoryEventIDs.value.has( String( eventId ?? "" ))
+}
+
+const toggleHistoryEventExpanded = ( eventId ) => {
+    const next = new Set( expandedHistoryEventIDs.value )
+    const normalizedID = String( eventId ?? "" )
+
+    if( next.has( normalizedID ) ){
+        next.delete( normalizedID )
+    } else {
+        next.add( normalizedID )
+    }
+
+    expandedHistoryEventIDs.value = next
 }
 
 const mapHistoryError = ( error, scope ) => {
@@ -481,7 +607,7 @@ const loadOwnedHistoryGroupsSummary = async () => {
 const buildHistoryQuery = ( nextToken = "" ) => {
 
     const query = {
-        limit: Number( historyLimit.value ) || 50,
+        limit: HISTORY_PAGE_SIZE,
         nextToken: String( nextToken ?? "" ).trim(),
         from: localDateTimeToIso( historyFrom.value ),
         to: localDateTimeToIso( historyTo.value )
@@ -509,11 +635,6 @@ const loadHistory = async ( reset = true ) => {
         return
     }
 
-    if( historyScope.value === "group" && String( historyGroupID.value ?? "" ).trim().length === 0 ){
-        historyError.value = "Select an owned group to load group history."
-        return
-    }
-
     const nextToken = reset ? "" : String( historyNextToken.value ?? "" )
     historyError.value = ""
 
@@ -521,15 +642,17 @@ const loadHistory = async ( reset = true ) => {
         historyLoading.value = true
         historyItems.value = []
         historyNextToken.value = null
+        expandedHistoryEventIDs.value = new Set()
     } else {
         historyLoadingMore.value = true
     }
 
     try{
         const query = buildHistoryQuery( nextToken )
-        const response = historyScope.value === "group"
+        const scope = String( historySourceID.value ?? "" ).trim().length > 0 ? "group" : "personal"
+        const response = scope === "group"
             ? await tokens.getGroupHistory({
-                groupID: String( historyGroupID.value ?? "" ).trim(),
+                groupID: String( historySourceID.value ?? "" ).trim(),
                 ...query
             })
             : await tokens.getPersonalHistory( query )
@@ -538,13 +661,15 @@ const loadHistory = async ( reset = true ) => {
 
         if( reset ){
             historyItems.value = fetchedItems
+            console.log( historyItems.value )
         } else {
             historyItems.value = [ ...historyItems.value, ...fetchedItems ]
         }
 
         historyNextToken.value = response?.nextToken ?? null
     } catch( error ){
-        historyError.value = mapHistoryError( error, historyScope.value )
+        const scope = String( historySourceID.value ?? "" ).trim().length > 0 ? "group" : "personal"
+        historyError.value = mapHistoryError( error, scope )
     } finally {
         historyLoading.value = false
         historyLoadingMore.value = false
@@ -563,13 +688,7 @@ const resetHistoryFilters = () => {
 
     historyFrom.value = ""
     historyTo.value = ""
-    historyLimit.value = 50
     historyError.value = ""
-
-    if( historyScope.value === "group" && String( historyGroupID.value ?? "" ).trim().length === 0 ){
-        const defaultGroupID = String( availableHistoryGroups.value[0]?.groupId ?? "" )
-        historyGroupID.value = defaultGroupID
-    }
 }
 
 const open = async ( modal, group) => {
@@ -666,10 +785,6 @@ onMounted( async () => {
 	tokenGroups.value = await tokens.listGroupsAndMembers();
 	tokenGroups.value = tokenGroups.value.filter( g => g.owner != null);
     await loadOwnedHistoryGroupsSummary()
-
-    if( availableHistoryGroups.value.length > 0 ){
-        historyGroupID.value = availableHistoryGroups.value[0].groupId
-    }
 
     await loadHistory( true )
 

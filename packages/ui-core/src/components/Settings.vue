@@ -11,14 +11,6 @@
         <Sidebar :style="sidebarStyle">
             <Logo></Logo>
 
-            <SidebarButton @click="navigation.route('Main menu', {})" class="my-2">
-                Project menu
-            </SidebarButton>
-            
-
-            
-            <hr class="h-0.5 bg-gray border-0 my-4">
-
             <div
                 v-for="section in sections"
                 :key="section"
@@ -36,6 +28,20 @@
         <NavigationBar>
             <template v-slot:left-items>
                 <button @click="sidebarOpen = true" class="md:hidden px-3 py-2 rounded bg-slate-100">☰</button>
+                <BaseDropdown :close-on-select = "true"
+                              :teleport-to-body = "true"
+                              portal-placement = "bottom-start"
+                              :portal-offset-x = "0"
+                              :portal-offset-y = "8"
+                              menu-class = "fixed z-[45] min-w-[12rem] origin-top-left rounded-md bg-dark-gray shadow-lg ring-1 ring-black/30">
+                    <template v-slot:trigger>
+                        <span class = "font-medium">Menu</span>
+                    </template>
+
+                    <BaseDropdownItem @select = 'navigation.redirect("Main menu")'>
+                        Main menu
+                    </BaseDropdownItem>
+                </BaseDropdown>
             </template>
             <template v-slot:right-items>
                 <AccountDropdown></AccountDropdown>
@@ -43,12 +49,14 @@
         </NavigationBar>
 
         <!-- Main Content -->
-        <main class="bg-white rounded-lg shadow-sm p-4 overflow-y-auto">
-            <div class="w-full max-w-3xl rounded-lg">
+        <main class="min-h-0 bg-white rounded-lg shadow-sm p-4"
+              :class="selected === 'Compute tokens' ? 'overflow-hidden' : 'overflow-y-auto'">
+            <div class="w-full max-w-3xl rounded-lg"
+                 :class="selected === 'Compute tokens' ? 'flex h-full min-h-0 flex-col' : ''">
 
                 <!-- Plain text -->
                 <Profile v-show = "selected === 'Profile'"></Profile>
-                <Tokens  v-show = "selected === 'Compute tokens'"></Tokens>
+                <Tokens  v-show = "selected === 'Compute tokens'" class = "h-full min-h-0"></Tokens>
                 <component :is = "Visualization" v-show = "selected === 'Visualization'"></component>
                 <Metadata v-show = "selected === 'Metadata'"></Metadata>
                 <Zenodo v-show = "selected === 'Zenodo'"></Zenodo>
@@ -70,9 +78,10 @@ import { navigation } from '@harkana/tools'
 
 import Sidebar from './sidebar/Sidebar.vue'
 import Logo from "./sidebar/Logo.vue"
-import SidebarButton from './sidebar/SidebarButton.vue'
 
 import NavigationBar from './navbar/NavigationBar.vue'
+import BaseDropdown from './navbar/BaseDropdown.vue'
+import BaseDropdownItem from './navbar/BaseDropdownItem.vue'
 import AccountDropdown from './navbar/AccountDropdown.vue'
 
 import Profile from './sections/Profile.vue'

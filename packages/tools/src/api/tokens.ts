@@ -9,6 +9,13 @@ type GenericApiResponse = {
     [key: string]: any
 }
 
+export type TokenHistoryActor = {
+    sub: string
+    email: string
+    givenName: string
+    familyName: string
+}
+
 export type TokenHistoryEvent = {
     PK: string
     SK: string
@@ -21,6 +28,7 @@ export type TokenHistoryEvent = {
     direction: "DEBIT" | "CREDIT"
     deltaTokens: number
     actorUserSub: string
+    actor: TokenHistoryActor
     subjectUserSub: string
     source: string
     operationId: string
@@ -57,6 +65,48 @@ type TokenHistoryQuery = {
     nextToken?: string
     from?: string
     to?: string
+}
+
+const normalizeTokenHistoryActor = ( value: any, fallbackSub = "" ): TokenHistoryActor => {
+    return {
+        sub: String( value?.sub ?? fallbackSub ?? "" ),
+        email: String( value?.email ?? "" ),
+        givenName: String( value?.givenName ?? "" ),
+        familyName: String( value?.familyName ?? "" )
+    }
+}
+
+const normalizeTokenHistoryEvent = ( value: any ): TokenHistoryEvent => {
+    const actorUserSub = String( value?.actorUserSub ?? "" )
+
+    return {
+        ...value,
+        actorUserSub,
+        actor: normalizeTokenHistoryActor( value?.actor, actorUserSub )
+    } as TokenHistoryEvent
+}
+
+const normalizeTokenHistoryListResponse = ( value: any ): TokenHistoryListResponse => {
+    return {
+        items: Array.isArray( value?.items ) ? value.items.map(( item: any ) => normalizeTokenHistoryEvent( item )) : [],
+        nextToken: value?.nextToken ?? null
+    }
+}
+
+const normalizeOwnedGroupsHistorySummaryResponse = ( value: any ): OwnedGroupsHistorySummaryResponse => {
+    return {
+        groups: Array.isArray( value?.groups )
+            ? value.groups.map(( group: any ) => {
+                return {
+                    ...group,
+                    lastEvent: group?.lastEvent ? normalizeTokenHistoryEvent( group.lastEvent ) : null,
+                    recent: Array.isArray( group?.recent )
+                        ? group.recent.map(( item: any ) => normalizeTokenHistoryEvent( item ))
+                        : group?.recent
+                }
+            })
+            : []
+    }
 }
 
 const normalizeHistoryLimit = ( value: any ) => {
@@ -165,7 +215,8 @@ var getPersonalHistory = async function( query: TokenHistoryQuery = {} ){
     const base = import.meta.env.VITE_BASE_URL + "/tokens/history/personal"
     const url = base + "?" + buildQueryString( parameters )
 
-    return await apiFetch<TokenHistoryListResponse>( url )
+    const response = await apiFetch<TokenHistoryListResponse>( url )
+    return normalizeTokenHistoryListResponse( response )
 }
 
 var getGroupHistory = async function( query: TokenHistoryQuery & { groupID: string } ){
@@ -183,7 +234,8 @@ var getGroupHistory = async function( query: TokenHistoryQuery & { groupID: stri
     const base = import.meta.env.VITE_BASE_URL + "/tokens/history/group"
     const url = base + "?" + buildQueryString( parameters )
 
-    return await apiFetch<TokenHistoryListResponse>( url )
+    const response = await apiFetch<TokenHistoryListResponse>( url )
+    return normalizeTokenHistoryListResponse( response )
 }
 
 var getOwnedGroupsHistorySummary = async function(
@@ -206,7 +258,8 @@ var getOwnedGroupsHistorySummary = async function(
     const queryString = buildQueryString( parameters )
     const url = queryString.length > 0 ? base + "?" + queryString : base
 
-    return await apiFetch<OwnedGroupsHistorySummaryResponse>( url )
+    const response = await apiFetch<OwnedGroupsHistorySummaryResponse>( url )
+    return normalizeOwnedGroupsHistorySummaryResponse( response )
 }
 
 export default { balance,

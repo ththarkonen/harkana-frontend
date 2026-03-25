@@ -9,11 +9,7 @@
 		 data-tutorial = "viewer-layout">
 
 			<Sidebar :style = "sidebarStyle">
-				<RouterLink :to = "{ name: 'Main menu' }"
-							class = "block text-left rounded-md focus:outline-none focus:ring-2 focus:ring-brand"
-							aria-label = "Open project menu">
-					<Logo></Logo>
-				</RouterLink>
+				<Logo></Logo>
 
 				<div class = "mt-2 p-2 shadow-md shadow-black border-2 border-gray bg-gray-800 rounded-lg"
 					 data-tutorial = "display-section">

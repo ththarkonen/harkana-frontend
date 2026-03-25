@@ -5,7 +5,7 @@
         {{ errorMessage }}
     </div>
 
-    <h3 class = "m-0 text-lg font-bold text-black">Name and email settings</h3>
+    <h3 class = "m-0 text-lg font-bold text-black">Name and login settings</h3>
 
     <div class = "mt-5 max-w-2xl space-y-8">
         <section class = "space-y-4">
@@ -25,13 +25,13 @@
 
                 <SettingsButton @click = "updateName"
                                 :loading = "updatingName"
-                                class = "!mt-3 !rounded-full !border !border-black/10 !bg-black/[0.03] !px-3 !py-1.5 !text-xs !font-semibold !text-black/75 !shadow-none hover:!bg-brand hover:!text-white">
+                                class = "mt-3">
                     Update name
                 </SettingsButton>
             </div>
         </section>
 
-        <section class = "space-y-4">
+        <section class = "space-y-4 pt-3">
             <label class = "block">
                 <div class = "mb-1 text-xs font-semibold uppercase tracking-wide text-black/70">Email address</div>
                 <input type = "text"
@@ -42,7 +42,7 @@
             <SettingsButton v-if = "!showVerification"
                             @click = "updateEmail"
                             :loading = "updatingEmail"
-                            class = "!mt-3 !rounded-full !border !border-black/10 !bg-black/[0.03] !px-3 !py-1.5 !text-xs !font-semibold !text-black/75 !shadow-none hover:!bg-black/[0.06]">
+                            class = "mt-3">
                 Update email
             </SettingsButton>
         </section>
@@ -56,49 +56,48 @@
                        class = "w-full border-0 border-b border-black/35 bg-transparent px-0 py-1 text-sm font-medium text-slate-900 caret-brand transition-[border-color,color] duration-150 ease-out placeholder:text-black/40 focus:border-brand focus:outline-none focus-visible:border-brand focus-visible:outline-none" />
             </label>
             <SettingsButton @click = "verifyEmail"
-                            :loading = "verifyingEmail"
-                            class = "!rounded-full !border !border-black/10 !bg-black/[0.03] !px-3 !py-1.5 !text-xs !font-semibold !text-black/75 !shadow-none hover:!bg-black/[0.06]">
+                            :loading = "verifyingEmail">
                 Verify email
             </SettingsButton>
         </div>
     </div>
 
-    <div>
+    <div class = "mt-12 max-w-2xl space-y-4">
+        <div class = "text-xs font-semibold uppercase tracking-wide text-black/70">Multi-factor authentication (MFA)</div>
+        <p class = "mt-0 text-sm text-black/65">
+            Set up or replace your authenticator application for account sign-in.
+        </p>
 
-        <SettingsButton @click = "setupMFA" :loading = "generatingTOTP" class = "mt-0">
+        <SettingsButton @click = "setupMFA" :loading = "generatingTOTP">
             Enable or update multi-factor authentication (MFA)
         </SettingsButton>
 
-        <div v-if = "qrDataUrl" class = "w-full mt-4">
-            <div class = "border-brand rounded-lg border-2 p-4 shadow-black shadow-lg">
-                Open your authorized authenticator application and scan the displayed QR code,
-                or enter the alphanumeric code provided below directly into your application.
-                Your application will generate a 6-digit verification code.
-                Enter the code into the input field to complete the authentication process.
-                <img :src="qrDataUrl" class = "w-max-50"/>
-                <p class="font-mono text-sm w-full">{{ secret }}</p>
+        <div v-if = "qrDataUrl" class = "space-y-5 pt-1">
+            <p class = "m-0 text-sm text-black/65">
+                Scan the QR code in your authenticator app or enter the secret manually, then confirm the generated 6-digit code.
+            </p>
 
-                <label class="block mt-4">
-                    <h4 class="mb-2 text-sm font-semibold text-black">
-                        Enter the 6-digit verification code in your authenticator to finalize MFA.
-                    </h4>
+            <img :src = "qrDataUrl" class = "h-48 w-48 rounded-lg border border-black/10 bg-white p-3" />
 
-                    <input
-                        type="text"
-                        v-model="emailVerificationCode"
-                        placeholder="Verification code"
-                        class="w-full rounded border border-gray-300 px-3 py-2 text-sm
-                            focus:outline-none focus:ring-2 focus:ring-brand">
-                    </input>
+            <div class = "space-y-2">
+                <div class = "text-xs font-semibold uppercase tracking-wide text-black/70">Authenticator secret</div>
+                <p class = "m-0 break-all font-mono text-sm text-black/70">{{ secret }}</p>
+            </div>
+
+            <div class = "space-y-3">
+                <label class = "block">
+                    <div class = "mb-1 text-xs font-semibold uppercase tracking-wide text-black/70">Verification code</div>
+                    <input type = "text"
+                           v-model = "totpVerificationCode"
+                           placeholder = "Verification code"
+                           class = "w-full border-0 border-b border-black/35 bg-transparent px-0 py-1 text-sm font-medium text-slate-900 caret-brand transition-[border-color,color] duration-150 ease-out placeholder:text-black/40 focus:border-brand focus:outline-none focus-visible:border-brand focus-visible:outline-none" />
                 </label>
 
-                <SettingsButton @click = "verifyMFA" :loading = "verifyingTOTP" class = "mt-4">
+                <SettingsButton @click = "verifyMFA" :loading = "verifyingTOTP">
                     Verify MFA
                 </SettingsButton>
-
             </div>
         </div>
-
     </div>
 
 </div>
