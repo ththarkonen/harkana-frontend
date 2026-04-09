@@ -17,14 +17,14 @@
     </BaseDropdownItem>
 
     <BaseDropdownItem @select = 'navigation.redirect("Settings", "Metadata")'>
-        Default metadata
+        Metadata settings
     </BaseDropdownItem>
 
-    <BaseDropdownItem @select = 'navigation.redirect("Data formats", "Plain text")'>
-        Data formats
+    <BaseDropdownItem @select = 'navigation.redirect("Settings", "Zenodo")'>
+        Zenodo settings
     </BaseDropdownItem>
 
-    <hr>
+    <hr class = "h-0.5 bg-gray border-0 my-1">
 
     <BaseDropdownItem @select = 'navigation.redirect("Sign out")'>
         Sign out

@@ -1,5 +1,118 @@
 import Plotly from 'plotly.js-dist'
 
+const SPECTRUM_GRID_MODEBAR_ICON = {
+    width: 512,
+    height: 512,
+    ascent: 512,
+    descent: 0,
+    path: "M64 64H448V448H64V64ZM96 96V192H192V96H96ZM224 96V192H320V96H224ZM352 96V192H416V96H352ZM96 224V320H192V224H96ZM224 224V320H320V224H224ZM352 224V320H416V224H352ZM96 352V416H192V352H96ZM224 352V416H320V352H224ZM352 352V416H416V352H352Z"
+}
+
+function normalizeGridlineVisibility( value, fallback = false ) {
+    if( typeof value === "boolean" ) return value
+    if( typeof value === "string" ){
+        if( value === "true" ) return true
+        if( value === "false" ) return false
+    }
+    return fallback
+}
+
+function defaultSpectrumGridlineColor(){
+    return "rgba(148, 163, 184, 0.22)"
+}
+
+function resolveSpectrumGridlinesVisible( graphContainer, settings ){
+    if( typeof graphContainer?.__harkanaSpectrumGridlinesVisible === "boolean" ){
+        return graphContainer.__harkanaSpectrumGridlinesVisible
+    }
+
+    const initialValue = normalizeGridlineVisibility( settings?.gridlines?.spectra, false )
+    if( graphContainer ){
+        graphContainer.__harkanaSpectrumGridlinesVisible = initialValue
+    }
+    return initialValue
+}
+
+function applySpectrumGridlinesToLayout( layout, graphContainer, settings, axisKeys = [] ){
+    const showGrid = resolveSpectrumGridlinesVisible( graphContainer, settings )
+
+    for( const axisKey of axisKeys ){
+        const axisLayout = layout?.[axisKey]
+        if( axisLayout === null || typeof axisLayout !== "object" ) continue
+
+        axisLayout.showgrid = showGrid
+        if( showGrid ){
+            axisLayout.gridcolor = typeof axisLayout.gridcolor === "string" && axisLayout.gridcolor.length > 0
+                ? axisLayout.gridcolor
+                : defaultSpectrumGridlineColor()
+            axisLayout.gridwidth = Number.isFinite( Number( axisLayout.gridwidth )) ? axisLayout.gridwidth : 1
+        }
+    }
+}
+
+function buildSpectrumGridlineRelayout( graphContainer, showGrid, axisKeys = [] ){
+    var relayout = {}
+
+    for( const axisKey of axisKeys ){
+        if( typeof axisKey !== "string" || axisKey.length === 0 ) continue
+        if( graphContainer?.layout?.[axisKey] === undefined ) continue
+
+        relayout[`${axisKey}.showgrid`] = showGrid === true
+        if( showGrid === true ){
+            relayout[`${axisKey}.gridcolor`] = typeof graphContainer?.layout?.[axisKey]?.gridcolor === "string" &&
+                graphContainer.layout[axisKey].gridcolor.length > 0
+                ? graphContainer.layout[axisKey].gridcolor
+                : defaultSpectrumGridlineColor()
+            relayout[`${axisKey}.gridwidth`] = 1
+        }
+    }
+
+    return relayout
+}
+
+function normalizeModebarButtonSpacing( graphContainer ){
+    const customButton = graphContainer?.querySelector?.('.modebar-btn[data-attr="toggle-gridlines"]')
+    const customGroup = customButton?.closest?.('.modebar-group')
+
+    if( customGroup && customGroup.parentElement?.lastElementChild === customGroup ){
+        customGroup.style.marginLeft = "0px"
+    }
+}
+
+function buildSpectrumGridModebarButton( graphContainer, axisKeys = [] ){
+    return {
+        name: "Toggle gridlines",
+        title: "Toggle gridlines",
+        attr: "toggle-gridlines",
+        icon: SPECTRUM_GRID_MODEBAR_ICON,
+        click: ( gd ) => {
+            const nextVisible = !resolveSpectrumGridlinesVisible( gd, { gridlines: { spectra: false } } )
+            gd.__harkanaSpectrumGridlinesVisible = nextVisible
+
+            Plotly.relayout( gd, buildSpectrumGridlineRelayout( gd, nextVisible, axisKeys ))
+                .then(() => {
+                    normalizeModebarButtonSpacing( gd )
+                })
+                .catch(( error ) => {
+                    console.log( error )
+                })
+        }
+    }
+}
+
+function buildPlotConfig( graphContainer, axisKeys = [] ){
+    var config = {}
+    config.responsive = true
+    config.displaylogo = false
+    config.modeBarButtonsToRemove = [ "autoScale2d" ]
+
+    if( axisKeys.length > 0 ){
+        config.modeBarButtonsToAdd = [ buildSpectrumGridModebarButton( graphContainer, axisKeys ) ]
+    }
+
+    return config
+}
+
 var initialize = async function( data, estimate, graphContainer, settings) {
 
     const xLabel = settings.labels.horizontal.replace(/\\/g, "\\");
@@ -88,6 +201,7 @@ var initialize = async function( data, estimate, graphContainer, settings) {
     layout.xaxis.title.text = "$$\\Large " + xLabel + "$$";
     layout.xaxis.title.font.size = labelFontSize
     layout.xaxis.autorange = horizontalReverse;
+    layout.xaxis.showgrid = false;
 
     layout.legend = {};
     layout.legend.font = {};
@@ -122,6 +236,9 @@ var initialize = async function( data, estimate, graphContainer, settings) {
     layoutVertical.yaxis2.tickfont = {};
     layoutVertical.yaxis.tickfont.size = tickFontSize;
     layoutVertical.yaxis2.tickfont.size = tickFontSize;
+    layoutVertical.yaxis.showgrid = false;
+    layoutVertical.xaxis2.showgrid = false;
+    layoutVertical.yaxis2.showgrid = false;
 
     var layoutHorizontal = structuredClone( layout );
     layoutHorizontal.grid = {};
@@ -145,11 +262,15 @@ var initialize = async function( data, estimate, graphContainer, settings) {
     layoutHorizontal.yaxis2.tickfont = {};
     layoutHorizontal.yaxis.tickfont.size = tickFontSize;
     layoutHorizontal.yaxis2.tickfont.size = tickFontSize;
+    layoutHorizontal.yaxis.showgrid = false;
+    layoutHorizontal.xaxis2.showgrid = false;
+    layoutHorizontal.yaxis2.showgrid = false;
 
     layout.margin.r = 10 + 2 * labelFontSize;
     layout.yaxis = {};
     layout.yaxis.tickfont = {};
     layout.yaxis.tickfont.size = tickFontSize;
+    layout.yaxis.showgrid = false;
 
     layout.yaxis2 = {};
     layout.rangemode = "tozero";
@@ -157,14 +278,21 @@ var initialize = async function( data, estimate, graphContainer, settings) {
     layout.yaxis2.side = "right";
     layout.yaxis2.tickfont = {};
     layout.yaxis2.tickfont.size = tickFontSize;
+    layout.yaxis2.showgrid = false;
 
-    var config = {};
-    config.responsive = true;
-    config.displaylogo = false;
+    applySpectrumGridlinesToLayout( layoutVertical, graphContainer, settings, [ "xaxis", "yaxis", "xaxis2", "yaxis2" ] )
+    applySpectrumGridlinesToLayout( layoutHorizontal, graphContainer, settings, [ "xaxis", "yaxis", "xaxis2", "yaxis2" ] )
+    applySpectrumGridlinesToLayout( layout, graphContainer, settings, [ "xaxis", "yaxis", "yaxis2" ] )
 
-    if( settings.layout.layout === "vertical" )   Plotly.newPlot( graphContainer, traces, layoutVertical, config)
-    if( settings.layout.layout === "horizontal" ) Plotly.newPlot( graphContainer, traces, layoutHorizontal, config)
-    if( settings.layout.layout === "single" )     Plotly.newPlot( graphContainer, tracesAll, layout, config)
+    const activeAxisKeys = settings.layout.layout === "vertical" || settings.layout.layout === "horizontal"
+        ? [ "xaxis", "yaxis", "xaxis2", "yaxis2" ]
+        : [ "xaxis", "yaxis", "yaxis2" ]
+    const config = buildPlotConfig( graphContainer, activeAxisKeys )
+
+    if( settings.layout.layout === "vertical" )   await Plotly.newPlot( graphContainer, traces, layoutVertical, config)
+    if( settings.layout.layout === "horizontal" ) await Plotly.newPlot( graphContainer, traces, layoutHorizontal, config)
+    if( settings.layout.layout === "single" )     await Plotly.newPlot( graphContainer, tracesAll, layout, config)
+    normalizeModebarButtonSpacing( graphContainer )
 };
 
 function uncertaintyTraces( x, lowerBounds, upperBounds, quantile, legends, visibility, color, flag){
@@ -341,6 +469,7 @@ var comparison = async function( data, estimate,
     layout.xaxis.title.text = "$$\\Large " + xLabel + "$$";
     layout.xaxis.title.font.size = labelFontSize
     layout.xaxis.autorange = horizontalReverse;
+    layout.xaxis.showgrid = false;
 
     layout.legend = {};
     layout.legend.font = {};
@@ -375,6 +504,9 @@ var comparison = async function( data, estimate,
     layoutVertical.yaxis2.tickfont = {};
     layoutVertical.yaxis.tickfont.size = tickFontSize;
     layoutVertical.yaxis2.tickfont.size = tickFontSize;
+    layoutVertical.yaxis.showgrid = false;
+    layoutVertical.xaxis2.showgrid = false;
+    layoutVertical.yaxis2.showgrid = false;
 
     var layoutHorizontal = structuredClone( layout );
     layoutHorizontal.grid = {};
@@ -398,11 +530,15 @@ var comparison = async function( data, estimate,
     layoutHorizontal.yaxis2.tickfont = {};
     layoutHorizontal.yaxis.tickfont.size = tickFontSize;
     layoutHorizontal.yaxis2.tickfont.size = tickFontSize;
+    layoutHorizontal.yaxis.showgrid = false;
+    layoutHorizontal.xaxis2.showgrid = false;
+    layoutHorizontal.yaxis2.showgrid = false;
 
     layout.margin.r = 10 + 2 * labelFontSize;
     layout.yaxis = {};
     layout.yaxis.tickfont = {};
     layout.yaxis.tickfont.size = tickFontSize;
+    layout.yaxis.showgrid = false;
 
     layout.yaxis2 = {};
     layout.rangemode = "tozero";
@@ -410,14 +546,21 @@ var comparison = async function( data, estimate,
     layout.yaxis2.side = "right";
     layout.yaxis2.tickfont = {};
     layout.yaxis2.tickfont.size = tickFontSize;
+    layout.yaxis2.showgrid = false;
 
-    var config = {};
-    config.responsive = true;
-    config.displaylogo = false;
+    applySpectrumGridlinesToLayout( layoutVertical, graphContainer, settings, [ "xaxis", "yaxis", "xaxis2", "yaxis2" ] )
+    applySpectrumGridlinesToLayout( layoutHorizontal, graphContainer, settings, [ "xaxis", "yaxis", "xaxis2", "yaxis2" ] )
+    applySpectrumGridlinesToLayout( layout, graphContainer, settings, [ "xaxis", "yaxis", "yaxis2" ] )
 
-    if( settings.layout.layout === "vertical" )   Plotly.newPlot( graphContainer, traces, layoutVertical, config)
-    if( settings.layout.layout === "horizontal" ) Plotly.newPlot( graphContainer, traces, layoutHorizontal, config)
-    if( settings.layout.layout === "single" )     Plotly.newPlot( graphContainer, tracesAll, layout, config)
+    const activeAxisKeys = settings.layout.layout === "vertical" || settings.layout.layout === "horizontal"
+        ? [ "xaxis", "yaxis", "xaxis2", "yaxis2" ]
+        : [ "xaxis", "yaxis", "yaxis2" ]
+    const config = buildPlotConfig( graphContainer, activeAxisKeys )
+
+    if( settings.layout.layout === "vertical" )   await Plotly.newPlot( graphContainer, traces, layoutVertical, config)
+    if( settings.layout.layout === "horizontal" ) await Plotly.newPlot( graphContainer, traces, layoutHorizontal, config)
+    if( settings.layout.layout === "single" )     await Plotly.newPlot( graphContainer, tracesAll, layout, config)
+    normalizeModebarButtonSpacing( graphContainer )
 };
 
 

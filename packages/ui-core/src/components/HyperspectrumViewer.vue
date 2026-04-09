@@ -876,10 +876,29 @@
 			<main class="relative z-0 bg-dark-gray rounded-lg overflow-hidden shadow-sm p-0">
 				<template v-if = "heatmapRendererMode === 'deckgl'">
 					<div ref = "deckLayoutContainer" class = "flex h-full min-h-0 gap-1 p-2">
-						<div class = "flex min-w-0 flex-1 flex-col gap-2 md:min-w-[20rem]"
+						<div ref = "deckSpectraPaneContainer"
+							 class = "grid h-full min-h-0 min-w-0 flex-1 md:min-w-[20rem]"
+							 :style = "deckSpectraPaneGridStyle"
 							 data-tutorial = "spectra-panels">
-							<div ref = "deckTopPanelGraph" class = "h-1/2 min-h-0 overflow-hidden rounded-lg bg-white"></div>
-							<div ref = "deckBottomPanelGraph" class = "h-1/2 min-h-0 overflow-hidden rounded-lg bg-white"></div>
+							<div class = "min-h-0 overflow-hidden rounded-lg bg-white">
+								<div ref = "deckTopPanelGraph" class = "h-full w-full bg-white"></div>
+							</div>
+							<div class = "relative h-5 shrink-0 cursor-row-resize select-none touch-none"
+								 title = "Resize spectra panes"
+								 @pointerdown = "startDeckSpectraPaneResize">
+								<div class = "absolute inset-x-2 top-1/2 h-px -translate-y-1/2 rounded-full bg-gray/90"></div>
+								<div class = "absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 flex-row items-center"
+									 aria-hidden = "true">
+									<span class = "flex flex-row items-center gap-[2px] rounded-md border border-gray/70 bg-dark-gray/90 px-1 py-1 shadow-sm">
+										<span class = "h-1 w-1 rotate-45 bg-white/60"></span>
+										<span class = "h-1 w-1 rotate-45 bg-white/60"></span>
+										<span class = "h-1 w-1 rotate-45 bg-white/60"></span>
+									</span>
+								</div>
+							</div>
+							<div class = "min-h-0 overflow-hidden rounded-lg bg-white">
+								<div ref = "deckBottomPanelGraph" class = "h-full w-full bg-white"></div>
+							</div>
 						</div>
 						<div class = "relative w-5 shrink-0 cursor-col-resize touch-none"
 							 title = "Resize"
@@ -1085,6 +1104,7 @@ const rpcaClassificationMip = shallowRef(null)
 const rpcaMip = shallowRef(null)
 const rpcaLoadings = shallowRef(null)
 const deckLayoutContainer = ref(null)
+const deckSpectraPaneContainer = ref(null)
 const deckTopPanelGraph = ref(null)
 const deckBottomPanelGraph = ref(null)
 const graph = ref(null)
@@ -1129,6 +1149,7 @@ const zBlendPresetStatusMessage = ref("")
 const zBlendPresetLoadedFromBackend = ref(false)
 const zBlendDirty = ref(false)
 const zBlendSaving = ref(false)
+const projectSpectrumGridlinesVisible = ref(null)
 const zBlendMeasurementIntensityMaximumByLayer = ref({})
 const zBlendEstimatedIntensityMaximumByLayer = ref({})
 const pcaRgbRedInput = ref(1)
@@ -1180,6 +1201,7 @@ const DEFAULT_HYPERSPECTRUM_PRIORITIZATION = {
 	rpca_rgb: false
 }
 const VIEWER_TUTORIAL_STORAGE_KEY = "harkana.viewerTutorial.v1"
+const SPECTRUM_GRIDLINE_CHANGE_EVENT = "harkana:spectrum-gridlines-change"
 const PREPARATION_TARGET_ORDER = [
 	"mip",
 	"mip_hsv",
@@ -1404,14 +1426,19 @@ const pcaLegend = computed(() => {
 var resizeObserver = null
 let deckPaneResizeSession = null
 let deckPaneResponsiveResizeQueued = false
+let spectrumGridlineGraphListeners = []
 
 const MIN_DECK_HEATMAP_PANE_WIDTH = 320
 const MIN_DECK_SPECTRA_PANE_WIDTH = 360
+const MIN_DECK_SPECTRUM_PANEL_HEIGHT = 120
 const DECK_HEATMAP_PANE_INSET_PX = 8
+const DECK_SPECTRA_PANE_DIVIDER_HEIGHT_PX = 20
 const LAYER_CACHE_WINDOW_RADIUS = 10
 
 const deckHeatmapPaneWidth = ref(null)
 const deckHeatmapPaneWidthTouched = ref(false)
+const deckTopSpectrumPaneHeight = ref(null)
+const deckTopSpectrumPaneHeightTouched = ref(false)
 const viewerTutorialPromptVisible = ref(false)
 const viewerTutorialVisible = ref(false)
 const viewerTutorialStepIndex = ref(0)
@@ -1659,6 +1686,30 @@ const resolvedSecondarySpectrumSource = () => {
 	return resolvedPrimarySpectrumSource() === "raman"
 		? "measurement"
 		: "raman"
+}
+
+const spectrumGridlineSourceKeyForSpectrumSource = ( source ) => {
+	return normalizeSpectrumSource( source ) === "raman" ? "estimate" : "measurement"
+}
+
+const topSpectrumGridlineSourceKey = () => {
+
+	const mode = spectrumSelectionMode.value
+	const topSource = mode === "both"
+		? ( resolvedSecondarySpectrumSource() ?? "measurement" )
+		: mode
+
+	return spectrumGridlineSourceKeyForSpectrumSource( topSource )
+}
+
+const bottomSpectrumGridlineSourceKey = () => {
+
+	const mode = spectrumSelectionMode.value
+	const bottomSource = mode === "both"
+		? resolvedPrimarySpectrumSource()
+		: mode
+
+	return spectrumGridlineSourceKeyForSpectrumSource( bottomSource )
 }
 
 const loadingsSource = () => {
@@ -2788,6 +2839,20 @@ const normalizeConfidenceLevel = ( value ) => {
 	return 95
 }
 
+const normalizeGridlineVisibility = ( value, fallback = false ) => {
+
+	if( typeof value === "boolean" ){
+		return value
+	}
+
+	if( typeof value === "string" ){
+		if( value === "true" ) return true
+		if( value === "false" ) return false
+	}
+
+	return fallback
+}
+
 const defaultDisplayMode = () => {
 	return normalizeDisplayMode( settings.value?.hyperspectrumDefaults?.displayMode )
 }
@@ -2818,6 +2883,64 @@ const defaultFalseColoringBasis = () => {
 
 const defaultRoiEstimateUncertaintyMode = () => {
 	return normalizeRoiEstimateUncertaintyMode( settings.value?.hyperspectrumDefaults?.roiEstimateUncertainty )
+}
+
+const defaultProjectSpectrumGridlinesVisible = () => {
+	const defaultVisible = normalizeGridlineVisibility( settings.value?.gridlines?.hyperspectra, false )
+
+	return {
+		measurement: defaultVisible,
+		estimate: defaultVisible
+	}
+}
+
+const normalizeProjectSpectrumGridlineState = ( value, fallback = null ) => {
+
+	const normalizedFallback = fallback !== null && typeof fallback === "object"
+		? {
+			measurement: normalizeGridlineVisibility( fallback?.measurement ?? fallback?.showGridlines, false ),
+			estimate: normalizeGridlineVisibility( fallback?.estimate ?? fallback?.showGridlines, false )
+		}
+		: defaultProjectSpectrumGridlinesVisible()
+
+	if( value !== null && typeof value === "object" ){
+		const hasSharedVisible = Object.prototype.hasOwnProperty.call( value, "showGridlines" )
+		const sharedVisible = hasSharedVisible
+			? normalizeGridlineVisibility( value.showGridlines, normalizedFallback.measurement )
+			: null
+
+		const normalizedState = {
+			measurement: Object.prototype.hasOwnProperty.call( value, "measurement" )
+				? normalizeGridlineVisibility( value.measurement, normalizedFallback.measurement )
+				: ( sharedVisible ?? normalizedFallback.measurement ),
+			estimate: Object.prototype.hasOwnProperty.call( value, "estimate" )
+				? normalizeGridlineVisibility( value.estimate, normalizedFallback.estimate )
+				: ( sharedVisible ?? normalizedFallback.estimate )
+		}
+
+		const hasUpperPane = Object.prototype.hasOwnProperty.call( value, "upperPane" )
+		const hasLowerPane = Object.prototype.hasOwnProperty.call( value, "lowerPane" )
+		if( hasUpperPane ){
+			normalizedState[ topSpectrumGridlineSourceKey() ] = normalizeGridlineVisibility(
+				value.upperPane,
+				normalizedState[ topSpectrumGridlineSourceKey() ]
+			)
+		}
+		if( hasLowerPane ){
+			normalizedState[ bottomSpectrumGridlineSourceKey() ] = normalizeGridlineVisibility(
+				value.lowerPane,
+				normalizedState[ bottomSpectrumGridlineSourceKey() ]
+			)
+		}
+
+		return normalizedState
+	}
+
+	const normalizedVisible = normalizeGridlineVisibility( value, normalizedFallback.measurement )
+	return {
+		measurement: normalizedVisible,
+		estimate: normalizedVisible
+	}
 }
 
 const normalizeHyperspectrumPrioritization = ( value ) => {
@@ -3039,6 +3162,28 @@ const clampDeckHeatmapPaneWidth = ( width ) => {
 	return Math.max( minimumWidth, Math.min( maximumWidth, Math.round( normalizedWidth )))
 }
 
+const clampDeckTopSpectrumPaneHeight = ( height ) => {
+
+	const normalizedHeight = Number( height )
+	const containerHeight = Number( deckSpectraPaneContainer.value?.clientHeight )
+	const minimumHeight = MIN_DECK_SPECTRUM_PANEL_HEIGHT
+
+	if( Number.isFinite( normalizedHeight ) === false ){
+		return minimumHeight
+	}
+
+	if( Number.isFinite( containerHeight ) === false || containerHeight <= 0 ){
+		return Math.max( minimumHeight, Math.round( normalizedHeight ))
+	}
+
+	const maximumHeight = Math.max(
+		minimumHeight,
+		Math.round( containerHeight - minimumHeight - DECK_SPECTRA_PANE_DIVIDER_HEIGHT_PX )
+	)
+
+	return Math.max( minimumHeight, Math.min( maximumHeight, Math.round( normalizedHeight )))
+}
+
 const normalizedHeatmapAspectRatio = ( dimensions ) => {
 
 	if( dimensions === null ) return null
@@ -3112,6 +3257,21 @@ const defaultDeckHeatmapPaneWidth = () => {
 	return clampDeckHeatmapPaneWidth( containerHeight )
 }
 
+const defaultDeckTopSpectrumPaneHeight = () => {
+
+	const containerHeight = Number( deckSpectraPaneContainer.value?.clientHeight )
+	if( Number.isFinite( containerHeight ) === false || containerHeight <= 0 ){
+		return MIN_DECK_SPECTRUM_PANEL_HEIGHT
+	}
+
+	const availableHeight = containerHeight - DECK_SPECTRA_PANE_DIVIDER_HEIGHT_PX
+	if( Number.isFinite( availableHeight ) === false || availableHeight <= 0 ){
+		return MIN_DECK_SPECTRUM_PANEL_HEIGHT
+	}
+
+	return clampDeckTopSpectrumPaneHeight( availableHeight / 2 )
+}
+
 const ensureDeckHeatmapPaneWidth = ( options = {} ) => {
 
 	const shouldReset = options?.forceDefault === true
@@ -3121,6 +3281,17 @@ const ensureDeckHeatmapPaneWidth = ( options = {} ) => {
 
 	deckHeatmapPaneWidth.value = nextWidth
 	return nextWidth
+}
+
+const ensureDeckTopSpectrumPaneHeight = ( options = {} ) => {
+
+	const shouldReset = options?.forceDefault === true
+	const nextHeight = shouldReset || Number.isFinite( Number( deckTopSpectrumPaneHeight.value )) === false
+		? defaultDeckTopSpectrumPaneHeight()
+		: clampDeckTopSpectrumPaneHeight( deckTopSpectrumPaneHeight.value )
+
+	deckTopSpectrumPaneHeight.value = nextHeight
+	return nextHeight
 }
 
 const reconcileDeckHeatmapPaneWidthWithPlotlyLayout = ( matrix ) => {
@@ -3162,6 +3333,22 @@ const resolvedDeckHeatmapPaneWidth = computed(() => {
 const deckHeatmapPaneStyle = computed(() => {
 	return {
 		width: `${resolvedDeckHeatmapPaneWidth.value}px`
+	}
+})
+
+const resolvedDeckTopSpectrumPaneHeight = computed(() => {
+
+	const configuredHeight = Number( deckTopSpectrumPaneHeight.value )
+	if( Number.isFinite( configuredHeight ) ){
+		return clampDeckTopSpectrumPaneHeight( configuredHeight )
+	}
+
+	return defaultDeckTopSpectrumPaneHeight()
+})
+
+const deckSpectraPaneGridStyle = computed(() => {
+	return {
+		gridTemplateRows: `${resolvedDeckTopSpectrumPaneHeight.value}px ${DECK_SPECTRA_PANE_DIVIDER_HEIGHT_PX}px minmax(${MIN_DECK_SPECTRUM_PANEL_HEIGHT}px, 1fr)`
 	}
 })
 
@@ -3232,6 +3419,7 @@ const spectrumPayloadRenderKey = ( payload ) => {
 const upperPanelRenderKey = ( options ) => {
 	return [
 		"settings=" + deckPanelSettingsKey(),
+		"source=" + String( options?.topSpectrumGridlineSource ?? "" ),
 		"axes=" + deckPanelObjectKey( options?.axes ?? null ),
 		"roi=" + spectrumPayloadRenderKey( options?.topLeftSpectrum?.roi ?? null ),
 		"current=" + spectrumPayloadRenderKey( options?.topLeftSpectrum?.current ?? null ),
@@ -3245,6 +3433,7 @@ const upperPanelRenderKey = ( options ) => {
 const lowerPanelRenderKey = ( options ) => {
 	return [
 		"settings=" + deckPanelSettingsKey(),
+		"source=" + String( options?.bottomSpectrumGridlineSource ?? "" ),
 		"axes=" + deckPanelObjectKey( options?.axes ?? null ),
 		"selected=" + spectrumPayloadRenderKey( options?.selectedSpectrum ?? null ),
 		"roi=" + spectrumPayloadRenderKey( options?.bottomLeftSpectrum?.roi ?? null ),
@@ -4471,8 +4660,180 @@ const zBlendPresetPayload = () => {
 	return {
 		version: "zblend-v1",
 		projectID: String( project.value?.rawid ?? project.value?.id ?? "" ).trim(),
-		dataType: measurementDataType.toLowerCase() === "raman" ? "raman" : "hypercars",
+		dataType: measurementDataType.toLowerCase() === "hyperraman" || measurementDataType.toLowerCase() === "raman"
+			? "hyperraman"
+			: "hypercars",
 		channels: canonicalizeZBlendChannelsForPersistence()
+	}
+}
+
+const spectrumGridlinePresetPayload = () => {
+	const normalizedState = normalizeProjectSpectrumGridlineState( projectSpectrumGridlinesVisible.value )
+
+	return {
+		version: "spectrum-gridlines-v1",
+		projectID: String( project.value?.rawid ?? project.value?.id ?? "" ).trim(),
+		dataType: measurementDataType.toLowerCase() === "hyperraman" || measurementDataType.toLowerCase() === "raman"
+			? "hyperraman"
+			: "hypercars",
+		measurement: normalizedState.measurement,
+		estimate: normalizedState.estimate
+	}
+}
+
+const spectrumGridlineSourceKeysForGraph = ( graphContainer ) => {
+
+	if( graphContainer === deckTopPanelGraph.value ){
+		return [ topSpectrumGridlineSourceKey() ]
+	}
+
+	if( graphContainer === deckBottomPanelGraph.value ){
+		return [ bottomSpectrumGridlineSourceKey() ]
+	}
+
+	if( graphContainer === graph.value ){
+		return Array.from( new Set([
+			topSpectrumGridlineSourceKey(),
+			bottomSpectrumGridlineSourceKey()
+		]))
+	}
+
+	return []
+}
+
+const spectrumGridlineVisibilityForGraph = ( state, graphContainer ) => {
+
+	const normalizedState = normalizeProjectSpectrumGridlineState( state )
+	const topVisible = normalizedState[ topSpectrumGridlineSourceKey() ] === true
+	const bottomVisible = normalizedState[ bottomSpectrumGridlineSourceKey() ] === true
+
+	if( graphContainer === deckTopPanelGraph.value ){
+		return topVisible
+	}
+
+	if( graphContainer === deckBottomPanelGraph.value ){
+		return bottomVisible
+	}
+
+	if( graphContainer === graph.value ){
+		return {
+			xaxis: topVisible,
+			yaxis: topVisible,
+			xaxis2: bottomVisible,
+			yaxis2: bottomVisible
+		}
+	}
+
+	return topVisible
+}
+
+const applyProjectSpectrumGridlineState = async ( state ) => {
+
+	const normalizedState = normalizeProjectSpectrumGridlineState(
+		state,
+		defaultProjectSpectrumGridlinesVisible()
+	)
+
+	projectSpectrumGridlinesVisible.value = normalizedState
+	const graphContainers = Array.from( new Set(
+		[ graph.value, deckTopPanelGraph.value, deckBottomPanelGraph.value ]
+			.filter(( graphContainer ) => graphContainer !== null )
+	) )
+
+	for( const graphContainer of graphContainers ){
+		graphContainer.__harkanaSpectrumGridlinesVisible = spectrumGridlineVisibilityForGraph(
+			normalizedState,
+			graphContainer
+		)
+	}
+}
+
+const loadProjectSpectrumGridlinePreset = async ( requestID = null ) => {
+
+	const fallbackState = defaultProjectSpectrumGridlinesVisible()
+	await applyProjectSpectrumGridlineState( fallbackState )
+
+	if( project.value?.id === "" ) return
+
+	try{
+		const response = await hyperspectra.loadSpectrumGridlineSettings( project.value, measurementDataType )
+		if( requestID !== null && requestID !== activeProjectLoadRequestID.value ) return
+		await applyProjectSpectrumGridlineState( response )
+	} catch( error ){
+		if( requestID !== null && requestID !== activeProjectLoadRequestID.value ) return
+		await applyProjectSpectrumGridlineState( fallbackState )
+		console.log( error )
+	}
+}
+
+const saveProjectSpectrumGridlinePreset = async () => {
+
+	if( project.value?.id === "" ){
+		return
+	}
+
+	try{
+		await hyperspectra.saveSpectrumGridlineSettings(
+			project.value,
+			spectrumGridlinePresetPayload(),
+			measurementDataType
+		)
+	} catch( error ){
+		console.log( error )
+	}
+}
+
+const debouncedSaveProjectSpectrumGridlinePreset = debounce( () => {
+	void saveProjectSpectrumGridlinePreset()
+}, 250 )
+
+const handleSpectrumGridlineChange = ( event ) => {
+
+	const sourceKeys = spectrumGridlineSourceKeysForGraph( event?.currentTarget ?? null )
+	if( sourceKeys.length === 0 ){
+		return
+	}
+
+	const nextVisible = normalizeGridlineVisibility( event?.detail?.visible, false )
+	const currentState = normalizeProjectSpectrumGridlineState( projectSpectrumGridlinesVisible.value )
+	const nextState = { ...currentState }
+
+	for( const sourceKey of sourceKeys ){
+		nextState[sourceKey] = nextVisible
+	}
+
+	void applyProjectSpectrumGridlineState( nextState )
+	debouncedSaveProjectSpectrumGridlinePreset()
+}
+
+const clearSpectrumGridlineGraphListeners = () => {
+
+	for( const listenerEntry of spectrumGridlineGraphListeners ){
+		listenerEntry.element.removeEventListener( SPECTRUM_GRIDLINE_CHANGE_EVENT, listenerEntry.handler )
+	}
+
+	spectrumGridlineGraphListeners = []
+}
+
+const syncSpectrumGridlineGraphListeners = () => {
+
+	clearSpectrumGridlineGraphListeners()
+
+	const graphContainers = Array.from( new Set(
+		[ graph.value, deckTopPanelGraph.value, deckBottomPanelGraph.value ]
+			.filter(( graphContainer ) => graphContainer !== null )
+	) )
+
+	for( const graphContainer of graphContainers ){
+		const handler = ( event ) => {
+			handleSpectrumGridlineChange( event )
+		}
+
+		graphContainer.addEventListener( SPECTRUM_GRIDLINE_CHANGE_EVENT, handler )
+		spectrumGridlineGraphListeners.push({
+			element: graphContainer,
+			handler
+		})
 	}
 }
 
@@ -5149,7 +5510,9 @@ const dataSourceForSpectrumSource = ( source ) => {
 }
 
 const confidenceLevelsForSpectrumSource = ( source ) => {
-	return normalizeSpectrumSource( source ) === "raman" ? estimateConfidenceLevels : []
+	return normalizeSpectrumSource( source ) === "raman"
+		? estimateConfidenceLevels
+		: confidenceLevelOptions
 }
 
 const updateLatestSingleSpectrum = ( source, x, y, response ) => {
@@ -6623,6 +6986,51 @@ const startDeckPaneResize = ( event ) => {
 	event.preventDefault()
 }
 
+const startDeckSpectraPaneResize = ( event ) => {
+
+	if( heatmapRendererMode.value !== "deckgl" ){
+		return
+	}
+
+	stopDeckPaneResize()
+
+	const startHeight = ensureDeckTopSpectrumPaneHeight()
+	const startY = Number( event.clientY )
+
+	if( Number.isFinite( startY ) === false ){
+		return
+	}
+
+	const onPointerMove = ( moveEvent ) => {
+
+		const currentY = Number( moveEvent.clientY )
+		if( Number.isFinite( currentY ) === false ){
+			return
+		}
+
+		deckTopSpectrumPaneHeight.value = clampDeckTopSpectrumPaneHeight( startHeight + ( currentY - startY ))
+		queueDeckPaneResponsiveResize()
+	}
+
+	const onPointerUp = () => {
+		stopDeckPaneResize()
+		queueDeckPaneResponsiveResize()
+	}
+
+	deckPaneResizeSession = {
+		onPointerMove,
+		onPointerUp
+	}
+
+	deckTopSpectrumPaneHeightTouched.value = true
+
+	window.addEventListener( "pointermove", onPointerMove )
+	window.addEventListener( "pointerup", onPointerUp )
+	window.addEventListener( "pointercancel", onPointerUp )
+
+	event.preventDefault()
+}
+
 const plotlyGraphHasData = ( graphContainer ) => {
 	return Array.isArray( graphContainer?.data ) && graphContainer.data.length > 0
 }
@@ -6843,10 +7251,16 @@ const renderCurrentMatrix = async ( initialize = false ) => {
 		await nextTick()
 	}
 
+	syncSpectrumGridlineGraphListeners()
+	await applyProjectSpectrumGridlineState( projectSpectrumGridlinesVisible.value )
+
 	const matrix = currentMatrix()
 	if( matrix === null || graph.value === null ) return
 	if( heatmapRendererMode.value === "deckgl" && deckHeatmapPaneWidthTouched.value === false ){
 		deckHeatmapPaneWidth.value = defaultDeckHeatmapPaneWidth()
+	}
+	if( heatmapRendererMode.value === "deckgl" && deckTopSpectrumPaneHeightTouched.value === false ){
+		deckTopSpectrumPaneHeight.value = defaultDeckTopSpectrumPaneHeight()
 	}
 	const renderStartedAt = performance.now()
 	if( heatmapRendererMode.value === "deckgl" ){
@@ -6865,6 +7279,9 @@ const renderCurrentMatrix = async ( initialize = false ) => {
 		selectedSpectrum: bottomLeftOptions.selectedSpectrum,
 		bottomLeftSpectrum: bottomLeftOptions.bottomLeftSpectrum,
 		topLeftSpectrum: topLeftSpectrumOptions(),
+		topSpectrumGridlineSource: topSpectrumGridlineSourceKey(),
+		bottomSpectrumGridlineSource: bottomSpectrumGridlineSourceKey(),
+		projectSpectrumGridlines: normalizeProjectSpectrumGridlineState( projectSpectrumGridlinesVisible.value ),
 		roiOverlays: activeRoiOverlays(),
 		axes: plotAxes(),
 		heatmapRenderer: heatmapRendererMode.value
@@ -7877,6 +8294,7 @@ const refreshOnResize = debounce( async () => {
 	if( graph.value === null ) return
 	if( heatmapRendererMode.value === "deckgl" ){
 		ensureDeckHeatmapPaneWidth()
+		ensureDeckTopSpectrumPaneHeight()
 		queueDeckPaneResponsiveResize()
 		return
 	}
@@ -7947,6 +8365,8 @@ const resetViewerState = () => {
 	}
 	clearProjectBackgroundWork()
 	scheduledDisplayPayloadPrewarmTargets.clear()
+	debouncedSaveProjectSpectrumGridlinePreset.cancel()
+	clearSpectrumGridlineGraphListeners()
 	displayPayloadPrewarmRequestID += 1
 	activeLayerRequestID.value += 1
 	activeLayerPayloadPrewarmRequestID.value += 1
@@ -7972,6 +8392,8 @@ const resetViewerState = () => {
 	resetDeckPanelRenderKeys()
 	deckHeatmapPaneWidth.value = null
 	deckHeatmapPaneWidthTouched.value = false
+	deckTopSpectrumPaneHeight.value = null
+	deckTopSpectrumPaneHeightTouched.value = false
 	resetPreparationState()
 	viewerTutorialPromptVisible.value = false
 	viewerTutorialVisible.value = false
@@ -7992,6 +8414,7 @@ const resetViewerState = () => {
 	heatmapInteractionMode.value = defaultHeatmapInteractionMode()
 	heatmapRendererMode.value = defaultHeatmapRendererMode()
 	heatmapZoomAspectRatio.value = defaultHeatmapZoomAspectRatio()
+	projectSpectrumGridlinesVisible.value = defaultProjectSpectrumGridlinesVisible()
 	zBlendChannels.value = []
 	zBlendSaving.value = false
 	zBlendPresetStatus.value = "idle"
@@ -8168,6 +8591,7 @@ const initializeProjectView = async () => {
 		hyperspectrumCache.setActiveLayer( project.value, initialLayerIndex, layerCacheOptions() )
 		hyperspectrumCache.setInitialLayerWindow( project.value, initialLayerIndex, layerCacheOptions() )
 		ensureDefaultZBlendState()
+		await loadProjectSpectrumGridlinePreset( requestID )
 		void loadZBlendPreset( requestID )
 		const startingDisplayMode = activePlot.value
 		const blockingPreparationTarget = blockingPreparationTargetForDisplayMode( startingDisplayMode )
@@ -8637,6 +9061,8 @@ onBeforeUnmount( () => {
 	gpuStatusPollInFlight = false
 	removeHeatmapViewportSyncListener()
 	stopDeckPaneResize()
+	debouncedSaveProjectSpectrumGridlinePreset.cancel()
+	clearSpectrumGridlineGraphListeners()
 	clearProjectBackgroundWork()
 	if( typeof removeProjectBackgroundInteractionListeners === "function" ){
 		removeProjectBackgroundInteractionListeners()

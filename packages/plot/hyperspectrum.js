@@ -84,6 +84,15 @@ const STANDALONE_HEATMAP_AXIS_CONFIG = {
     traceXaxis: "x",
     traceYaxis: "y"
 }
+const STANDALONE_SPECTRUM_GRID_AXIS_KEYS = [ "xaxis", "yaxis" ]
+const COMBINED_SPECTRUM_GRID_AXIS_KEYS = [ "xaxis", "yaxis", "xaxis2", "yaxis2" ]
+const SPECTRUM_GRID_MODEBAR_ICON = {
+    width: 512,
+    height: 512,
+    ascent: 512,
+    descent: 0,
+    path: "M64 64H448V448H64V64ZM96 96V192H192V96H96ZM224 96V192H320V96H224ZM352 96V192H416V96H352ZM96 224V320H192V224H96ZM224 224V320H320V224H224ZM352 224V320H416V224H352ZM96 352V416H192V352H96ZM224 352V416H320V352H224ZM352 352V416H416V352H352Z"
+}
 var pcaComponentColors = DEFAULT_PCA_COMPONENT_COLOR_STRINGS
     .map(( color ) => parseColorValue( color ))
     .filter(( color ) => color !== null )
@@ -150,6 +159,273 @@ function resolveHeatmapAxisConfig( graphContainer ){
     }
 
     return FULL_HEATMAP_AXIS_CONFIG
+}
+
+function normalizeSpectrumGridAxisKeys( axisKeys ){
+
+    if( Array.isArray( axisKeys ) === false ){
+        return []
+    }
+
+    return axisKeys.filter(( axisKey ) => typeof axisKey === "string" && axisKey.length > 0 )
+}
+
+function normalizeSpectrumGridlineVisibility( value, fallback = false ){
+    if( typeof value === "boolean" ) return value
+    if( typeof value === "string" ){
+        if( value === "true" ) return true
+        if( value === "false" ) return false
+    }
+    return fallback
+}
+
+function resolveDefaultHyperspectrumGridlines( settings ){
+    return normalizeSpectrumGridlineVisibility( settings?.gridlines?.hyperspectra, false )
+}
+
+function normalizeSpectrumGridlineSourceKey( sourceKey ){
+    return sourceKey === "estimate" ? "estimate" : "measurement"
+}
+
+function resolveDefaultHyperspectrumGridlinesForSource( settings, sourceKey, projectGridlineState = null ){
+
+    const defaults = projectGridlineState !== null && typeof projectGridlineState === "object"
+        ? projectGridlineState
+        : settings?.projectSpectrumGridlines
+    const normalizedSourceKey = normalizeSpectrumGridlineSourceKey( sourceKey )
+
+    if( defaults !== null && typeof defaults === "object" ){
+        return normalizeSpectrumGridlineVisibility(
+            defaults[normalizedSourceKey],
+            resolveDefaultHyperspectrumGridlines( settings )
+        )
+    }
+
+    return resolveDefaultHyperspectrumGridlines( settings )
+}
+
+function buildSpectrumGridDefaultVisibilityMap( axisKeys, visible ){
+
+    const resolvedAxisKeys = normalizeSpectrumGridAxisKeys( axisKeys )
+    const normalizedVisible = normalizeSpectrumGridlineVisibility( visible, false )
+    var visibilityMap = {}
+
+    for( const axisKey of resolvedAxisKeys ){
+        visibilityMap[axisKey] = normalizedVisible
+    }
+
+    return visibilityMap
+}
+
+function buildSpectrumGridAvailabilityMap( axisKeys, available ){
+
+    const resolvedAxisKeys = normalizeSpectrumGridAxisKeys( axisKeys )
+    const normalizedAvailable = available !== false
+    var availabilityMap = {}
+
+    for( const axisKey of resolvedAxisKeys ){
+        availabilityMap[axisKey] = normalizedAvailable
+    }
+
+    return availabilityMap
+}
+
+function defaultSpectrumGridlineColor(){
+    return "rgba(148, 163, 184, 0.22)"
+}
+
+function normalizeSpectrumGridlineVisibilityState( axisKeys, value, fallback = false ){
+
+    const resolvedAxisKeys = normalizeSpectrumGridAxisKeys( axisKeys )
+    var normalizedState = {}
+
+    const normalizedFallback = value !== null && typeof value === "object" && Array.isArray( value ) === false
+        ? null
+        : normalizeSpectrumGridlineVisibility( fallback, false )
+
+    for( const axisKey of resolvedAxisKeys ){
+        if( value !== null && typeof value === "object" && Array.isArray( value ) === false ){
+            normalizedState[axisKey] = normalizeSpectrumGridlineVisibility(
+                value[axisKey],
+                normalizeSpectrumGridlineVisibility( fallback?.[axisKey], false )
+            )
+            continue
+        }
+
+        normalizedState[axisKey] = normalizeSpectrumGridlineVisibility( value, normalizedFallback )
+    }
+
+    return normalizedState
+}
+
+function normalizeSpectrumGridlineAvailabilityState( axisKeys, value, fallback = true ){
+
+    const resolvedAxisKeys = normalizeSpectrumGridAxisKeys( axisKeys )
+    var normalizedState = {}
+    const normalizedFallback = fallback !== false
+
+    for( const axisKey of resolvedAxisKeys ){
+        if( value !== null && typeof value === "object" && Array.isArray( value ) === false ){
+            normalizedState[axisKey] = value[axisKey] !== false
+            continue
+        }
+
+        normalizedState[axisKey] = value !== false && normalizedFallback
+    }
+
+    return normalizedState
+}
+
+function areSpectrumGridlinesVisible( graphContainer, axisKeys = [] ){
+
+    const resolvedAxisKeys = normalizeSpectrumGridAxisKeys( axisKeys )
+    if( resolvedAxisKeys.length === 0 ){
+        return false
+    }
+
+    const visibilityState = normalizeSpectrumGridlineVisibilityState(
+        resolvedAxisKeys,
+        graphContainer?.__harkanaSpectrumGridlinesVisible,
+        false
+    )
+
+    return resolvedAxisKeys.every(( axisKey ) => visibilityState[axisKey] === true )
+}
+
+function applySpectrumGridlineLayoutState( layout, graphContainer, axisKeys, defaultVisible = false, availability = true ){
+
+    if( layout === null || typeof layout !== "object" ){
+        return []
+    }
+
+    const resolvedAxisKeys = normalizeSpectrumGridAxisKeys( axisKeys )
+    if( resolvedAxisKeys.length === 0 ){
+        return []
+    }
+
+    const visibilityState = normalizeSpectrumGridlineVisibilityState(
+        resolvedAxisKeys,
+        graphContainer?.__harkanaSpectrumGridlinesVisible,
+        defaultVisible
+    )
+    const availabilityState = normalizeSpectrumGridlineAvailabilityState(
+        resolvedAxisKeys,
+        availability,
+        graphContainer?.__harkanaSpectrumGridlineAvailability
+    )
+    if( graphContainer ){
+        graphContainer.__harkanaSpectrumGridlinesVisible = visibilityState
+        graphContainer.__harkanaSpectrumGridlineAvailability = availabilityState
+    }
+
+    for( const axisKey of resolvedAxisKeys ){
+        const axisLayout = layout[ axisKey ]
+        if( axisLayout === null || typeof axisLayout !== "object" ) continue
+
+        const showGrid = visibilityState[axisKey] === true && availabilityState[axisKey] !== false
+        axisLayout.showgrid = showGrid
+        if( showGrid ){
+            if( typeof axisLayout.gridcolor !== "string" || axisLayout.gridcolor.length === 0 ){
+                axisLayout.gridcolor = defaultSpectrumGridlineColor()
+            }
+            if( Number.isFinite( Number( axisLayout.gridwidth )) === false ){
+                axisLayout.gridwidth = 1
+            }
+        }
+    }
+
+    return resolvedAxisKeys
+}
+
+function buildSpectrumGridlineRelayout( graphContainer, showGrid, axisKeys ){
+
+    const resolvedAxisKeys = normalizeSpectrumGridAxisKeys( axisKeys )
+    const visibilityState = normalizeSpectrumGridlineVisibilityState(
+        resolvedAxisKeys,
+        showGrid,
+        graphContainer?.__harkanaSpectrumGridlinesVisible
+    )
+    const availabilityState = normalizeSpectrumGridlineAvailabilityState(
+        resolvedAxisKeys,
+        graphContainer?.__harkanaSpectrumGridlineAvailability,
+        true
+    )
+    var relayout = {}
+
+    for( const axisKey of resolvedAxisKeys ){
+        const visible = visibilityState[axisKey] === true && availabilityState[axisKey] !== false
+        relayout[ `${axisKey}.showgrid` ] = visible
+        if( visible ){
+            const existingGridColor = graphContainer?.layout?.[ axisKey ]?.gridcolor
+            relayout[ `${axisKey}.gridcolor` ] = typeof existingGridColor === "string" && existingGridColor.length > 0
+                ? existingGridColor
+                : defaultSpectrumGridlineColor()
+            relayout[ `${axisKey}.gridwidth` ] = 1
+        }
+    }
+
+    return relayout
+}
+
+function buildSpectrumGridModebarButton( graphContainer ){
+    return {
+        name: "Toggle gridlines",
+        title: "Toggle gridlines",
+        attr: "toggle-gridlines",
+        icon: SPECTRUM_GRID_MODEBAR_ICON,
+        click: ( gd ) => {
+            const axisKeys = normalizeSpectrumGridAxisKeys(
+                gd?.__harkanaSpectrumGridAxisKeys ?? graphContainer?.__harkanaSpectrumGridAxisKeys
+            )
+            if( axisKeys.length === 0 ) return
+
+            const nextVisible = !areSpectrumGridlinesVisible( gd, axisKeys )
+            const nextState = normalizeSpectrumGridlineVisibilityState( axisKeys, nextVisible, false )
+            gd.__harkanaSpectrumGridlinesVisible = nextState
+
+            Plotly.relayout( gd, buildSpectrumGridlineRelayout( gd, nextState, axisKeys ))
+                .then(() => {
+                    if( typeof gd?.dispatchEvent === "function" ){
+                        gd.dispatchEvent( new CustomEvent( "harkana:spectrum-gridlines-change", {
+                            detail: {
+                                visible: nextVisible
+                            }
+                        }) )
+                    }
+                    normalizeModebarButtonSpacing( gd )
+                })
+                .catch(( error ) => {
+                    console.log( error )
+                })
+        }
+    }
+}
+
+function normalizeModebarButtonSpacing( graphContainer ){
+    const customButton = graphContainer?.querySelector?.('.modebar-btn[data-attr="toggle-gridlines"]')
+    const customGroup = customButton?.closest?.('.modebar-group')
+
+    if( customGroup && customGroup.parentElement?.lastElementChild === customGroup ){
+        customGroup.style.marginLeft = "0px"
+    }
+}
+
+async function setSpectrumGridlinesVisible( graphContainer, visible ){
+
+    if( !graphContainer ) return
+
+    const axisKeys = normalizeSpectrumGridAxisKeys( graphContainer.__harkanaSpectrumGridAxisKeys )
+    if( axisKeys.length === 0 ) return
+    const visibilityState = normalizeSpectrumGridlineVisibilityState(
+        axisKeys,
+        visible,
+        graphContainer.__harkanaSpectrumGridlinesVisible
+    )
+    graphContainer.__harkanaSpectrumGridlinesVisible = visibilityState
+    if( Array.isArray( graphContainer.data ) === false || graphContainer.data.length === 0 ) return
+
+    await Plotly.relayout( graphContainer, buildSpectrumGridlineRelayout( graphContainer, visibilityState, axisKeys ))
+    normalizeModebarButtonSpacing( graphContainer )
 }
 
 function parseColorValue( color ){
@@ -288,6 +564,7 @@ var updateLowerSpectrum = async function( graphContainer, spectrum, options = {}
     const settings = options?.settings ?? {}
     const spectralLabel = sanitizeLatexLabel( settings?.labels?.spectral, "\\nu" )
     const spectralTitle = formatAxisTitle( spectralLabel, axes.zUnit, settings?.labels?.showUnits !== false && settings?.labels?.showUnits !== "false" )
+    const intensityTitle = resolveIntensityAxisTitle( settings )
     const annotations = buildSidePanelInstructionAnnotations(
         graphContainer?.layout ?? {},
         TOP_LEFT_INSTRUCTION_TEXT,
@@ -331,7 +608,7 @@ var updateLowerSpectrum = async function( graphContainer, spectrum, options = {}
                                "xaxis2.showticklabels": lowerPlot.usingSpectrum,
                                "yaxis2.showticklabels": lowerPlot.usingSpectrum,
                                "xaxis2.title.text": lowerPlot.usingSpectrum ? spectralTitle : "",
-                               "yaxis2.title.text": lowerPlot.usingSpectrum ? "$$\\Large I$$" : ""
+                               "yaxis2.title.text": lowerPlot.usingSpectrum ? intensityTitle : ""
                            } )
 }
 
@@ -1660,11 +1937,23 @@ async function renderFigure( graphContainer, figure, preferReact ){
 
     const config = {
         responsive: true,
-        displaylogo: false
+        displaylogo: false,
+        modeBarButtonsToRemove: [ "autoScale2d" ]
     }
+
+    const spectrumGridAxisKeys = applySpectrumGridlineLayoutState(
+        figure?.layout,
+        graphContainer,
+        figure?.spectrumGridAxisKeys,
+        figure?.spectrumGridDefaultVisible,
+        figure?.spectrumGridAvailability
+    )
+    graphContainer.__harkanaSpectrumGridAxisKeys = spectrumGridAxisKeys
 
     if( figure?.heatmapPanelOnly === true ){
         config.displayModeBar = false
+    } else if( spectrumGridAxisKeys.length > 0 ){
+        config.modeBarButtonsToAdd = [ buildSpectrumGridModebarButton( graphContainer ) ]
     }
 
     const hasExistingFigure = Array.isArray( graphContainer.data ) && graphContainer.data.length > 0
@@ -1676,10 +1965,12 @@ async function renderFigure( graphContainer, figure, preferReact ){
     if( figure?.heatmapPanelOnly === true ){
         if( preferReact || hasExistingFigure ){
             await Plotly.react( graphContainer, figure.traces, figure.layout, config )
+            normalizeModebarButtonSpacing( graphContainer )
             return
         }
 
         await Plotly.newPlot( graphContainer, figure.traces, figure.layout, config )
+        normalizeModebarButtonSpacing( graphContainer )
         return
     }
 
@@ -1692,10 +1983,12 @@ async function renderFigure( graphContainer, figure, preferReact ){
 
     if( preferReact || hasExistingFigure ){
         await Plotly.react( graphContainer, figure.traces, figure.layout, config )
+        normalizeModebarButtonSpacing( graphContainer )
         return
     }
 
     await Plotly.newPlot( graphContainer, figure.traces, figure.layout, config )
+    normalizeModebarButtonSpacing( graphContainer )
 }
 
 async function updateExternalHeatmapFigure( graphContainer, figure ){
@@ -2080,7 +2373,7 @@ function buildTopLeftTraces( settings, topLeftSpectrum, spectralAxisValues = [],
         return {
             traces: [ ...roiGroup.traces, ...currentGroup.traces ],
             axisValues,
-            label: "$$\\Large I$$",
+            label: resolveIntensityAxisTitle( settings ),
             message: usingSpectrum
                 ? ""
                 : ( typeof topLeftSpectrum?.fallbackMessage === "string" && topLeftSpectrum.fallbackMessage.length > 0
@@ -2596,6 +2889,7 @@ function buildStandaloneLowerPanelLayout( graphContainer, settings, lowerPlot, a
     const spectralLabel = sanitizeLatexLabel( settings?.labels?.spectral, "\\nu" )
     const showUnits = settings?.labels?.showUnits !== false && settings?.labels?.showUnits !== "false"
     const spectralTitle = formatAxisTitle( spectralLabel, axes.zUnit, showUnits )
+    const intensityTitle = resolveIntensityAxisTitle( settings )
     const lowerAxisTicks = valueLatexTicks( lowerPlot.axisValues )
     const showSpectrum = typeof lowerPlot.message !== "string" || lowerPlot.message.length === 0
 
@@ -2631,7 +2925,7 @@ function buildStandaloneLowerPanelLayout( graphContainer, settings, lowerPlot, a
         showgrid: false,
         zeroline: false,
         title: {
-            text: showSpectrum ? "$$\\Large I$$" : "",
+            text: showSpectrum ? intensityTitle : "",
             font: { size: labelFontSize }
         },
         showticklabels: showSpectrum
@@ -2744,7 +3038,17 @@ function buildUpperPanelFigure( graphContainer, settings, options = {} ){
 
     return {
         traces: topLeftPlot.traces,
-        layout: buildStandaloneUpperPanelLayout( graphContainer, settings, topLeftPlot )
+        layout: buildStandaloneUpperPanelLayout( graphContainer, settings, topLeftPlot ),
+        spectrumGridAxisKeys: STANDALONE_SPECTRUM_GRID_AXIS_KEYS,
+        spectrumGridAvailability: buildSpectrumGridAvailabilityMap(
+            STANDALONE_SPECTRUM_GRID_AXIS_KEYS,
+            typeof topLeftPlot.message !== "string" || topLeftPlot.message.length === 0
+        ),
+        spectrumGridDefaultVisible: resolveDefaultHyperspectrumGridlinesForSource(
+            settings,
+            options?.topSpectrumGridlineSource,
+            options?.projectSpectrumGridlines
+        )
     }
 }
 
@@ -2760,7 +3064,17 @@ function buildLowerPanelFigure( graphContainer, settings, options = {} ){
 
     return {
         traces: lowerPlot.traces,
-        layout: buildStandaloneLowerPanelLayout( graphContainer, settings, lowerPlot, axes )
+        layout: buildStandaloneLowerPanelLayout( graphContainer, settings, lowerPlot, axes ),
+        spectrumGridAxisKeys: STANDALONE_SPECTRUM_GRID_AXIS_KEYS,
+        spectrumGridAvailability: buildSpectrumGridAvailabilityMap(
+            STANDALONE_SPECTRUM_GRID_AXIS_KEYS,
+            typeof lowerPlot.message !== "string" || lowerPlot.message.length === 0
+        ),
+        spectrumGridDefaultVisible: resolveDefaultHyperspectrumGridlinesForSource(
+            settings,
+            options?.bottomSpectrumGridlineSource,
+            options?.projectSpectrumGridlines
+        )
     }
 }
 
@@ -2816,7 +3130,7 @@ function buildFigure( matrix, graphContainer, settings, options = {} ){
                                     graphContainer,
                                     settings,
                                     topLeftPlot.label,
-                                    "$$\\Large I$$",
+                                    resolveIntensityAxisTitle( settings ),
                                     {
                                         axes,
                                         upperAxisValues: topLeftPlot.axisValues,
@@ -2831,7 +3145,28 @@ function buildFigure( matrix, graphContainer, settings, options = {} ){
     return {
         traces: [ ...topLeftPlot.traces, ...lowerPlot.traces, heatmapTrace ],
         layout,
-        externalHeatmap: useExternalRenderer
+        externalHeatmap: useExternalRenderer,
+        spectrumGridAxisKeys: COMBINED_SPECTRUM_GRID_AXIS_KEYS,
+        spectrumGridAvailability: {
+            ...buildSpectrumGridAvailabilityMap(
+                [ "xaxis", "yaxis" ],
+                typeof topLeftPlot.message !== "string" || topLeftPlot.message.length === 0
+            ),
+            ...buildSpectrumGridAvailabilityMap(
+                [ "xaxis2", "yaxis2" ],
+                typeof lowerPlot.message !== "string" || lowerPlot.message.length === 0
+            )
+        },
+        spectrumGridDefaultVisible: {
+            ...buildSpectrumGridDefaultVisibilityMap(
+                [ "xaxis", "yaxis" ],
+                resolveDefaultHyperspectrumGridlinesForSource( settings, options?.topSpectrumGridlineSource, options?.projectSpectrumGridlines )
+            ),
+            ...buildSpectrumGridDefaultVisibilityMap(
+                [ "xaxis2", "yaxis2" ],
+                resolveDefaultHyperspectrumGridlinesForSource( settings, options?.bottomSpectrumGridlineSource, options?.projectSpectrumGridlines )
+            )
+        }
     }
 }
 
@@ -2867,7 +3202,7 @@ function buildRgbFigure( rgbComposite, graphContainer, settings, options = {} ){
                                     graphContainer,
                                     settings,
                                     topLeftPlot.label,
-                                    "$$\\Large I$$",
+                                    resolveIntensityAxisTitle( settings ),
                                     {
                                         axes,
                                         upperAxisValues: topLeftPlot.axisValues,
@@ -2882,7 +3217,28 @@ function buildRgbFigure( rgbComposite, graphContainer, settings, options = {} ){
     return {
         traces: [ ...topLeftPlot.traces, ...lowerPlot.traces, rgbTrace ],
         layout,
-        externalHeatmap: useExternalRenderer
+        externalHeatmap: useExternalRenderer,
+        spectrumGridAxisKeys: COMBINED_SPECTRUM_GRID_AXIS_KEYS,
+        spectrumGridAvailability: {
+            ...buildSpectrumGridAvailabilityMap(
+                [ "xaxis", "yaxis" ],
+                typeof topLeftPlot.message !== "string" || topLeftPlot.message.length === 0
+            ),
+            ...buildSpectrumGridAvailabilityMap(
+                [ "xaxis2", "yaxis2" ],
+                typeof lowerPlot.message !== "string" || lowerPlot.message.length === 0
+            )
+        },
+        spectrumGridDefaultVisible: {
+            ...buildSpectrumGridDefaultVisibilityMap(
+                [ "xaxis", "yaxis" ],
+                resolveDefaultHyperspectrumGridlinesForSource( settings, options?.topSpectrumGridlineSource, options?.projectSpectrumGridlines )
+            ),
+            ...buildSpectrumGridDefaultVisibilityMap(
+                [ "xaxis2", "yaxis2" ],
+                resolveDefaultHyperspectrumGridlinesForSource( settings, options?.bottomSpectrumGridlineSource, options?.projectSpectrumGridlines )
+            )
+        }
     }
 }
 
@@ -2922,7 +3278,7 @@ function buildPcaFigure( classification, graphContainer, settings, options = {} 
                                     graphContainer,
                                     settings,
                                     topLeftPlot.label,
-                                    "$$\\Large I$$",
+                                    resolveIntensityAxisTitle( settings ),
                                     {
                                         axes,
                                         upperAxisValues: topLeftPlot.axisValues,
@@ -2937,7 +3293,28 @@ function buildPcaFigure( classification, graphContainer, settings, options = {} 
     return {
         traces: [ ...topLeftPlot.traces, ...lowerPlot.traces, classificationTrace ],
         layout,
-        externalHeatmap: useExternalRenderer
+        externalHeatmap: useExternalRenderer,
+        spectrumGridAxisKeys: COMBINED_SPECTRUM_GRID_AXIS_KEYS,
+        spectrumGridAvailability: {
+            ...buildSpectrumGridAvailabilityMap(
+                [ "xaxis", "yaxis" ],
+                typeof topLeftPlot.message !== "string" || topLeftPlot.message.length === 0
+            ),
+            ...buildSpectrumGridAvailabilityMap(
+                [ "xaxis2", "yaxis2" ],
+                typeof lowerPlot.message !== "string" || lowerPlot.message.length === 0
+            )
+        },
+        spectrumGridDefaultVisible: {
+            ...buildSpectrumGridDefaultVisibilityMap(
+                [ "xaxis", "yaxis" ],
+                resolveDefaultHyperspectrumGridlinesForSource( settings, options?.topSpectrumGridlineSource, options?.projectSpectrumGridlines )
+            ),
+            ...buildSpectrumGridDefaultVisibilityMap(
+                [ "xaxis2", "yaxis2" ],
+                resolveDefaultHyperspectrumGridlinesForSource( settings, options?.bottomSpectrumGridlineSource, options?.projectSpectrumGridlines )
+            )
+        }
     }
 }
 
@@ -2974,7 +3351,7 @@ function buildPcaMipFigure( rgbComposite, graphContainer, settings, options = {}
                                     graphContainer,
                                     settings,
                                     topLeftPlot.label,
-                                    "$$\\Large I$$",
+                                    resolveIntensityAxisTitle( settings ),
                                     {
                                         axes,
                                         upperAxisValues: topLeftPlot.axisValues,
@@ -2989,7 +3366,28 @@ function buildPcaMipFigure( rgbComposite, graphContainer, settings, options = {}
     return {
         traces: [ ...topLeftPlot.traces, ...lowerPlot.traces, rgbTrace ],
         layout,
-        externalHeatmap: useExternalRenderer
+        externalHeatmap: useExternalRenderer,
+        spectrumGridAxisKeys: COMBINED_SPECTRUM_GRID_AXIS_KEYS,
+        spectrumGridAvailability: {
+            ...buildSpectrumGridAvailabilityMap(
+                [ "xaxis", "yaxis" ],
+                typeof topLeftPlot.message !== "string" || topLeftPlot.message.length === 0
+            ),
+            ...buildSpectrumGridAvailabilityMap(
+                [ "xaxis2", "yaxis2" ],
+                typeof lowerPlot.message !== "string" || lowerPlot.message.length === 0
+            )
+        },
+        spectrumGridDefaultVisible: {
+            ...buildSpectrumGridDefaultVisibilityMap(
+                [ "xaxis", "yaxis" ],
+                resolveDefaultHyperspectrumGridlinesForSource( settings, options?.topSpectrumGridlineSource, options?.projectSpectrumGridlines )
+            ),
+            ...buildSpectrumGridDefaultVisibilityMap(
+                [ "xaxis2", "yaxis2" ],
+                resolveDefaultHyperspectrumGridlinesForSource( settings, options?.bottomSpectrumGridlineSource, options?.projectSpectrumGridlines )
+            )
+        }
     }
 }
 
@@ -3026,7 +3424,7 @@ function buildPcaRgbFigure( rgbComposite, graphContainer, settings, options = {}
                                     graphContainer,
                                     settings,
                                     topLeftPlot.label,
-                                    "$$\\Large I$$",
+                                    resolveIntensityAxisTitle( settings ),
                                     {
                                         axes,
                                         upperAxisValues: topLeftPlot.axisValues,
@@ -3041,7 +3439,28 @@ function buildPcaRgbFigure( rgbComposite, graphContainer, settings, options = {}
     return {
         traces: [ ...topLeftPlot.traces, ...lowerPlot.traces, rgbTrace ],
         layout,
-        externalHeatmap: useExternalRenderer
+        externalHeatmap: useExternalRenderer,
+        spectrumGridAxisKeys: COMBINED_SPECTRUM_GRID_AXIS_KEYS,
+        spectrumGridAvailability: {
+            ...buildSpectrumGridAvailabilityMap(
+                [ "xaxis", "yaxis" ],
+                typeof topLeftPlot.message !== "string" || topLeftPlot.message.length === 0
+            ),
+            ...buildSpectrumGridAvailabilityMap(
+                [ "xaxis2", "yaxis2" ],
+                typeof lowerPlot.message !== "string" || lowerPlot.message.length === 0
+            )
+        },
+        spectrumGridDefaultVisible: {
+            ...buildSpectrumGridDefaultVisibilityMap(
+                [ "xaxis", "yaxis" ],
+                resolveDefaultHyperspectrumGridlinesForSource( settings, options?.topSpectrumGridlineSource, options?.projectSpectrumGridlines )
+            ),
+            ...buildSpectrumGridDefaultVisibilityMap(
+                [ "xaxis2", "yaxis2" ],
+                resolveDefaultHyperspectrumGridlinesForSource( settings, options?.bottomSpectrumGridlineSource, options?.projectSpectrumGridlines )
+            )
+        }
     }
 }
 
@@ -3669,6 +4088,10 @@ function formatLatexNumber( value ){
 
 function formatAxisTitle( label, unit, showUnits = true ){
     return "$$\\Large " + label + ( showUnits ? formatAxisUnitSuffix( unit ) : "" ) + "$$"
+}
+
+function resolveIntensityAxisTitle( settings ){
+    return formatAxisTitle( sanitizeLatexLabel( settings?.labels?.intensity, "I" ), "", false )
 }
 
 function resolveHeatmapColorscale( colorscale ){
@@ -5155,5 +5578,6 @@ export default {
     prewarmPcaRgbHeatmapRendererPayload,
     prewarmPcaRgbHeatmapRendererPayloadAsync,
     prewarmZBlendHeatmapRendererPayload,
-    updateZBlendHeatmapPayload
+    updateZBlendHeatmapPayload,
+    setSpectrumGridlinesVisible
 }

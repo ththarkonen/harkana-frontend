@@ -1,6 +1,6 @@
 <template>
 <!-- Outer frame -->
-<div class="bg-brand min-h-screen p-[2px]">
+<div class="bg-brand min-h-screen p-[2px] overflow-y:hidden">
 
     <!-- Mobile overlay -->
     <div v-if="sidebarOpen" @click="sidebarOpen = false" class="fixed inset-0 bg-black/40 z-30 md:hidden"></div>
@@ -10,14 +10,6 @@
 
         <Sidebar :style="sidebarStyle">
             <Logo></Logo>
-
-            <SidebarButton @click="navigation.route('Main menu', {})" class="my-2">
-                Project menu
-            </SidebarButton>
-            
-
-            
-            <hr class="h-0.5 bg-gray border-0 my-4">
 
             <h3 class="px-4 pl-0 mb-2 text-lg font-semibold text-white">
                 Input data formats
@@ -51,20 +43,7 @@
         <NavigationBar>
             <template v-slot:left-items>
                 <button @click="sidebarOpen = true" class="md:hidden px-3 py-2 rounded bg-slate-100">☰</button>
-                <BaseDropdown :close-on-select = "true"
-                              :teleport-to-body = "true"
-                              portal-placement = "bottom-start"
-                              :portal-offset-x = "0"
-                              :portal-offset-y = "8"
-                              menu-class = "fixed z-[45] min-w-[12rem] origin-top-left rounded-md bg-dark-gray shadow-lg ring-1 ring-black/30">
-                    <template v-slot:trigger>
-                        <span class = "font-medium">Menu</span>
-                    </template>
-
-                    <BaseDropdownItem @select = 'navigation.redirect("Main menu")'>
-                        Main menu
-                    </BaseDropdownItem>
-                </BaseDropdown>
+                <MenuDropdown></MenuDropdown>
             </template>
             <template v-slot:right-items>
                 <AccountDropdown></AccountDropdown>
@@ -72,11 +51,17 @@
         </NavigationBar>
 
         <!-- Main Content -->
-        <main class="bg-dark-gray rounded-lg shadow-sm p-4 overflow-y-auto">
-            <div class="w-full max-w-3xl bg-white rounded-lg shadow p-6">
+        <main class="min-h-0 bg-white rounded-lg shadow-sm p-4 overflow-y-auto">
+            <div class="w-full max-w-3xl rounded-lg font-sans">
+                <div class="mb-6 space-y-2">
+                    <div class="text-xs font-semibold uppercase tracking-wide text-black/70">
+                        {{ selected === 'Output' ? 'Output format' : 'Input data format' }}
+                    </div>
+                    <h3 class="m-0 text-lg font-bold text-black">{{ selectedLabel }}</h3>
+                </div>
 
                 <!-- Plain text -->
-                <div v-if="selected === 'Plain text'" class="prose prose-gray max-w-none">
+                <div v-if="selected === 'Plain text'" class="data-format-content">
                     <p>
                         <strong>Plain Text / CSV</strong> files are simple, comma-separated data tables used for numerical measurements such as 
                         spectra or analytical readings. Each line represents one observation, where the first column contains the 
@@ -109,7 +94,7 @@
                 </div>
 
                 <!-- JSON -->
-                <div v-else-if="selected === 'JSON'" class="prose prose-gray max-w-none">
+                <div v-else-if="selected === 'JSON'" class="data-format-content">
                     <p>
                         <strong>JSON</strong> files provide structured, machine-readable datasets, ideal for storing both data and metadata. 
                         Each dataset is represented as paired arrays of <em>x</em> and <em>y</em> values.
@@ -133,7 +118,7 @@
                 </div>
 
                 <!-- SPC -->
-                <div v-else-if="selected === 'SPC'" class="prose prose-gray max-w-none">
+                <div v-else-if="selected === 'SPC'" class="data-format-content">
                     <p>
                         <strong>SPC</strong> files are a widely used <em>binary</em> file format for spectroscopic data, 
                         commonly produced by analytical instruments such as Raman, IR, and UV-Vis spectrometers.
@@ -188,7 +173,7 @@
 
 
                 <!-- Output -->
-                <div v-else class="prose prose-gray max-w-none">
+                <div v-else class="data-format-content">
                     <p>
                         The analysis process produces several structured <strong>JSON</strong> output files containing results, metadata, 
                         and calibration information. 
@@ -287,15 +272,11 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { navigation } from '@harkana/tools'
-
 import Sidebar from './sidebar/Sidebar.vue'
 import Logo from "./sidebar/Logo.vue"
-import SidebarButton from './sidebar/SidebarButton.vue'
 
 import NavigationBar from './navbar/NavigationBar.vue'
-import BaseDropdown from './navbar/BaseDropdown.vue'
-import BaseDropdownItem from './navbar/BaseDropdownItem.vue'
+import MenuDropdown from './navbar/MenuDropdown.vue'
 import AccountDropdown from './navbar/AccountDropdown.vue'
 
 const route = useRoute()
@@ -312,6 +293,15 @@ const sidebarStyle = computed(() => {
 
 const sections = ['Plain text', 'JSON', "SPC"]
 const selected = ref(route.query.section || 'Plain text')
+const selectedLabel = computed(() => {
+    if (selected.value === 'Plain text') {
+        return 'Plain text / CSV'
+    }
+    if (selected.value === 'Output') {
+        return 'Output files'
+    }
+    return selected.value
+})
 
 // Function to change section without triggering route navigation
 const selectSection = (section) => {
@@ -339,3 +329,75 @@ onMounted(() => {
     emit('loaded')
 })
 </script>
+
+<style scoped>
+.data-format-content {
+    color: rgb(0 0 0 / 0.72);
+    font-size: 0.9375rem;
+    line-height: 1.7;
+}
+
+.data-format-content > * + * {
+    margin-top: 1rem;
+}
+
+.data-format-content h4 {
+    color: rgb(0 0 0);
+    font-size: 1rem;
+    font-weight: 700;
+    line-height: 1.4;
+}
+
+.data-format-content p,
+.data-format-content ul,
+.data-format-content pre {
+    margin-top: 0;
+    margin-bottom: 0;
+}
+
+.data-format-content ul {
+    padding-left: 1.25rem;
+}
+
+.data-format-content li + li {
+    margin-top: 0.75rem;
+}
+
+.data-format-content strong {
+    color: rgb(0 0 0);
+    font-weight: 600;
+}
+
+.data-format-content code {
+    border-radius: 0.375rem;
+    background: rgb(15 23 42 / 0.06);
+    color: rgb(15 23 42);
+    font-size: 0.875em;
+    padding: 0.1rem 0.35rem;
+}
+
+.data-format-content pre {
+    overflow-x: auto;
+    border-radius: 0.75rem;
+    background: rgb(15 23 42);
+    color: rgb(241 245 249);
+    font-size: 0.8125rem;
+    line-height: 1.6;
+    padding: 1rem;
+}
+
+.data-format-content pre code {
+    background: transparent;
+    color: inherit;
+    padding: 0;
+}
+
+.data-format-content a {
+    text-decoration: underline;
+    text-underline-offset: 0.15em;
+}
+
+.data-format-content a:hover {
+    opacity: 0.8;
+}
+</style>

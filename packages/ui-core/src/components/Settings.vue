@@ -28,20 +28,7 @@
         <NavigationBar>
             <template v-slot:left-items>
                 <button @click="sidebarOpen = true" class="md:hidden px-3 py-2 rounded bg-slate-100">☰</button>
-                <BaseDropdown :close-on-select = "true"
-                              :teleport-to-body = "true"
-                              portal-placement = "bottom-start"
-                              :portal-offset-x = "0"
-                              :portal-offset-y = "8"
-                              menu-class = "fixed z-[45] min-w-[12rem] origin-top-left rounded-md bg-dark-gray shadow-lg ring-1 ring-black/30">
-                    <template v-slot:trigger>
-                        <span class = "font-medium">Menu</span>
-                    </template>
-
-                    <BaseDropdownItem @select = 'navigation.redirect("Main menu")'>
-                        Main menu
-                    </BaseDropdownItem>
-                </BaseDropdown>
+                <MenuDropdown></MenuDropdown>
             </template>
             <template v-slot:right-items>
                 <AccountDropdown></AccountDropdown>
@@ -80,8 +67,7 @@ import Sidebar from './sidebar/Sidebar.vue'
 import Logo from "./sidebar/Logo.vue"
 
 import NavigationBar from './navbar/NavigationBar.vue'
-import BaseDropdown from './navbar/BaseDropdown.vue'
-import BaseDropdownItem from './navbar/BaseDropdownItem.vue'
+import MenuDropdown from './navbar/MenuDropdown.vue'
 import AccountDropdown from './navbar/AccountDropdown.vue'
 
 import Profile from './sections/Profile.vue'

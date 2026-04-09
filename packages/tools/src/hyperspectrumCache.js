@@ -634,7 +634,7 @@ function pruneLowQueue( state ){
             continue
         }
 
-        if( pcaIndex !== null && Math.abs( pcaIndex - state.activePca ) <= limit ){
+        if( pcaIndex !== null && Math.abs( pcaIndex - state.activePca ) <= state.prefetchRadius ){
             keptTasks.push( task )
             continue
         }

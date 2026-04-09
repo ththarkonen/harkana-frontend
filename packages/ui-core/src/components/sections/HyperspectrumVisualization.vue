@@ -1,77 +1,234 @@
 <template>
 <div class="prose prose-gray max-w-none">
-
-	<div class="border-2 border-brand rounded-lg p-4 mb-8 shadow-black shadow-lg">
-		<p>
-			<strong>Hyperspectrum Visualization Settings</strong> control how hyperspectral image views and spectra
-			are displayed. These options cover axis labels, unit display, scalar heatmap colormaps, UMAP channel colors, PCA component
-			colors, queried-spectrum styling, uncertainty display, and orientation for the image views and spectral side plots.
-		</p>
-	</div>
-
-	<div class="border-2 border-brand rounded-lg p-4 mb-8 shadow-black shadow-lg">
-
-		<LatexField description = "Horizontal axis label" v-model = "labels.horizontal"></LatexField>
-		<LatexField description = "Vertical axis label" v-model = "labels.vertical" class = "mt-4"></LatexField>
-		<LatexField description = "Spectral axis label" v-model = "labels.spectral" class = "mt-4"></LatexField>
-
-		<div class="flex items-center gap-3 rounded-lg border-2 border-brand bg-black/5 p-4 shadow-sm mt-4">
-			<input id = "show-units"
-				   v-model = "labels.showUnits"
-				   type = "checkbox"
-				   class = "h-4 w-4 rounded border-gray-300 accent-brand focus:ring-brand"/>
-			<label for = "show-units" class = "font-semibold text-black cursor-pointer">
-				Show physical units after axis labels
-			</label>
+	<div class="not-prose space-y-8">
+		<div class="flex w-full max-w-2xl flex-wrap gap-2 rounded-lg border border-black/10 bg-black/[0.03] p-2"
+			 role = "tablist"
+			 aria-label = "Hyperspectrum visualization settings sections">
+			<button v-for = "tab in visualizationTabs"
+					:key = "tab.id"
+					type = "button"
+					role = "tab"
+					:aria-selected = "activeVisualizationTab === tab.id ? 'true' : 'false'"
+					:tabindex = "activeVisualizationTab === tab.id ? 0 : -1"
+					@click = "activeVisualizationTab = tab.id"
+					class = "inline-flex items-center justify-center rounded-full px-3 py-1.5 text-xs font-semibold transition-colors"
+					:class = "activeVisualizationTab === tab.id
+						? 'bg-brand text-white'
+						: 'bg-transparent text-black/70 hover:bg-black/5 hover:text-black'">
+				{{ tab.label }}
+			</button>
 		</div>
 
-		<hr class="h-0.5 bg-gray border-0 my-4">
+		<div v-show = "activeVisualizationTab === 'axis'" role = "tabpanel" class = "max-w-2xl space-y-8">
+			<p class = "text-sm text-black/70">
+				Control the displayed axis labels, orientation, and font sizes for hyperspectral plots.
+			</p>
 
-		<div class="flex flex-col gap-2 rounded-lg border-2 border-brand bg-black/5 p-4 shadow-sm">
-			<h4 class="font-semibold text-black">Reverse spectral axis</h4>
-			<select v-model = "layout.leftPlotsReversed"
-					class="w-full border border-gray-600 rounded px-3 py-2 mt-2 bg-white text-black focus:outline-none focus:ring-2 focus:ring-brand">
-				<option value = "false">False</option>
-				<option value = "true">True</option>
-			</select>
+			<div class = "space-y-4">
+				<div class = "text-xs font-semibold uppercase tracking-wide text-black/70">Axis labels</div>
+				<div class = "grid gap-5 md:grid-cols-2">
+					<LatexField description = "Horizontal axis label" v-model = "labels.horizontal"></LatexField>
+					<LatexField description = "Vertical axis label" v-model = "labels.vertical"></LatexField>
+					<LatexField description = "Spectral axis label" v-model = "labels.spectral"></LatexField>
+					<LatexField description = "Spectral axis intensity label" v-model = "labels.intensity"></LatexField>
+				</div>
+
+				<label class = "flex items-center gap-3 text-sm text-black">
+					<input id = "show-units"
+						   v-model = "labels.showUnits"
+						   type = "checkbox"
+						   class = "h-4 w-4 rounded border-gray-300 accent-brand focus:ring-brand"/>
+					<span>Show physical units after axis labels</span>
+				</label>
+			</div>
+
+			<div class = "space-y-4">
+				<div class = "text-xs font-semibold uppercase tracking-wide text-black/70">Axis layout</div>
+				<div class = "grid gap-5 md:grid-cols-2">
+					<label class = "block">
+						<div class = "mb-1 text-xs font-semibold uppercase tracking-wide text-black/70">Reverse spectral axis</div>
+						<select v-model = "layout.leftPlotsReversed"
+								class = "w-full border-0 border-b border-black/35 bg-transparent px-0 py-1 text-sm font-medium text-slate-900 focus:border-brand focus:outline-none focus-visible:border-brand">
+							<option value = "false">False</option>
+							<option value = "true">True</option>
+						</select>
+					</label>
+
+					<label class = "block">
+						<div class = "mb-1 text-xs font-semibold uppercase tracking-wide text-black/70">Heatmap and image origin</div>
+						<select v-model = "layout.heatmapOrigin"
+								class = "w-full border-0 border-b border-black/35 bg-transparent px-0 py-1 text-sm font-medium text-slate-900 focus:border-brand focus:outline-none focus-visible:border-brand">
+							<option value = "top-left">Top left</option>
+							<option value = "bottom-left">Bottom left</option>
+						</select>
+					</label>
+				</div>
+			</div>
+
+			<div class = "space-y-4">
+				<div class = "text-xs font-semibold uppercase tracking-wide text-black/70">Font sizes</div>
+				<div class = "grid gap-5 md:grid-cols-2">
+					<label class = "block">
+						<div class = "mb-1 text-xs font-semibold uppercase tracking-wide text-black/70">Axis tick font size</div>
+						<input v-model.number = "fontSizes.axis"
+							   class = "w-full border-0 border-b border-black/35 bg-transparent px-0 py-1 text-sm font-medium text-slate-900 focus:border-brand focus:outline-none focus-visible:border-brand"
+							   type = "number"
+							   name = "axis-tick-font-size"
+							   autocomplete = "off"
+							   inputmode = "numeric"
+							   spellcheck = "false"
+							   min = "8"
+							   max = "72"
+							   step = "1"/>
+					</label>
+
+					<label class = "block">
+						<div class = "mb-1 text-xs font-semibold uppercase tracking-wide text-black/70">Axis label font size</div>
+						<input v-model.number = "fontSizes.label"
+							   class = "w-full border-0 border-b border-black/35 bg-transparent px-0 py-1 text-sm font-medium text-slate-900 focus:border-brand focus:outline-none focus-visible:border-brand"
+							   type = "number"
+							   name = "axis-title-font-size"
+							   autocomplete = "off"
+							   inputmode = "numeric"
+							   spellcheck = "false"
+							   min = "8"
+							   max = "72"
+							   step = "1"/>
+					</label>
+				</div>
+			</div>
 		</div>
 
-		<div class="flex flex-col gap-2 rounded-lg border-2 border-brand bg-black/5 p-4 shadow-sm mt-4">
-			<h4 class="font-semibold text-black">Heatmap and image origin</h4>
-			<select v-model = "layout.heatmapOrigin"
-					class="w-full border border-gray-600 rounded px-3 py-2 mt-2 bg-white text-black focus:outline-none focus:ring-2 focus:ring-brand">
-				<option value = "top-left">Top left</option>
-				<option value = "bottom-left">Bottom left</option>
-			</select>
+		<div v-show = "activeVisualizationTab === 'colormaps'" role = "tabpanel" class = "max-w-2xl space-y-8">
+			<p class = "text-sm text-black/70">
+				Choose the scalar colormaps used for intensity-based heatmaps such as MIP and layer views.
+			</p>
+
+			<div class = "space-y-4">
+				<div class = "text-xs font-semibold uppercase tracking-wide text-black/70">Scalar heatmap colormaps</div>
+				<div class = "grid gap-5 md:grid-cols-2">
+					<label class = "block">
+						<div class = "mb-1 text-xs font-semibold uppercase tracking-wide text-black/70">MIP colormap</div>
+						<select v-model = "colormaps.mip"
+								class = "w-full border-0 border-b border-black/35 bg-transparent px-0 py-1 text-sm font-medium text-slate-900 focus:border-brand focus:outline-none focus-visible:border-brand">
+							<option v-for = "scale in colorscales" :key = "'mip-' + scale" :value = "scale">
+								{{ scale }}
+							</option>
+						</select>
+					</label>
+
+					<label class = "block">
+						<div class = "mb-1 text-xs font-semibold uppercase tracking-wide text-black/70">Layer colormap</div>
+						<select v-model = "colormaps.layer"
+								class = "w-full border-0 border-b border-black/35 bg-transparent px-0 py-1 text-sm font-medium text-slate-900 focus:border-brand focus:outline-none focus-visible:border-brand">
+							<option v-for = "scale in colorscales" :key = "'layer-' + scale" :value = "scale">
+								{{ scale }}
+							</option>
+						</select>
+					</label>
+				</div>
+			</div>
 		</div>
 
-		<hr class="h-0.5 bg-gray border-0 my-4">
+		<div v-show = "activeVisualizationTab === 'initialization'" role = "tabpanel" class = "max-w-2xl space-y-8">
+			<p class = "text-sm text-black/70">
+				Define the default viewer state and which visualizations are prepared earlier during initialization.
+			</p>
 
-		<div class="flex flex-col gap-2 rounded-lg border-2 border-brand bg-black/5 p-4 shadow-sm">
-			<h4 class="font-semibold text-black">MIP colormap</h4>
-			<select v-model = "colormaps.mip"
-					class="w-full border border-gray-600 rounded px-3 py-2 mt-2 bg-white text-black focus:outline-none focus:ring-2 focus:ring-brand">
-				<option v-for = "scale in colorscales" :key = "'mip-' + scale" :value = "scale">
-					{{ scale }}
-				</option>
-			</select>
+			<div class = "space-y-4">
+				<div class = "text-xs font-semibold uppercase tracking-wide text-black/70">Viewer defaults</div>
+				<div class = "grid gap-5 md:grid-cols-2">
+					<label class = "block">
+						<div class = "mb-1 text-xs font-semibold uppercase tracking-wide text-black/70">Display mode</div>
+						<select v-model = "viewerDefaults.displayMode"
+								class = "w-full border-0 border-b border-black/35 bg-transparent px-0 py-1 text-sm font-medium text-slate-900 focus:border-brand focus:outline-none focus-visible:border-brand">
+							<option value = "mip">MIP</option>
+							<option value = "mip_hsv">HSV-mapped MIP</option>
+							<option value = "umap">UMAP</option>
+							<option value = "layer">Layer</option>
+							<option value = "z_blend">Z-blend</option>
+							<option value = "pca">PCA classification</option>
+							<option value = "pca_mip">PCA MIP</option>
+							<option value = "pca_rgb">PCA RGB</option>
+							<option value = "rpca">RPCA classification</option>
+							<option value = "rpca_mip">RPCA MIP</option>
+							<option value = "rpca_rgb">RPCA RGB</option>
+						</select>
+					</label>
+
+					<label class = "block">
+						<div class = "mb-1 text-xs font-semibold uppercase tracking-wide text-black/70">Heatmap interaction</div>
+						<select v-model = "viewerDefaults.heatmapInteraction"
+								class = "w-full border-0 border-b border-black/35 bg-transparent px-0 py-1 text-sm font-medium text-slate-900 focus:border-brand focus:outline-none focus-visible:border-brand">
+							<option value = "select">Select spectra</option>
+							<option value = "zoom">Zoom</option>
+						</select>
+					</label>
+
+					<label class = "block">
+						<div class = "mb-1 text-xs font-semibold uppercase tracking-wide text-black/70">Zoom aspect ratio</div>
+						<select v-model = "viewerDefaults.heatmapZoomAspectRatio"
+								class = "w-full border-0 border-b border-black/35 bg-transparent px-0 py-1 text-sm font-medium text-slate-900 focus:border-brand focus:outline-none focus-visible:border-brand">
+							<option value = "square">Lock square</option>
+							<option value = "free">Free</option>
+						</select>
+					</label>
+
+					<label class = "block">
+						<div class = "mb-1 text-xs font-semibold uppercase tracking-wide text-black/70">Loadings</div>
+						<select v-model = "viewerDefaults.loadings"
+								class = "w-full border-0 border-b border-black/35 bg-transparent px-0 py-1 text-sm font-medium text-slate-900 focus:border-brand focus:outline-none focus-visible:border-brand">
+							<option value = "hide">Hide</option>
+							<option value = "show">Show</option>
+						</select>
+					</label>
+
+					<label class = "block">
+						<div class = "mb-1 text-xs font-semibold uppercase tracking-wide text-black/70">False-coloring basis</div>
+						<select v-model = "viewerDefaults.falseColoringBasis"
+								class = "w-full border-0 border-b border-black/35 bg-transparent px-0 py-1 text-sm font-medium text-slate-900 focus:border-brand focus:outline-none focus-visible:border-brand">
+							<option value = "measurement">Measurements</option>
+							<option value = "raman">Estimated Raman spectra</option>
+						</select>
+						<p class = "mt-2 text-xs text-black/60">
+							If Raman coloring is not available yet, measurements are used automatically.
+						</p>
+					</label>
+				</div>
+
+				<label class = "flex items-center gap-3 text-sm text-black">
+					<input v-model = "gridlines.hyperspectra"
+						   type = "checkbox"
+						   class = "h-4 w-4 rounded border-gray-300 accent-brand focus:ring-brand"/>
+					<span>Show spectrum gridlines by default</span>
+				</label>
+			</div>
+
+			<div class = "space-y-4">
+				<div class = "text-xs font-semibold uppercase tracking-wide text-black/70">Prioritization</div>
+				<p class = "text-sm text-black/70">
+					Choose which visualizations should be prepared earlier after the starting view.
+				</p>
+				<div class = "grid gap-3 md:grid-cols-2">
+					<label v-for = "entry in prioritizationEntries"
+						   :key = "'prioritization-' + entry.key"
+						   class = "flex items-center gap-3 text-sm text-black">
+						<input v-model = "prioritization[entry.key]"
+							   type = "checkbox"
+							   class = "h-4 w-4 rounded border-gray-300 accent-brand focus:ring-brand"/>
+						<span>{{ entry.label }}</span>
+					</label>
+				</div>
+			</div>
 		</div>
 
-		<div class="flex flex-col gap-2 rounded-lg border-2 border-brand bg-black/5 p-4 shadow-sm mt-4">
-			<h4 class="font-semibold text-black">Layer colormap</h4>
-			<select v-model = "colormaps.layer"
-					class="w-full border border-gray-600 rounded px-3 py-2 mt-2 bg-white text-black focus:outline-none focus:ring-2 focus:ring-brand">
-				<option v-for = "scale in colorscales" :key = "'layer-' + scale" :value = "scale">
-					{{ scale }}
-				</option>
-			</select>
-		</div>
+		<div v-show = "activeVisualizationTab === 'umap'" role = "tabpanel" class = "max-w-2xl space-y-4">
+			<p class = "text-sm text-black/70">
+				Set the colors used for the red, green, and blue UMAP channels.
+			</p>
 
-		<hr class="h-0.5 bg-gray border-0 my-4">
-
-		<div class="flex flex-col gap-2 rounded-lg border-2 border-brand bg-black/5 p-4 shadow-sm">
-			<h4 class="font-semibold text-black">UMAP channel colors</h4>
-			<div class="grid grid-cols-1 gap-4 mt-2">
+			<div class = "text-xs font-semibold uppercase tracking-wide text-black/70">UMAP channel colors</div>
+			<div class = "grid gap-5 md:grid-cols-2">
 				<ColorPicker v-model = "umapChannelColors.r"
 							 description = "UMAP red channel color">
 				</ColorPicker>
@@ -84,14 +241,16 @@
 			</div>
 		</div>
 
-		<hr class="h-0.5 bg-gray border-0 my-4">
+		<div v-show = "activeVisualizationTab === 'z-blend'" role = "tabpanel" class = "max-w-2xl space-y-4">
+			<p class = "text-sm text-black/70">
+				Adjust the ordered palette applied to channels when using the z-blend visualization.
+			</p>
 
-		<div class="flex flex-col gap-2 rounded-lg border-2 border-brand bg-black/5 p-4 shadow-sm">
-			<h4 class="font-semibold text-black">Z-blend channel palette</h4>
-			<p class="text-sm text-black/70 mt-1">
+			<div class = "text-xs font-semibold uppercase tracking-wide text-black/70">Z-blend palette</div>
+			<p class = "text-sm text-black/70">
 				These colors are assigned automatically to z-blend channels in order.
 			</p>
-			<div class="grid grid-cols-1 gap-4 mt-2">
+			<div class = "grid gap-5 md:grid-cols-2">
 				<ColorPicker v-for = "( color, index ) in zBlendPalette"
 							 :key = "'z-blend-palette-' + index"
 							 v-model = "zBlendPalette[index]"
@@ -100,246 +259,135 @@
 			</div>
 		</div>
 
-		<hr class="h-0.5 bg-gray border-0 my-4">
-
-		<ColorPicker v-model = "spectrumColors.queriedSpectrum"
-					 description = "Queried spectrum color">
-		</ColorPicker>
-
-		<div class="rounded-lg border-2 border-brand bg-black/5 p-4 shadow-sm mt-4">
-			<h4 class="font-semibold text-black">Uncertainty interval</h4>
-
-			<div class="flex flex-col gap-2 mt-3">
-				<label class="font-semibold text-black">Interval color</label>
-				<div class="flex items-center gap-3">
-					<input
-						type = "color"
-						v-model = "spectrumColors.queriedInterval"
-						class = "h-10 w-10 cursor-pointer rounded-md border border-gray-300 bg-transparent p-0"
-					/>
-					<input
-						type = "text"
-						v-model = "spectrumColors.queriedInterval"
-						class = "flex-1 rounded-md border border-gray-300 bg-gray-50 px-3 py-2 text-sm font-mono text-gray-800 focus:outline-none focus:ring-2 focus:ring-brand"
-					/>
-					<div
-						class = "h-10 w-10 rounded-md border border-gray-300"
-						:style = "{ backgroundColor: spectrumColors.queriedInterval }"
-					/>
-				</div>
-			</div>
-
-			<div class="flex items-center gap-3 mt-4">
-				<input id = "show-interval"
-					   v-model = "spectrumOptions.showInterval"
-					   type = "checkbox"
-					   class = "h-4 w-4 rounded border-gray-300 accent-brand focus:ring-brand"/>
-				<label for = "show-interval" class = "font-semibold text-black cursor-pointer">
-					Show uncertainty interval
-				</label>
-			</div>
-
-			<div class="flex flex-col gap-2 mt-4">
-				<label class="font-semibold text-black">Interval opacity</label>
-				<input v-model.number = "spectrumOptions.intervalOpacity"
-					   class="flex-1 rounded-md border border-gray-300 bg-gray-50 px-3 py-2 text-sm font-mono text-gray-800 focus:outline-none focus:ring-2 focus:ring-brand"
-					   type = "number"
-					   min = "0"
-					   max = "1"
-					   step = "0.01"/>
-			</div>
-		</div>
-
-		<hr class="h-0.5 bg-gray border-0 my-4">
-
-		<div class="rounded-lg border-2 border-brand bg-black/5 p-4 shadow-sm">
-			<h4 class="font-semibold text-black">ROI comparison plot</h4>
-
-			<ColorPicker v-model = "roiColors.roiSpectrum"
-						 description = "ROI spectrum color"
-						 class = "mt-3">
-			</ColorPicker>
-
-			<div class="flex flex-col gap-2 mt-4">
-				<label class="font-semibold text-black">ROI interval color</label>
-				<div class="flex items-center gap-3">
-					<input
-						type = "color"
-						v-model = "roiColors.roiInterval"
-						class = "h-10 w-10 cursor-pointer rounded-md border border-gray-300 bg-transparent p-0"
-					/>
-					<input
-						type = "text"
-						v-model = "roiColors.roiInterval"
-						class = "flex-1 rounded-md border border-gray-300 bg-gray-50 px-3 py-2 text-sm font-mono text-gray-800 focus:outline-none focus:ring-2 focus:ring-brand"
-					/>
-					<div
-						class = "h-10 w-10 rounded-md border border-gray-300"
-						:style = "{ backgroundColor: roiColors.roiInterval }"
-					/>
-				</div>
-			</div>
-
-			<div class="flex items-center gap-3 mt-4">
-				<input id = "show-roi-interval"
-					   v-model = "roiOptions.showInterval"
-					   type = "checkbox"
-					   class = "h-4 w-4 rounded border-gray-300 accent-brand focus:ring-brand"/>
-				<label for = "show-roi-interval" class = "font-semibold text-black cursor-pointer">
-					Show ROI uncertainty interval
-				</label>
-			</div>
-
-			<div class="flex flex-col gap-2 mt-4">
-				<label class="font-semibold text-black">ROI interval opacity</label>
-				<input v-model.number = "roiOptions.intervalOpacity"
-					   class="flex-1 rounded-md border border-gray-300 bg-gray-50 px-3 py-2 text-sm font-mono text-gray-800 focus:outline-none focus:ring-2 focus:ring-brand"
-					   type = "number"
-					   min = "0"
-					   max = "1"
-					   step = "0.01"/>
-			</div>
-		</div>
-
-		<div class="rounded-lg border-2 border-brand bg-black/5 p-4 shadow-sm mt-4">
-			<h4 class="font-semibold text-black">ROI overlay</h4>
-
-			<ColorPicker v-model = "roiColors.roiBox"
-						 description = "ROI box color"
-						 class = "mt-3">
-			</ColorPicker>
-
-			<ColorPicker v-model = "roiColors.roiTitle"
-						 description = "ROI title color"
-						 class = "mt-3">
-			</ColorPicker>
-
-			<ColorPicker v-model = "roiColors.selectionBox"
-						 description = "Current selection box color"
-						 class = "mt-3">
-			</ColorPicker>
-
-			<div class="flex flex-col gap-2 mt-4">
-				<label class="font-semibold text-black">ROI overlay opacity</label>
-				<input v-model.number = "roiOptions.overlayOpacity"
-					   class="flex-1 rounded-md border border-gray-300 bg-gray-50 px-3 py-2 text-sm font-mono text-gray-800 focus:outline-none focus:ring-2 focus:ring-brand"
-					   type = "number"
-					   min = "0"
-					   max = "1"
-					   step = "0.01"/>
-			</div>
-		</div>
-
-		<div class="rounded-lg border-2 border-brand bg-black/5 p-4 shadow-sm mt-4">
-			<h4 class="font-semibold text-black">Hyperspectrum viewer defaults</h4>
-			<p class="text-sm text-black/70 mt-1">
-				These defaults are applied when you open a hyperspectrum project.
+		<div v-show = "activeVisualizationTab === 'spectrum'" role = "tabpanel" class = "max-w-2xl space-y-8">
+			<p class = "text-sm text-black/70">
+				Configure the styling of the selected spectrum, including the interval display and confidence level.
 			</p>
 
-			<div class="grid grid-cols-1 gap-4 mt-4 md:grid-cols-2">
-				<div class="flex flex-col gap-2">
-					<label class="font-semibold text-black">Display mode</label>
-					<select v-model = "viewerDefaults.displayMode"
-							class="w-full border border-gray-600 rounded px-3 py-2 bg-white text-black focus:outline-none focus:ring-2 focus:ring-brand">
-						<option value = "mip">MIP</option>
-						<option value = "mip_hsv">HSV-mapped MIP</option>
-						<option value = "umap">UMAP</option>
-						<option value = "layer">Layer</option>
-						<option value = "z_blend">Z-blend</option>
-						<option value = "pca">PCA classification</option>
-						<option value = "pca_mip">PCA MIP</option>
-						<option value = "pca_rgb">PCA RGB</option>
-						<option value = "rpca">RPCA classification</option>
-						<option value = "rpca_mip">RPCA MIP</option>
-						<option value = "rpca_rgb">RPCA RGB</option>
-					</select>
+			<div class = "space-y-4">
+				<div class = "text-xs font-semibold uppercase tracking-wide text-black/70">Spectrum styling</div>
+				<div class = "grid gap-5 md:grid-cols-2">
+					<ColorPicker v-model = "spectrumColors.queriedSpectrum"
+								 description = "Queried spectrum color">
+					</ColorPicker>
+					<ColorPicker v-model = "spectrumColors.queriedInterval"
+								 description = "Interval color">
+					</ColorPicker>
 				</div>
 
-				<div class="flex flex-col gap-2">
-					<label class="font-semibold text-black">Heatmap interaction</label>
-					<select v-model = "viewerDefaults.heatmapInteraction"
-							class="w-full border border-gray-600 rounded px-3 py-2 bg-white text-black focus:outline-none focus:ring-2 focus:ring-brand">
-						<option value = "select">Select spectra</option>
-						<option value = "zoom">Zoom</option>
-					</select>
-				</div>
+				<label class = "flex items-center gap-3 text-sm text-black">
+					<input id = "show-interval"
+						   v-model = "spectrumOptions.showInterval"
+						   type = "checkbox"
+						   class = "h-4 w-4 rounded border-gray-300 accent-brand focus:ring-brand"/>
+					<span>Show uncertainty interval</span>
+				</label>
 
-				<div class="flex flex-col gap-2">
-					<label class="font-semibold text-black">Zoom aspect ratio</label>
-					<select v-model = "viewerDefaults.heatmapZoomAspectRatio"
-							class="w-full border border-gray-600 rounded px-3 py-2 bg-white text-black focus:outline-none focus:ring-2 focus:ring-brand">
-						<option value = "square">Lock square</option>
-						<option value = "free">Free</option>
-					</select>
-				</div>
+				<div class = "grid gap-5 md:grid-cols-2">
+					<label class = "block">
+						<div class = "mb-1 text-xs font-semibold uppercase tracking-wide text-black/70">Interval opacity</div>
+						<input v-model.number = "spectrumOptions.intervalOpacity"
+							   class = "w-full border-0 border-b border-black/35 bg-transparent px-0 py-1 text-sm font-medium text-slate-900 focus:border-brand focus:outline-none focus-visible:border-brand"
+							   type = "number"
+							   min = "0"
+							   max = "1"
+							   step = "0.01"/>
+					</label>
 
-				<div class="flex flex-col gap-2">
-					<label class="font-semibold text-black">Selection confidence level</label>
-					<select v-model = "viewerDefaults.selectionConfidenceLevel"
-							class="w-full border border-gray-600 rounded px-3 py-2 bg-white text-black focus:outline-none focus:ring-2 focus:ring-brand">
-						<option value = "none">No uncertainty</option>
-						<option value = "50">50%</option>
-						<option value = "75">75%</option>
-						<option value = "90">90%</option>
-						<option value = "95">95%</option>
-					</select>
-				</div>
-
-				<div class="flex flex-col gap-2">
-					<label class="font-semibold text-black">Loadings</label>
-					<select v-model = "viewerDefaults.loadings"
-							class="w-full border border-gray-600 rounded px-3 py-2 bg-white text-black focus:outline-none focus:ring-2 focus:ring-brand">
-						<option value = "hide">Hide</option>
-						<option value = "show">Show</option>
-					</select>
-				</div>
-
-				<div class="flex flex-col gap-2">
-					<label class="font-semibold text-black">False-coloring basis</label>
-					<select v-model = "viewerDefaults.falseColoringBasis"
-							class="w-full border border-gray-600 rounded px-3 py-2 bg-white text-black focus:outline-none focus:ring-2 focus:ring-brand">
-						<option value = "measurement">Measurements</option>
-						<option value = "raman">Estimated Raman spectra</option>
-					</select>
-					<p class="text-xs text-black/60">
-						If Raman coloring is not available yet, measurements are used automatically.
-					</p>
-				</div>
-
-				<div class="flex flex-col gap-2">
-					<label class="font-semibold text-black">Estimate ROI uncertainty</label>
-					<select v-model = "viewerDefaults.roiEstimateUncertainty"
-							class="w-full border border-gray-600 rounded px-3 py-2 bg-white text-black focus:outline-none focus:ring-2 focus:ring-brand">
-						<option value = "show">Show</option>
-						<option value = "hide">Hide</option>
-					</select>
-				</div>
-			</div>
-
-			<div class="mt-6 rounded-lg border border-brand/60 bg-white/40 p-4">
-				<h5 class="font-semibold text-black">Prioritization</h5>
-				<p class="text-sm text-black/70 mt-1">
-					Choose which visualizations should be prepared earlier after the starting view.
-				</p>
-
-				<div class="grid grid-cols-1 gap-3 mt-4 md:grid-cols-2">
-					<label v-for = "entry in prioritizationEntries"
-						   :key = "'prioritization-' + entry.key"
-						   class = "flex items-center gap-3 rounded-lg border border-brand/40 bg-black/5 px-3 py-2 text-sm text-black shadow-sm">
-						<input v-model = "prioritization[entry.key]"
-							   type = "checkbox"
-							   class = "h-4 w-4 rounded border-gray-300 accent-brand focus:ring-brand"/>
-						<span>{{ entry.label }}</span>
+					<label class = "block">
+						<div class = "mb-1 text-xs font-semibold uppercase tracking-wide text-black/70">Selection confidence level</div>
+						<select v-model = "viewerDefaults.selectionConfidenceLevel"
+								class = "w-full border-0 border-b border-black/35 bg-transparent px-0 py-1 text-sm font-medium text-slate-900 focus:border-brand focus:outline-none focus-visible:border-brand">
+							<option value = "none">No uncertainty</option>
+							<option value = "50">50%</option>
+							<option value = "75">75%</option>
+							<option value = "90">90%</option>
+							<option value = "95">95%</option>
+						</select>
 					</label>
 				</div>
 			</div>
 		</div>
 
-		<hr class="h-0.5 bg-gray border-0 my-4">
+		<div v-show = "activeVisualizationTab === 'roi'" role = "tabpanel" class = "max-w-2xl space-y-8">
+			<p class = "text-sm text-black/70">
+				Control how regions of interest are shown in spectra, overlays, and uncertainty displays.
+			</p>
 
-		<div class="flex flex-col gap-2 rounded-lg border-2 border-brand bg-black/5 p-4 shadow-sm">
-			<h4 class="font-semibold text-black">PCA component colors</h4>
-			<div class="grid grid-cols-1 gap-4 mt-2">
+			<div class = "space-y-4">
+				<div class = "text-xs font-semibold uppercase tracking-wide text-black/70">ROI comparison plot</div>
+				<div class = "grid gap-5 md:grid-cols-2">
+					<ColorPicker v-model = "roiColors.roiSpectrum"
+								 description = "ROI spectrum color">
+					</ColorPicker>
+					<ColorPicker v-model = "roiColors.roiInterval"
+								 description = "ROI interval color">
+					</ColorPicker>
+				</div>
+
+				<label class = "flex items-center gap-3 text-sm text-black">
+					<input id = "show-roi-interval"
+						   v-model = "roiOptions.showInterval"
+						   type = "checkbox"
+						   class = "h-4 w-4 rounded border-gray-300 accent-brand focus:ring-brand"/>
+					<span>Show ROI uncertainty interval</span>
+				</label>
+
+				<div class = "grid gap-5 md:grid-cols-2">
+					<label class = "block">
+						<div class = "mb-1 text-xs font-semibold uppercase tracking-wide text-black/70">ROI interval opacity</div>
+						<input v-model.number = "roiOptions.intervalOpacity"
+							   class = "w-full border-0 border-b border-black/35 bg-transparent px-0 py-1 text-sm font-medium text-slate-900 focus:border-brand focus:outline-none focus-visible:border-brand"
+							   type = "number"
+							   min = "0"
+							   max = "1"
+							   step = "0.01"/>
+					</label>
+
+					<label class = "block">
+						<div class = "mb-1 text-xs font-semibold uppercase tracking-wide text-black/70">Estimate ROI uncertainty</div>
+						<select v-model = "viewerDefaults.roiEstimateUncertainty"
+								class = "w-full border-0 border-b border-black/35 bg-transparent px-0 py-1 text-sm font-medium text-slate-900 focus:border-brand focus:outline-none focus-visible:border-brand">
+							<option value = "show">Show</option>
+							<option value = "hide">Hide</option>
+						</select>
+					</label>
+				</div>
+			</div>
+
+			<div class = "space-y-4">
+				<div class = "text-xs font-semibold uppercase tracking-wide text-black/70">ROI overlay</div>
+				<div class = "grid gap-5 md:grid-cols-2">
+					<ColorPicker v-model = "roiColors.roiBox"
+								 description = "ROI box color">
+					</ColorPicker>
+					<ColorPicker v-model = "roiColors.roiTitle"
+								 description = "ROI title color">
+					</ColorPicker>
+					<ColorPicker v-model = "roiColors.selectionBox"
+								 description = "Current selection box color">
+					</ColorPicker>
+				</div>
+
+				<label class = "block max-w-sm">
+					<div class = "mb-1 text-xs font-semibold uppercase tracking-wide text-black/70">ROI overlay opacity</div>
+					<input v-model.number = "roiOptions.overlayOpacity"
+						   class = "w-full border-0 border-b border-black/35 bg-transparent px-0 py-1 text-sm font-medium text-slate-900 focus:border-brand focus:outline-none focus-visible:border-brand"
+						   type = "number"
+						   min = "0"
+						   max = "1"
+						   step = "0.01"/>
+				</label>
+			</div>
+		</div>
+
+		<div v-show = "activeVisualizationTab === 'pca'" role = "tabpanel" class = "max-w-2xl space-y-4">
+			<p class = "text-sm text-black/70">
+				Assign the colors used for PCA component-based visualizations and related overlays.
+			</p>
+
+			<div class = "text-xs font-semibold uppercase tracking-wide text-black/70">PCA component colors</div>
+			<div class = "grid gap-5 md:grid-cols-2">
 				<ColorPicker v-for = "entry in pcaColorEntries"
 							 :key = "entry.componentIndex"
 							 v-model = "pcaComponentColors[entry.componentIndex]"
@@ -348,38 +396,17 @@
 			</div>
 		</div>
 
-		<hr class="h-0.5 bg-gray border-0 my-4">
+		<div class = "flex flex-wrap gap-3 max-w-2xl">
+			<SettingsButton @click = "updateSettings" :loading = "updating" class = "disabled:cursor-not-allowed disabled:opacity-50">
+				Update visualization settings
+			</SettingsButton>
 
-		<div class="flex flex-col gap-2 rounded-lg border-2 border-brand bg-black/5 p-4 shadow-sm mt-4">
-			<h4 class="font-semibold text-black">Axis tick font size</h4>
-			<input v-model.number = "fontSizes.axis"
-				   class="flex-1 rounded-md border border-gray-300 bg-gray-50 px-3 py-2 text-sm font-mono text-gray-800 focus:outline-none focus:ring-2 focus:ring-brand"
-				   type = "number"
-				   min = "8"
-				   max = "72"
-				   step = "1"/>
+			<SettingsButton @click = "resetSettings"
+							:loading = "updating"
+							class = "disabled:cursor-not-allowed disabled:opacity-50">
+				Reset to default settings
+			</SettingsButton>
 		</div>
-
-		<div class="flex flex-col gap-2 rounded-lg border-2 border-brand bg-black/5 p-4 shadow-sm mt-4">
-			<h4 class="font-semibold text-black">Axis label font size</h4>
-			<input v-model.number = "fontSizes.label"
-				   class="flex-1 rounded-md border border-gray-300 bg-gray-50 px-3 py-2 text-sm font-mono text-gray-800 focus:outline-none focus:ring-2 focus:ring-brand"
-				   type = "number"
-				   min = "8"
-				   max = "72"
-				   step = "1"/>
-		</div>
-
-		<SettingsButton @click = "updateSettings" :loading = "updating" class = "mt-4 disabled:opacity-50 disabled:cursor-not-allowed">
-			Update visualization settings
-		</SettingsButton>
-
-		<SettingsButton @click = "resetSettings"
-						:loading = "updating"
-						class = "mt-2 ml-4 disabled:opacity-50 disabled:cursor-not-allowed">
-			Reset to default settings
-		</SettingsButton>
-
 	</div>
 
 </div>
@@ -449,8 +476,19 @@ const pcaColorEntries = Array.from({ length: 10 }, (_, index ) => {
 		label: "PC" + String( componentIndex ).padStart( 2, "0" )
 	}
 })
+const visualizationTabs = [
+	{ id: "axis", label: "Axis settings" },
+	{ id: "colormaps", label: "Colormaps" },
+	{ id: "initialization", label: "Initialization" },
+	{ id: "umap", label: "UMAP channel colors" },
+	{ id: "z-blend", label: "Z-blend palette" },
+	{ id: "spectrum", label: "Spectrum selection color" },
+	{ id: "roi", label: "Regions of interest" },
+	{ id: "pca", label: "PCA colors" }
+]
 
 const updating = ref( false )
+const activeVisualizationTab = ref( "axis" )
 
 const layout = reactive({
 	leftPlotsReversed: "false",
@@ -461,7 +499,11 @@ const labels = reactive({
 	horizontal: "x",
 	vertical: "y",
 	spectral: "\\nu",
+	intensity: "I",
 	showUnits: true
+})
+const gridlines = reactive({
+	hyperspectra: false
 })
 
 const colormaps = reactive({
@@ -661,7 +703,9 @@ const syncFromSettings = ( savedSettings ) => {
 	labels.horizontal = typeof savedSettings?.labels?.horizontal === "string" ? savedSettings.labels.horizontal : "x"
 	labels.vertical = typeof savedSettings?.labels?.vertical === "string" ? savedSettings.labels.vertical : "y"
 	labels.spectral = typeof savedSettings?.labels?.spectral === "string" ? savedSettings.labels.spectral : "\\nu"
+	labels.intensity = typeof savedSettings?.labels?.intensity === "string" ? savedSettings.labels.intensity : "I"
 	labels.showUnits = normalizeCheckbox( savedSettings?.labels?.showUnits, true )
+	gridlines.hyperspectra = normalizeCheckbox( savedSettings?.gridlines?.hyperspectra, false )
 
 	colormaps.mip = typeof savedSettings?.colormaps?.mip === "string" && savedSettings.colormaps.mip.length > 0
 		? savedSettings.colormaps.mip
@@ -815,7 +859,12 @@ const updateSettings = async () => {
 		horizontal: labels.horizontal,
 		vertical: labels.vertical,
 		spectral: labels.spectral,
+		intensity: labels.intensity,
 		showUnits: labels.showUnits
+	}
+	savedSettings.gridlines = {
+		...( savedSettings.gridlines ?? {} ),
+		hyperspectra: gridlines.hyperspectra === true
 	}
 
 	savedSettings.font = {

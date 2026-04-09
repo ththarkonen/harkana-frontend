@@ -1,5 +1,6 @@
 <template>
-<div class = "prose prose-gray flex h-full min-h-0 max-w-none flex-col">
+<div class = "prose prose-gray h-full max-w-none">
+<div class = "not-prose flex h-full min-h-0 max-w-none flex-col font-sans">
     <div class = "mb-6 flex w-full max-w-2xl flex-none flex-wrap gap-2 rounded-lg border border-black/10 bg-black/[0.03] p-2 not-prose"
          role = "tablist"
          aria-label = "Compute token sections">
@@ -19,8 +20,8 @@
     </div>
 
     <div v-show = "activeTokenTab === 'overview'" role = "tabpanel" class = "max-w-2xl space-y-10">
-        <div class = "space-y-4">
-            <p>
+        <div class = "space-y-4 text-sm text-black/70">
+            <p class = "m-0">
                 <strong>Compute tokens</strong> allow you to manage usage and collaboration within the platform.
                 Tokens are the internal currency used to perform analyses and computations.
                 Each user begins with a free balance, and tokens are deducted automatically
@@ -29,26 +30,26 @@
                 seconds for the purchased tokens to get processed and get updated upon page refresh.
             </p>
 
-            <p>
+            <p class = "m-0">
                 <strong>Billing source:</strong>
                 Choose whether analyses are billed from your <em>personal balance</em> or from a
                 <em>token group</em>. Token groups allow multiple users to share a common pool
                 of tokens for collaborative work.
             </p>
 
-            <p>
+            <p class = "m-0">
                 <strong>Token groups:</strong>
                 View and manage your owned token groups. Each group lists its owner or members along with their
                 <em>names</em> and <em>email addresses</em>.
                 As a group owner, you can invite or remove members as needed.
             </p>
 
-            <p>
+            <p class = "m-0">
                 <strong>Create new token group:</strong>
                 Create a new shared token group by specifying a unique name.
                 As the owner, you control group membership and manage the shared token balance.
             </p>
-            <p>
+            <p class = "m-0">
                 Token groups make it easy to share resources and collaborate with your team while maintaining
                 clear ownership and spending control.
             </p>
@@ -307,6 +308,7 @@
 
     <TokenGroupMemberModal ref = "memberModal" :group = "activeGroup" @updateTokenGroups = "updateGroups"></TokenGroupMemberModal>
     <DeleteTokenGroupModal ref = "deleteGroupModal" :group = "activeGroup" @updateTokenGroups = "updateGroups"></DeleteTokenGroupModal>
+</div>
 </div>
 </template>
 

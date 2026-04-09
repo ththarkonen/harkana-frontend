@@ -11,8 +11,16 @@ type ZBlendChannelPreset = {
 type ZBlendPreset = {
     version: "zblend-v1"
     projectID: string
-    dataType: "hypercars" | "raman"
+    dataType: "hypercars" | "hyperraman"
     channels: ZBlendChannelPreset[]
+}
+
+type SpectrumGridlinePreset = {
+    version: "spectrum-gridlines-v1"
+    projectID: string
+    dataType: "hypercars" | "hyperraman"
+    measurement: boolean
+    estimate: boolean
 }
 
 var resolveProjectReference = ( project: any ) => {
@@ -502,6 +510,78 @@ var saveZBlendSettings = async (
     })
 }
 
+var loadSpectrumGridlineSettings = async (
+    project: any,
+    dataType: string = ""
+) => {
+
+    const projectReference = resolveProjectReference( project )
+    if( projectReference.projectID.length === 0 ){
+        throw new Error( "Missing projectID for spectrum gridline settings request." )
+    }
+
+    const normalizedDataType = resolveRoiDataType( dataType )
+    const parameters: Record<string, string> = {
+        projectID: projectReference.projectID,
+        dataType: normalizedDataType
+    }
+
+    if( projectReference.isShared || projectReference.projectKey.length > 0 ){
+        parameters.projectKey = projectReference.projectKey
+    }
+
+    const route = projectReference.isShared
+        ? "/hyperspectrum/shared/spectrum-gridlines/settings"
+        : "/hyperspectrum/spectrum-gridlines/settings"
+
+    const base = (import.meta as any).env.VITE_BASE_URL + route
+    const url = base + "?" + buildQueryString( parameters )
+
+    return await apiFetch<SpectrumGridlinePreset>( url )
+}
+
+var saveSpectrumGridlineSettings = async (
+    project: any,
+    preset: Partial<SpectrumGridlinePreset> = {},
+    dataType: string = ""
+) => {
+
+    const projectReference = resolveProjectReference( project )
+    if( projectReference.projectID.length === 0 ){
+        throw new Error( "Missing projectID for spectrum gridline settings save." )
+    }
+
+    const normalizedDataType = resolveRoiDataType( dataType )
+    const body: SpectrumGridlinePreset = {
+        version: "spectrum-gridlines-v1",
+        projectID: projectReference.projectID,
+        dataType: normalizedDataType,
+        measurement: preset?.measurement === true,
+        estimate: preset?.estimate === true
+    }
+
+    const parameters: Record<string, string> = {
+        projectID: projectReference.projectID,
+        dataType: normalizedDataType
+    }
+
+    if( projectReference.isShared || projectReference.projectKey.length > 0 ){
+        parameters.projectKey = projectReference.projectKey
+    }
+
+    const route = projectReference.isShared
+        ? "/hyperspectrum/shared/spectrum-gridlines/settings"
+        : "/hyperspectrum/spectrum-gridlines/settings"
+
+    const base = (import.meta as any).env.VITE_BASE_URL + route
+    const url = base + "?" + buildQueryString( parameters )
+
+    return await apiFetch<any>( url, {
+        method: "PUT",
+        body: JSON.stringify( body )
+    })
+}
+
 export default {
     parse,
     estimate,
@@ -512,5 +592,7 @@ export default {
     createRoi,
     deleteRoi,
     loadZBlendSettings,
-    saveZBlendSettings
+    saveZBlendSettings,
+    loadSpectrumGridlineSettings,
+    saveSpectrumGridlineSettings
 }

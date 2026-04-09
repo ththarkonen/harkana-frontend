@@ -77,6 +77,13 @@
             <option value="single">Single</option>
         </select>
 
+        <label class = "mt-4 flex items-center gap-3 text-sm text-black">
+            <input v-model = "gridlines.spectra"
+                   type = "checkbox"
+                   class = "h-4 w-4 rounded border-gray-300 accent-brand focus:ring-brand" />
+            <span>Show spectrum gridlines by default</span>
+        </label>
+
         <hr class="h-0.5 bg-gray border-0 my-4">
 
         <LatexField description = "Horizontal axis label" v-model = "labels.horizontal"></LatexField>
@@ -162,6 +169,7 @@ const updating = ref(false)
 const layout = ref({})
 const labels = ref({})
 const legends = ref({})
+const gridlines = ref({})
 
 const font = ref({ sizes: {}})
 const colors = ref({})
@@ -176,6 +184,10 @@ const syncFromSettings = ( settings ) => {
 	layout.value = settings.layout
 	labels.value = settings.labels
 	legends.value = settings.legends
+    gridlines.value = {
+        ...( settings.gridlines ?? {} ),
+        spectra: settings?.gridlines?.spectra === true || settings?.gridlines?.spectra === "true"
+    }
 
 	colors.value = settings.colors
 	comparisonColors.value = settings.comparisonColors
@@ -205,6 +217,10 @@ const updateSettings = async () => {
     settings.layout = layout.value
     settings.labels = labels.value
     settings.legends = legends.value
+    settings.gridlines = {
+        ...( settings.gridlines ?? {} ),
+        spectra: gridlines.value.spectra === true
+    }
 
     settings.colors = colors.value
     settings.comparisonColors = comparisonColors.value

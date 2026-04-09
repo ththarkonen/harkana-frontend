@@ -54,7 +54,12 @@ var getDefaultSettings = async function() {
             horizontal: isHyperspectrum ? "x" : "\\nu",
             vertical: "y",
             spectral: "\\nu",
+            intensity: "I",
             showUnits: true
+        },
+        gridlines: {
+            spectra: false,
+            hyperspectra: false
         },
         legends: {
             data: "y",
