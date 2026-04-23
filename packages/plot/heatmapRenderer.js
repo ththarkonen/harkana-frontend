@@ -337,6 +337,11 @@ function viewStateFromPane( paneState ){
 	}
 }
 
+function samplingYRangeFromPane( paneState, payload ){
+	// Use the Plotly axis range so image-origin changes flip the raster together with the axis labels.
+	return Array.isArray( paneState?.yRange ) ? paneState.yRange : [ -0.5, Number( payload?.height ) - 0.5 ]
+}
+
 function nextAnimationFrame(){
 	return new Promise(( resolve ) => {
 		requestAnimationFrame(() => resolve() )
@@ -699,9 +704,7 @@ function createZBlendWebglRenderer( container, options = {} ){
 		resizeCanvas( paneState )
 
 		const xRange = Array.isArray( paneState?.xRange ) ? paneState.xRange : [ -0.5, Number( payload?.width ) - 0.5 ]
-		const yRange = Array.isArray( paneState?.renderYRange )
-			? paneState.renderYRange
-			: ( Array.isArray( paneState?.yRange ) ? paneState.yRange : [ -0.5, Number( payload?.height ) - 0.5 ] )
+		const yRange = samplingYRangeFromPane( paneState, payload )
 		const bounds = bitmapBounds( payload )
 		const colors = new Float32Array( MAX_Z_BLEND_CHANNELS * 3 )
 		const contrastLimits = new Float32Array( MAX_Z_BLEND_CHANNELS * 2 )
@@ -1009,9 +1012,7 @@ function createScalarWebglRenderer( container, options = {} ){
 		updateColorMapTexture( payload.colorMapTexture )
 
 		const xRange = Array.isArray( paneState?.xRange ) ? paneState.xRange : [ -0.5, Number( payload?.width ) - 0.5 ]
-		const yRange = Array.isArray( paneState?.renderYRange )
-			? paneState.renderYRange
-			: ( Array.isArray( paneState?.yRange ) ? paneState.yRange : [ -0.5, Number( payload?.height ) - 0.5 ] )
+		const yRange = samplingYRangeFromPane( paneState, payload )
 		const bounds = bitmapBounds( payload )
 
 		context.viewport( 0, 0, canvas.width, canvas.height )

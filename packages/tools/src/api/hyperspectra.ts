@@ -23,6 +23,123 @@ type SpectrumGridlinePreset = {
     estimate: boolean
 }
 
+type InspectAxis = {
+    index: number
+    name: string
+    type: string
+    unit: string | null
+    size: number
+}
+
+type InspectLayerAxisOption = {
+    index: number
+    name: string
+    type: string
+    unit: string | null
+    size: number
+}
+
+type OmeZarrInspectResponse = {
+    version: "hyperspectrum-source-inspect-v1"
+    projectID: string
+    dataType: "hypercars" | "hyperraman"
+    source: {
+        format: "ome-zarr"
+        kind: "s3-prefix"
+        s3Uri: string
+        bucket: string
+        key: string
+        name: string
+        extension: "zarr"
+    }
+    dimensions: {
+        axisOrder: string
+        shape: number[]
+        shapeByAxis: Record<string, number>
+        axes: InspectAxis[]
+        analysisRoles: {
+            required: string[]
+            optional: string[]
+        }
+        layerAxisOptions: InspectLayerAxisOption[]
+        recommendedLayerAxis: string | null
+    }
+    metadata: {
+        omeZarrVersion: string | null
+        zarrFormat: number | null
+        datasetPath: string
+        multiscalesCount: number
+        rootMetadataPath: string
+        datasetMetadataPath: string
+    }
+    warnings: string[]
+}
+
+type OmeTiffInspectResponse = {
+    version: "hyperspectrum-source-inspect-v1"
+    projectID: string
+    dataType: "hypercars" | "hyperraman"
+    source: {
+        format: "ome-tiff"
+        kind: "s3-object"
+        s3Uri: string
+        bucket: string
+        key: string
+        name: string
+        extension: "tif" | "tiff"
+    }
+    dimensions: {
+        axisOrder: string
+        shape: number[]
+        shapeByAxis: Record<string, number>
+        axes: InspectAxis[]
+        analysisRoles: {
+            required: string[]
+            optional: string[]
+        }
+        layerAxisOptions: InspectLayerAxisOption[]
+        recommendedLayerAxis: string | null
+    }
+    metadata: {
+        omeSchema: string | null
+        dimensionOrder: string
+        seriesIndex: 0
+        imageDescriptionTag: 270
+        imageDescriptionOffset: number
+        physicalSizeX: number | null
+        physicalSizeY: number | null
+        physicalSizeZ: number | null
+        physicalSizeXUnit: string | null
+        physicalSizeYUnit: string | null
+        physicalSizeZUnit: string | null
+        channelLabels: string[]
+    }
+    warnings: string[]
+}
+
+type HyperspectrumSourceInspectResponse = OmeZarrInspectResponse | OmeTiffInspectResponse
+
+type HyperspectrumSourceAnalysisRequest = {
+    projectID: string
+    dataType?: "hypercars" | "hyperraman"
+    inputS3Uri?: string
+    axisMapping: {
+        x: string
+        y: string
+        z?: string
+        c?: string
+        t?: string
+    }
+    fixedIndices?: Record<string, number>
+}
+
+type ParseJobResponse = {
+    jobId: string
+    taskArn: string
+    status: "STARTED"
+    submittedAt: string
+}
+
 var resolveProjectReference = ( project: any ) => {
 
     const shareInfo = project?.shareInfo ?? {}
@@ -77,6 +194,16 @@ var resolveRoiDataType = ( dataType: string = "" ) => {
 
     const normalized = resolveDataType( dataType ).toLowerCase()
     if( normalized === "raman" || normalized === "hyperraman" ){
+        return "hyperraman"
+    }
+
+    return "hypercars"
+}
+
+var resolveHyperspectrumDataType = ( dataType: string = "" ) => {
+
+    const normalized = resolveDataType( dataType ).toLowerCase()
+    if( normalized === "hyperraman" || normalized === "raman" ){
         return "hyperraman"
     }
 
@@ -171,6 +298,153 @@ var estimate = async (
     const url = base + "?" + buildQueryString( parameters )
 
     return await apiFetch<any>( url )
+}
+
+var inspectSource = async (
+    project: any,
+    options: {
+        inputS3Uri?: string
+        dataType?: string
+    } = {}
+) => {
+
+    const projectReference = resolveProjectReference( project )
+    if( projectReference.projectID.length === 0 ){
+        throw new Error( "Missing projectID for hyperspectrum inspect request." )
+    }
+
+    const parameters: Record<string, string> = {
+        projectID: projectReference.projectID,
+        dataType: resolveHyperspectrumDataType( options?.dataType )
+    }
+
+    const inputS3Uri = String( options?.inputS3Uri ?? "" ).trim()
+    if( inputS3Uri.length > 0 ){
+        parameters.inputS3Uri = inputS3Uri
+    }
+
+    if( projectReference.isShared || projectReference.projectKey.length > 0 ){
+        parameters.projectKey = projectReference.projectKey
+    }
+
+    const route = projectReference.isShared
+        ? "/hyperspectrum/shared/inspect"
+        : "/hyperspectrum/inspect"
+
+    const base = (import.meta as any).env.VITE_BASE_URL + route
+    const url = base + "?" + buildQueryString( parameters )
+
+    return await apiFetch<HyperspectrumSourceInspectResponse>( url )
+}
+
+var launchSourceAnalysis = async (
+    project: any,
+    groupID: string = "",
+    payload: Partial<HyperspectrumSourceAnalysisRequest> = {},
+    dataType: string = "",
+    route: string = "/hyperspectrum/ome-zarr/analysis"
+) => {
+
+    const projectReference = resolveProjectReference( project )
+    if( projectReference.projectID.length === 0 ){
+        throw new Error( "Missing projectID for hyperspectrum source analysis request." )
+    }
+
+    if( projectReference.isShared ){
+        throw new Error( "Hyperspectrum source analysis launch is not available for shared projects." )
+    }
+
+    const normalizedDataType = resolveHyperspectrumDataType( dataType )
+    const axisMapping = typeof payload?.axisMapping === "object" && payload?.axisMapping !== null
+        ? payload.axisMapping
+        : null
+
+    if( axisMapping === null ){
+        throw new Error( "OME-Zarr analysis axisMapping is required." )
+    }
+
+    const parameters: Record<string, string> = {
+        projectID: projectReference.projectID,
+        dataType: normalizedDataType,
+        groupID: groupID ?? ""
+    }
+
+    const body: HyperspectrumSourceAnalysisRequest = {
+        projectID: projectReference.projectID,
+        dataType: normalizedDataType,
+        axisMapping: {
+            x: String( axisMapping?.x ?? "" ).trim(),
+            y: String( axisMapping?.y ?? "" ).trim()
+        }
+    }
+
+    const optionalRoles = [ "z", "c", "t" ]
+    for( const role of optionalRoles ){
+        const axisName = String( axisMapping?.[ role as keyof typeof axisMapping ] ?? "" ).trim()
+        if( axisName.length > 0 ){
+            body.axisMapping[ role as "z" | "c" | "t" ] = axisName
+        }
+    }
+
+    const inputS3Uri = String( payload?.inputS3Uri ?? "" ).trim()
+    if( inputS3Uri.length > 0 ){
+        body.inputS3Uri = inputS3Uri
+    }
+
+    const fixedIndicesInput = payload?.fixedIndices
+    if( fixedIndicesInput && typeof fixedIndicesInput === "object" ){
+        const fixedIndices: Record<string, number> = {}
+        for( const [ axisName, rawValue ] of Object.entries( fixedIndicesInput ) ){
+            const normalizedAxisName = String( axisName ?? "" ).trim()
+            const numericValue = Number.parseInt( String( rawValue ), 10 )
+            if( normalizedAxisName.length === 0 || Number.isInteger( numericValue ) === false ){
+                continue
+            }
+            fixedIndices[ normalizedAxisName ] = numericValue
+        }
+
+        if( Object.keys( fixedIndices ).length > 0 ){
+            body.fixedIndices = fixedIndices
+        }
+    }
+
+    const base = (import.meta as any).env.VITE_BASE_URL + route
+    const url = base + "?" + buildQueryString( parameters )
+
+    return await apiFetch<ParseJobResponse>( url, {
+        method: "POST",
+        body: JSON.stringify( body )
+    })
+}
+
+var launchOmeZarrAnalysis = async (
+    project: any,
+    groupID: string = "",
+    payload: Partial<HyperspectrumSourceAnalysisRequest> = {},
+    dataType: string = ""
+) => {
+    return await launchSourceAnalysis(
+        project,
+        groupID,
+        payload,
+        dataType,
+        "/hyperspectrum/ome-zarr/analysis"
+    )
+}
+
+var launchOmeTiffAnalysis = async (
+    project: any,
+    groupID: string = "",
+    payload: Partial<HyperspectrumSourceAnalysisRequest> = {},
+    dataType: string = ""
+) => {
+    return await launchSourceAnalysis(
+        project,
+        groupID,
+        payload,
+        dataType,
+        "/hyperspectrum/ome-tiff/analysis"
+    )
 }
 
 var spectrum = async (
@@ -585,6 +859,9 @@ var saveSpectrumGridlineSettings = async (
 export default {
     parse,
     estimate,
+    inspectSource,
+    launchOmeZarrAnalysis,
+    launchOmeTiffAnalysis,
     spectrum,
     meanSpectrum,
     status,

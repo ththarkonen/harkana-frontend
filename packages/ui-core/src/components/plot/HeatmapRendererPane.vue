@@ -18,9 +18,14 @@
 					  :y = "overlay.top"
 					  :width = "overlay.width"
 					  :height = "overlay.height"
+					  :class = "{
+						  'heatmap-overlay-highlight': overlay.isEmphasized,
+						  'heatmap-overlay-dimmed': overlay.isDimmed
+					  }"
+					  :style = "overlay.rectStyle"
 					  :fill = "overlay.fillColor"
 					  :stroke = "overlay.boxColor"
-					  stroke-width = "2"></rect>
+					  :stroke-width = "overlay.strokeWidth"></rect>
 			</template>
 
 			<rect v-if = "selectionPreviewRect"
@@ -36,6 +41,10 @@
 
 		<div v-for = "overlay in titledOverlays"
 			 :key = "overlay.key"
+			 :class = "{
+				 'heatmap-overlay-label-highlight': overlay.isEmphasized,
+				 'heatmap-overlay-label-dimmed': overlay.isDimmed
+			 }"
 			 class = "pointer-events-none absolute rounded-sm border px-1.5 py-0.5 text-[11px] font-medium leading-none whitespace-nowrap"
 			 :style = "overlay.labelStyle">
 			{{ overlay.name }}
@@ -158,7 +167,8 @@ const titledOverlays = computed(() => {
 					transform: "translate(-50%, calc(-100% - 6px))",
 					color: overlay.titleColor,
 					backgroundColor: overlay.labelBackground,
-					borderColor: overlay.titleColor
+					borderColor: overlay.titleColor,
+					opacity: overlay.labelOpacity
 				}
 			}
 		})
@@ -457,6 +467,10 @@ function projectOverlay( overlay, index ){
 		? Math.max( 0, Math.min( 1, Number( overlay.opacity )))
 		: 0.25
 	const showTitle = overlay.showTitle !== false
+	const isEmphasized = overlay.isEmphasized === true
+	const isDimmed = overlay.isDimmed === true
+	const resolvedOpacity = isDimmed ? opacity * 0.45 : opacity
+	const strokeWidth = isEmphasized ? 3 : 2
 
 	return {
 		key: `${index}:${overlay.name ?? ""}:${x0}:${x1}:${y0}:${y1}`,
@@ -468,10 +482,18 @@ function projectOverlay( overlay, index ){
 		height,
 		boxColor,
 		titleColor,
-		fillColor: colorWithAlpha( boxColor, opacity * 0.25 ),
-		labelBackground: colorWithAlpha( titleColor, opacity ),
+		fillColor: colorWithAlpha( boxColor, ( isEmphasized ? opacity * 0.45 : resolvedOpacity * 0.25 )),
+		labelBackground: colorWithAlpha( titleColor, isEmphasized ? Math.min( 0.92, opacity + 0.18 ) : resolvedOpacity ),
 		labelLeft: left + ( width / 2 ),
-		labelTop: top
+		labelTop: top,
+		labelOpacity: isDimmed ? 0.45 : 1,
+		strokeWidth,
+		isEmphasized,
+		isDimmed,
+		rectStyle: {
+			opacity: isDimmed ? 0.45 : 1,
+			filter: isEmphasized ? "drop-shadow(0 0 6px rgba(0, 0, 0, 0.18))" : "none"
+		}
 	}
 }
 
@@ -874,5 +896,43 @@ onBeforeUnmount(() => {
 <style scoped>
 :deep(.deck-widget-container){
 	cursor: inherit !important;
+}
+
+.heatmap-overlay-highlight{
+	animation: overlay-pulse 1s ease-in-out infinite;
+	transform-box: fill-box;
+	transform-origin: center;
+}
+
+.heatmap-overlay-dimmed{
+	transition: opacity 140ms ease;
+}
+
+.heatmap-overlay-label-highlight{
+	animation: overlay-label-bounce 0.9s ease-in-out infinite;
+}
+
+.heatmap-overlay-label-dimmed{
+	transition: opacity 140ms ease;
+}
+
+@keyframes overlay-pulse{
+	0%, 100%{
+		transform: scale(1);
+	}
+
+	50%{
+		transform: scale(1.018);
+	}
+}
+
+@keyframes overlay-label-bounce{
+	0%, 100%{
+		transform: translate(-50%, calc(-100% - 6px));
+	}
+
+	50%{
+		transform: translate(-50%, calc(-100% - 8px));
+	}
 }
 </style>

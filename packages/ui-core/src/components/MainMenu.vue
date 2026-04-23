@@ -28,23 +28,23 @@
 
 		<!-- Main Content -->
 		<main class="bg-dark-gray rounded-lg shadow-sm p-4 overflow-y-auto">
-			<div class = "w-full text-white font-semibold pb-4">
-				<div v-show = "!showInfo">{{ activeFolder }}</div>
-				<div v-if = "showBatchActions" class = "float-right">
+			<div class = "flex min-h-8 w-full items-center justify-between gap-3 pb-4 text-white font-semibold">
+				<div v-show = "!showInfo" class = "min-w-0">{{ activeFolder }}</div>
+				<div v-if = "showBatchActions" class = "flex items-center gap-1">
 					<button
-						class="h-8 w-8 items-center justify-center rounded-md text-white hover:bg-green-100 hover:text-brand transition-colors"
+						class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-white hover:bg-green-100 hover:text-brand transition-colors"
 						@click="open( projectFoldersModal, selectedProjects)"
 						title = "Add selected projects to folders">
 						<i class="fas fa-folder-tree"></i>
 					</button>
 					<button
-						class="h-8 w-8 items-center justify-center rounded-md text-white hover:bg-green-100 hover:text-brand transition-colors"
+						class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-white hover:bg-green-100 hover:text-brand transition-colors"
 						@click = "projects.download( selectedProjects )"
 						title = "Download selected projects">
 						<i class="fas fa-cloud-download"></i>
 					</button>
 					<button
-						class="h-8 w-8 items-center justify-center rounded-md text-white hover:bg-green-100 hover:text-brand transition-colors"
+						class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-white hover:bg-green-100 hover:text-brand transition-colors"
 						@click="open( deleteModal, selectedProjects)"
 						title = "Delete selected projects">
 						<i class="fas fa-trash"></i>
@@ -56,25 +56,25 @@
 			<ProjectTable v-if = "!showInfo & activeFolder !== 'Processing'" :projects = "filteredProjects" :selectedProjectIDs = "activeIDs" class = "mt-4">
 				<template v-slot:actions="{ project }">
 					<button
-						class="h-8 w-8 items-center justify-center rounded-md text-white hover:bg-green-100 hover:text-brand transition-colors"
+						class="inline-flex h-8 w-8 items-center justify-center rounded-md text-white hover:bg-green-100 hover:text-brand transition-colors"
 						@click="open( projectFoldersModal, [ project ])"
 						title = "Add to folders">
 						<i class="fas fa-folder-tree"></i>
 					</button>
 					<button
-						class="h-8 w-8 items-center justify-center rounded-md text-white hover:bg-green-100 hover:text-brand transition-colors"
+						class="inline-flex h-8 w-8 items-center justify-center rounded-md text-white hover:bg-green-100 hover:text-brand transition-colors"
 						@click="open( metadataModal, [ project ])"
 						title = "Project metadata">
 						<i class="fas fa-database"></i>
 					</button>
 					<button
-						class="h-8 w-8 items-center justify-center rounded-md text-white hover:bg-green-100 hover:text-brand transition-colors"
+						class="inline-flex h-8 w-8 items-center justify-center rounded-md text-white hover:bg-green-100 hover:text-brand transition-colors"
 						@click = "projects.download([ project ])"
 						title = "Download project">
 						<i class="fas fa-cloud-download"></i>
 					</button>
 					<button
-						class="h-8 w-8 items-center justify-center rounded-md text-white hover:bg-green-100 hover:text-brand transition-colors"
+						class="inline-flex h-8 w-8 items-center justify-center rounded-md text-white hover:bg-green-100 hover:text-brand transition-colors"
 						@click="open( deleteModal, [ project ])"
 						title = "Delete project">
 						<i class="fas fa-trash"></i>

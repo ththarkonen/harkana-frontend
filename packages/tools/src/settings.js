@@ -97,6 +97,18 @@ var getDefaultSettings = async function() {
             queriedInterval: "#1f77b4",
             roiSpectrum: "#333333",
             roiInterval: "#333333",
+            roiPalette: [
+                "#ff7f0e",
+                "#2ca02c",
+                "#d62728",
+                "#9467bd",
+                "#8c564b",
+                "#e377c2",
+                "#7f7f7f",
+                "#bcbd22",
+                "#17becf",
+                "#333333"
+            ],
             roiBox: "#ffffff",
             roiTitle: "#ffffff",
             selectionBox: "#9ca3af",
@@ -148,7 +160,7 @@ var getDefaultSettings = async function() {
             selectionConfidenceLevel: 95,
             loadings: "hide",
             falseColoringBasis: "measurement",
-            roiEstimateUncertainty: "show"
+            roiEstimateUncertainty: 95
         },
         hyperspectrumPrioritization: {
             mip: true,

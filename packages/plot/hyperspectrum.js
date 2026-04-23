@@ -93,6 +93,27 @@ const SPECTRUM_GRID_MODEBAR_ICON = {
     descent: 0,
     path: "M64 64H448V448H64V64ZM96 96V192H192V96H96ZM224 96V192H320V96H224ZM352 96V192H416V96H352ZM96 224V320H192V224H96ZM224 224V320H320V224H224ZM352 224V320H416V224H352ZM96 352V416H192V352H96ZM224 352V416H320V352H224ZM352 352V416H416V352H352Z"
 }
+const SPECTRUM_LEGEND_MODEBAR_ATTR = "toggle-legends"
+const SPECTRUM_LEGEND_MODEBAR_ICON = {
+    width: 512,
+    height: 512,
+    ascent: 512,
+    descent: 0,
+    path: "M88 120H152V184H88V120ZM184 132H424V172H184V132ZM88 224H152V288H88V224ZM184 236H424V276H184V236ZM88 328H152V392H88V328ZM184 340H424V380H184V340Z"
+}
+const HEATMAP_INTERACTION_CHANGE_EVENT = "harkana:heatmap-interaction-change"
+const HEATMAP_RESET_VIEW_EVENT = "harkana:heatmap-reset-view"
+const HEATMAP_SELECT_MODEBAR_ATTR = "heatmap-select-mode"
+const HEATMAP_ZOOM_SQUARE_MODEBAR_ATTR = "heatmap-zoom-square-mode"
+const HEATMAP_ZOOM_FREE_MODEBAR_ATTR = "heatmap-zoom-free-mode"
+const HEATMAP_RESET_MODEBAR_ATTR = "heatmap-reset-view"
+const HEATMAP_ZOOM_MODEBAR_ICON = Plotly?.Icons?.zoombox ?? {
+    width: 512,
+    height: 512,
+    ascent: 512,
+    descent: 0,
+    path: "M96 96H416V416H96V96Z"
+}
 var pcaComponentColors = DEFAULT_PCA_COMPONENT_COLOR_STRINGS
     .map(( color ) => parseColorValue( color ))
     .filter(( color ) => color !== null )
@@ -232,6 +253,26 @@ function buildSpectrumGridAvailabilityMap( axisKeys, available ){
 
 function defaultSpectrumGridlineColor(){
     return "rgba(148, 163, 184, 0.22)"
+}
+
+function defaultSpectrumLegendLayout(){
+
+    return {
+        orientation: "h",
+        x: 0.02,
+        xanchor: "left",
+        y: 0.98,
+        yanchor: "top",
+        bgcolor: "rgba(255, 255, 255, 0.82)",
+        bordercolor: "rgba(148, 163, 184, 0.35)",
+        borderwidth: 1,
+        font: {
+            size: 11,
+            color: "#111827"
+        },
+        itemclick: false,
+        itemdoubleclick: false
+    }
 }
 
 function normalizeSpectrumGridlineVisibilityState( axisKeys, value, fallback = false ){
@@ -401,12 +442,166 @@ function buildSpectrumGridModebarButton( graphContainer ){
     }
 }
 
-function normalizeModebarButtonSpacing( graphContainer ){
-    const customButton = graphContainer?.querySelector?.('.modebar-btn[data-attr="toggle-gridlines"]')
-    const customGroup = customButton?.closest?.('.modebar-group')
+function normalizeSpectrumLegendVisibility( value, fallback = true ){
+    if( value === null || value === undefined ){
+        return fallback === true
+    }
 
-    if( customGroup && customGroup.parentElement?.lastElementChild === customGroup ){
-        customGroup.style.marginLeft = "0px"
+    return value === true || value === "true"
+}
+
+function hasSpectrumLegendItems( traces ){
+
+    if( Array.isArray( traces ) === false ){
+        return false
+    }
+
+    return traces.some(( trace ) => trace?.showlegend === true )
+}
+
+function areSpectrumLegendsVisible( graphContainer ){
+    return normalizeSpectrumLegendVisibility( graphContainer?.__harkanaSpectrumLegendVisible, true )
+}
+
+function syncSpectrumLegendModebarState( graphContainer ){
+
+    if( !graphContainer ){
+        return
+    }
+
+    const legendButton = graphContainer.querySelector?.(`.modebar-btn[data-attr="${SPECTRUM_LEGEND_MODEBAR_ATTR}"]`)
+    if( legendButton ){
+        legendButton.classList.toggle(
+            "active",
+            areSpectrumLegendsVisible( graphContainer ) === true && graphContainer?.__harkanaSpectrumLegendAvailable === true
+        )
+    }
+}
+
+function buildSpectrumLegendModebarButton( graphContainer ){
+    return {
+        name: "Toggle legends",
+        title: "Toggle legends",
+        attr: SPECTRUM_LEGEND_MODEBAR_ATTR,
+        icon: SPECTRUM_LEGEND_MODEBAR_ICON,
+        click: ( gd ) => {
+            const nextVisible = !areSpectrumLegendsVisible( gd )
+            gd.__harkanaSpectrumLegendVisible = nextVisible
+            gd.__harkanaSpectrumLegendAvailable = true
+
+            if( typeof gd?.dispatchEvent === "function" ){
+                gd.dispatchEvent( new CustomEvent( "harkana:spectrum-chip-legend-change", {
+                    detail: {
+                        visible: nextVisible
+                    }
+                }) )
+            }
+
+            syncSpectrumLegendModebarState( gd )
+            normalizeModebarButtonSpacing( gd )
+        }
+    }
+}
+
+function normalizeModebarButtonSpacing( graphContainer ){
+    const modebarGroups = Array.from( graphContainer?.querySelectorAll?.(".modebar-group") ?? [] )
+
+    for( const group of modebarGroups ){
+        group.style.marginLeft = "0px"
+        group.style.paddingLeft = "0px"
+    }
+}
+
+function resolveHeatmapModebarInteractionMode( graphContainer ){
+    return graphContainer?.__harkanaHeatmapInteractionMode === "zoom" ? "zoom" : "select"
+}
+
+function resolveHeatmapModebarZoomAspectRatio( graphContainer ){
+    return normalizeHeatmapZoomAspectRatio( graphContainer?.__harkanaHeatmapZoomAspectRatio )
+}
+
+function syncHeatmapModebarState( graphContainer, mode = "select", zoomAspectRatio = "square" ){
+
+    if( !graphContainer ) return
+
+    const normalizedMode = normalizeHeatmapInteractionMode( mode )
+    const normalizedAspectRatio = normalizeHeatmapZoomAspectRatio( zoomAspectRatio )
+    graphContainer.__harkanaHeatmapInteractionMode = normalizedMode
+    graphContainer.__harkanaHeatmapZoomAspectRatio = normalizedAspectRatio
+
+    const selectButton = graphContainer?.querySelector?.(`.modebar-btn[data-attr="${HEATMAP_SELECT_MODEBAR_ATTR}"]`)
+    const zoomSquareButton = graphContainer?.querySelector?.(`.modebar-btn[data-attr="${HEATMAP_ZOOM_SQUARE_MODEBAR_ATTR}"]`)
+    const zoomFreeButton = graphContainer?.querySelector?.(`.modebar-btn[data-attr="${HEATMAP_ZOOM_FREE_MODEBAR_ATTR}"]`)
+
+    selectButton?.classList?.toggle( "active", normalizedMode === "select" )
+    zoomSquareButton?.classList?.toggle( "active", normalizedMode === "zoom" && normalizedAspectRatio === "square" )
+    zoomFreeButton?.classList?.toggle( "active", normalizedMode === "zoom" && normalizedAspectRatio === "free" )
+}
+
+function dispatchHeatmapModebarEvent( graphContainer, eventName, detail = {} ){
+
+    if( typeof graphContainer?.dispatchEvent !== "function" ){
+        return
+    }
+
+    graphContainer.dispatchEvent( new CustomEvent( eventName, { detail } ) )
+}
+
+function buildHeatmapSelectModebarButton( graphContainer ){
+
+    return {
+        name: "Select spectra",
+        title: "Select spectra",
+        attr: HEATMAP_SELECT_MODEBAR_ATTR,
+        icon: Plotly.Icons.selectbox,
+        click: ( gd ) => {
+            const nextMode = "select"
+            gd.__harkanaHeatmapInteractionMode = nextMode
+            syncHeatmapModebarState( gd, nextMode, resolveHeatmapModebarZoomAspectRatio( gd ))
+            dispatchHeatmapModebarEvent( gd, HEATMAP_INTERACTION_CHANGE_EVENT, {
+                mode: nextMode
+            })
+        }
+    }
+}
+
+function buildHeatmapZoomModebarButton( graphContainer, aspectRatio = "square" ){
+
+    const normalizedAspectRatio = normalizeHeatmapZoomAspectRatio( aspectRatio )
+    const isFree = normalizedAspectRatio === "free"
+    const label = isFree ? "Zoom (free aspect ratio)" : "Zoom (square aspect ratio)"
+
+    return {
+        name: label,
+        title: label,
+        attr: isFree ? HEATMAP_ZOOM_FREE_MODEBAR_ATTR : HEATMAP_ZOOM_SQUARE_MODEBAR_ATTR,
+        icon: HEATMAP_ZOOM_MODEBAR_ICON,
+        click: ( gd ) => {
+            gd.__harkanaHeatmapInteractionMode = "zoom"
+            gd.__harkanaHeatmapZoomAspectRatio = normalizedAspectRatio
+            syncHeatmapModebarState( gd, "zoom", normalizedAspectRatio )
+            dispatchHeatmapModebarEvent( gd, HEATMAP_INTERACTION_CHANGE_EVENT, {
+                mode: "zoom",
+                zoomAspectRatio: normalizedAspectRatio
+            })
+        }
+    }
+}
+
+function buildHeatmapResetModebarButton( graphContainer ){
+    return {
+        name: "Reset zoom",
+        title: "Reset zoom",
+        attr: HEATMAP_RESET_MODEBAR_ATTR,
+        icon: Plotly.Icons.home,
+        click: ( gd ) => {
+            syncHeatmapModebarState(
+                gd,
+                resolveHeatmapModebarInteractionMode( gd ),
+                resolveHeatmapModebarZoomAspectRatio( gd )
+            )
+            dispatchHeatmapModebarEvent( gd, HEATMAP_RESET_VIEW_EVENT )
+        }
     }
 }
 
@@ -618,6 +813,96 @@ var resizeGraph = async function( graphContainer ){
     if( typeof Plotly?.Plots?.resize !== "function" ) return
 
     await Plotly.Plots.resize( graphContainer )
+}
+
+function normalizeSpectrumHighlightGroup( highlightedGroup = "" ){
+    return typeof highlightedGroup === "string" ? highlightedGroup.trim() : ""
+}
+
+function normalizeHiddenSpectrumTraceGroups( hiddenGroups = [] ){
+
+    if( Array.isArray( hiddenGroups ) === false ){
+        return []
+    }
+
+    return Array.from( new Set(
+        hiddenGroups
+            .map(( group ) => typeof group === "string" ? group.trim() : "" )
+            .filter(( group ) => group.length > 0 )
+    ))
+}
+
+async function applySpectrumTracePresentationInternal( graphContainer, highlightedGroup = "" ){
+
+    if( !graphContainer ) return
+
+    const traces = Array.isArray( graphContainer.data ) ? graphContainer.data : []
+    if( traces.length === 0 ) return
+
+    const normalizedGroup = normalizeSpectrumHighlightGroup( highlightedGroup )
+    graphContainer.__harkanaSpectrumHighlightGroup = normalizedGroup
+    const hiddenGroups = normalizeHiddenSpectrumTraceGroups( graphContainer?.__harkanaHiddenSpectrumTraceGroups )
+    const hiddenSet = new Set( hiddenGroups )
+    graphContainer.__harkanaHiddenSpectrumTraceGroups = hiddenGroups
+    const hasMatchingGroup = normalizedGroup.length > 0 && traces.some(( trace ) => {
+        const traceGroup = typeof trace?.legendgroup === "string" ? trace.legendgroup.trim() : ""
+        return traceGroup === normalizedGroup && hiddenSet.has( traceGroup ) === false
+    })
+
+    const traceIndices = traces.map(( _, index ) => index )
+    const visibility = traces.map(( trace ) => {
+        const traceGroup = typeof trace?.legendgroup === "string" ? trace.legendgroup.trim() : ""
+        if( traceGroup.length === 0 ){
+            return true
+        }
+
+        return hiddenSet.has( traceGroup ) === false
+    })
+    const opacities = traces.map(( trace ) => {
+        if( normalizedGroup.length === 0 || hasMatchingGroup === false ){
+            return 1
+        }
+
+        const traceGroup = typeof trace?.legendgroup === "string" ? trace.legendgroup.trim() : ""
+        if( traceGroup.length === 0 ){
+            return 1
+        }
+
+        if( hiddenSet.has( traceGroup ) ){
+            return 0
+        }
+
+        return traceGroup === normalizedGroup ? 1 : 0.18
+    })
+
+    await Plotly.restyle( graphContainer, {
+        visible: visibility,
+        opacity: opacities
+    }, traceIndices )
+}
+
+var setSpectrumHighlightGroup = async function( graphContainer, highlightedGroup = "" ){
+
+    try{
+        await applySpectrumTracePresentationInternal( graphContainer, highlightedGroup )
+    } catch( error ){
+        console.log( error )
+    }
+}
+
+var setSpectrumHiddenGroups = async function( graphContainer, hiddenGroups = [] ){
+
+    try{
+        if( graphContainer ){
+            graphContainer.__harkanaHiddenSpectrumTraceGroups = normalizeHiddenSpectrumTraceGroups( hiddenGroups )
+        }
+        await applySpectrumTracePresentationInternal(
+            graphContainer,
+            graphContainer?.__harkanaSpectrumHighlightGroup
+        )
+    } catch( error ){
+        console.log( error )
+    }
 }
 
 var configureHeatmapInteraction = async function( graphContainer, options = {} ){
@@ -1475,6 +1760,10 @@ function normalizeHeatmapInteractionMode( mode ){
     return mode === "select" ? "select" : "zoom"
 }
 
+function normalizeHeatmapZoomAspectRatio( value ){
+    return value === "free" ? "free" : "square"
+}
+
 function attachHeatmapPointerSelection( graphContainer, width, height, options ){
 
     if( typeof graphContainer.addEventListener !== "function" ) return
@@ -1949,11 +2238,17 @@ async function renderFigure( graphContainer, figure, preferReact ){
         figure?.spectrumGridAvailability
     )
     graphContainer.__harkanaSpectrumGridAxisKeys = spectrumGridAxisKeys
+    graphContainer.__harkanaSpectrumLegendVisible = normalizeSpectrumLegendVisibility(
+        graphContainer?.__harkanaSpectrumLegendVisible,
+        true
+    )
+    graphContainer.__harkanaSpectrumLegendAvailable = figure?.externalLegendToggle === true
 
-    if( figure?.heatmapPanelOnly === true ){
-        config.displayModeBar = false
-    } else if( spectrumGridAxisKeys.length > 0 ){
+    if( figure?.heatmapPanelOnly !== true && spectrumGridAxisKeys.length > 0 ){
         config.modeBarButtonsToAdd = [ buildSpectrumGridModebarButton( graphContainer ) ]
+        if( figure?.externalLegendToggle === true ){
+            config.modeBarButtonsToAdd.push( buildSpectrumLegendModebarButton( graphContainer ) )
+        }
     }
 
     const hasExistingFigure = Array.isArray( graphContainer.data ) && graphContainer.data.length > 0
@@ -1963,13 +2258,31 @@ async function renderFigure( graphContainer, figure, preferReact ){
         : FULL_HEATMAP_AXIS_CONFIG
 
     if( figure?.heatmapPanelOnly === true ){
+        config.displayModeBar = true
+        config.modeBarButtons = [[
+            buildHeatmapSelectModebarButton( graphContainer ),
+            buildHeatmapZoomModebarButton( graphContainer, "square" ),
+            buildHeatmapZoomModebarButton( graphContainer, "free" ),
+            buildHeatmapResetModebarButton( graphContainer )
+        ]]
+
         if( preferReact || hasExistingFigure ){
             await Plotly.react( graphContainer, figure.traces, figure.layout, config )
+            syncHeatmapModebarState(
+                graphContainer,
+                resolveHeatmapModebarInteractionMode( graphContainer ),
+                resolveHeatmapModebarZoomAspectRatio( graphContainer )
+            )
             normalizeModebarButtonSpacing( graphContainer )
             return
         }
 
         await Plotly.newPlot( graphContainer, figure.traces, figure.layout, config )
+        syncHeatmapModebarState(
+            graphContainer,
+            resolveHeatmapModebarInteractionMode( graphContainer ),
+            resolveHeatmapModebarZoomAspectRatio( graphContainer )
+        )
         normalizeModebarButtonSpacing( graphContainer )
         return
     }
@@ -1977,17 +2290,33 @@ async function renderFigure( graphContainer, figure, preferReact ){
     if( figure?.externalHeatmap === true && hasExistingFigure ){
         const incrementallyUpdated = await updateExternalHeatmapFigure( graphContainer, figure )
         if( incrementallyUpdated ){
+            await applySpectrumTracePresentationInternal(
+                graphContainer,
+                graphContainer?.__harkanaSpectrumHighlightGroup
+            )
+            syncSpectrumLegendModebarState( graphContainer )
+            normalizeModebarButtonSpacing( graphContainer )
             return
         }
     }
 
     if( preferReact || hasExistingFigure ){
         await Plotly.react( graphContainer, figure.traces, figure.layout, config )
+        await applySpectrumTracePresentationInternal(
+            graphContainer,
+            graphContainer?.__harkanaSpectrumHighlightGroup
+        )
+        syncSpectrumLegendModebarState( graphContainer )
         normalizeModebarButtonSpacing( graphContainer )
         return
     }
 
     await Plotly.newPlot( graphContainer, figure.traces, figure.layout, config )
+    await applySpectrumTracePresentationInternal(
+        graphContainer,
+        graphContainer?.__harkanaSpectrumHighlightGroup
+    )
+    syncSpectrumLegendModebarState( graphContainer )
     normalizeModebarButtonSpacing( graphContainer )
 }
 
@@ -2042,6 +2371,10 @@ async function restyleScatterTraces( graphContainer, traces, traceIndices ){
             fillcolor: traces.map(( trace ) => typeof trace?.fillcolor === "string" ? trace.fillcolor : "rgba(0, 0, 0, 0)" ),
             hovertemplate: traces.map(( trace ) => typeof trace?.hovertemplate === "string" ? trace.hovertemplate : "(%{x}, %{y})<extra></extra>" ),
             hoverinfo: traces.map(( trace ) => typeof trace?.hoverinfo === "string" ? trace.hoverinfo : "all" ),
+            name: traces.map(( trace ) => typeof trace?.name === "string" ? trace.name : "" ),
+            legendgroup: traces.map(( trace ) => typeof trace?.legendgroup === "string" ? trace.legendgroup : "" ),
+            visible: traces.map(( trace ) => trace?.visible !== false ),
+            opacity: traces.map(( trace ) => Number.isFinite( Number( trace?.opacity )) ? Number( trace.opacity ) : 1 ),
             showlegend: traces.map(( trace ) => trace?.showlegend === true )
         },
         traceIndices
@@ -2062,6 +2395,7 @@ function externalHeatmapLayoutUpdate( layout ){
     return {
         annotations: Array.isArray( layout?.annotations ) ? layout.annotations : [],
         shapes: Array.isArray( layout?.shapes ) ? layout.shapes : [],
+        showlegend: layout?.showlegend === true,
         "margin.t": Number( layout?.margin?.t ) || 0,
         "margin.r": Number( layout?.margin?.r ) || 0,
         "margin.b": Number( layout?.margin?.b ) || 0,
@@ -2101,7 +2435,7 @@ function externalHeatmapLayoutUpdate( layout ){
     }
 }
 
-function buildMeanTrace( x, y, xaxis, yaxis, color ){
+function buildMeanTrace( x, y, xaxis, yaxis, color, label = "", showLegend = false, legendGroup = "" ){
 
     var trace = {}
     trace.type = "scatter"
@@ -2111,7 +2445,16 @@ function buildMeanTrace( x, y, xaxis, yaxis, color ){
     trace.xaxis = xaxis
     trace.yaxis = yaxis
     trace.line = { color, width: 2 }
-    trace.hovertemplate = "(%{x}, %{y})<extra></extra>"
+    trace.showlegend = showLegend === true
+    if( typeof legendGroup === "string" && legendGroup.length > 0 ){
+        trace.legendgroup = legendGroup
+    }
+    trace.hovertemplate = typeof label === "string" && label.length > 0
+        ? label + ": (%{x}, %{y})<extra></extra>"
+        : "(%{x}, %{y})<extra></extra>"
+    if( typeof label === "string" && label.length > 0 ){
+        trace.name = label
+    }
 
     return trace
 }
@@ -2131,6 +2474,7 @@ function resolveQueriedSpectrumStyle( settings ){
         lineColor,
         intervalColor,
         intervalFillColor: colorWithAlpha( intervalColor, intervalOpacity ),
+        intervalOpacity,
         showInterval,
         lineWidth: 2
     }
@@ -2151,6 +2495,7 @@ function resolveRoiSpectrumStyle( settings ){
         lineColor,
         intervalColor,
         intervalFillColor: colorWithAlpha( intervalColor, intervalOpacity ),
+        intervalOpacity,
         showInterval,
         lineWidth: 2
     }
@@ -2175,7 +2520,7 @@ function colorWithAlpha( color, alpha ){
     return "rgba(" + rgb[0] + ", " + rgb[1] + ", " + rgb[2] + ", " + alpha + ")"
 }
 
-function buildUncertaintyLowerTrace( x, y, xaxis, yaxis, color ){
+function buildUncertaintyLowerTrace( x, y, xaxis, yaxis, color, legendGroup = "" ){
 
     var trace = {}
     trace.type = "scatter"
@@ -2186,12 +2531,15 @@ function buildUncertaintyLowerTrace( x, y, xaxis, yaxis, color ){
     trace.yaxis = yaxis
     trace.line = { color, width: 0 }
     trace.showlegend = false
+    if( typeof legendGroup === "string" && legendGroup.length > 0 ){
+        trace.legendgroup = legendGroup
+    }
     trace.hovertemplate = "(%{x}, %{y})<extra></extra>"
 
     return trace
 }
 
-function buildUncertaintyUpperTrace( x, y, xaxis, yaxis, color, fillcolor ){
+function buildUncertaintyUpperTrace( x, y, xaxis, yaxis, color, fillcolor, legendGroup = "" ){
 
     var trace = {}
     trace.type = "scatter"
@@ -2204,6 +2552,9 @@ function buildUncertaintyUpperTrace( x, y, xaxis, yaxis, color, fillcolor ){
     trace.fillcolor = fillcolor
     trace.line = { color, width: 0 }
     trace.showlegend = false
+    if( typeof legendGroup === "string" && legendGroup.length > 0 ){
+        trace.legendgroup = legendGroup
+    }
     trace.hovertemplate = "(%{x}, %{y})<extra></extra>"
 
     return trace
@@ -2229,6 +2580,12 @@ function buildPlaceholderTrace( x, xaxis, yaxis ){
 function buildSpectrumTraceGroup( style, spectrumPayload, spectralAxisValues = [], xaxis = "x2", yaxis = "y2" ){
 
     const normalizedSpectrum = normalizeSpectrumSeries( spectrumPayload )
+    const traceLabel = typeof style?.traceLabel === "string" && style.traceLabel.length > 0
+        ? style.traceLabel
+        : ( typeof spectrumPayload?.name === "string" ? spectrumPayload.name : "" )
+    const traceGroupKey = typeof style?.traceKey === "string" && style.traceKey.length > 0
+        ? style.traceKey
+        : ( typeof spectrumPayload?.traceGroupKey === "string" ? spectrumPayload.traceGroupKey : traceLabel )
 
     if( normalizedSpectrum !== null ){
         const xValues = resolveSeriesXValues( spectralAxisValues,
@@ -2245,7 +2602,8 @@ function buildSpectrumTraceGroup( style, spectrumPayload, spectralAxisValues = [
                                           normalizedSpectrum.lowerBound,
                                           xaxis,
                                           yaxis,
-                                          style.intervalColor )
+                                          style.intervalColor,
+                                          traceGroupKey )
             : buildPlaceholderTrace( xValues, xaxis, yaxis )
         const upperTrace = hasBounds
             ? buildUncertaintyUpperTrace( xValues,
@@ -2253,13 +2611,17 @@ function buildSpectrumTraceGroup( style, spectrumPayload, spectralAxisValues = [
                                           xaxis,
                                           yaxis,
                                           style.intervalColor,
-                                          style.intervalFillColor )
+                                          style.intervalFillColor,
+                                          traceGroupKey )
             : buildPlaceholderTrace( xValues, xaxis, yaxis )
         const meanTrace = buildMeanTrace( xValues,
                                           normalizedSpectrum.y,
                                           xaxis,
                                           yaxis,
-                                          style.lineColor )
+                                          style.lineColor,
+                                          traceLabel,
+                                          style?.showLegend === true,
+                                          traceGroupKey )
         meanTrace.line.width = Number.isFinite( Number( style?.lineWidth ))
             ? Number( style.lineWidth )
             : 2
@@ -2287,8 +2649,76 @@ function buildSpectrumTraceGroup( style, spectrumPayload, spectralAxisValues = [
     }
 }
 
+function normalizeSpectrumPayloadList( payload ){
+
+    if( Array.isArray( payload ) ){
+        return payload.filter(( entry ) => entry !== null && entry !== undefined )
+    }
+
+    if( payload === null || payload === undefined ){
+        return []
+    }
+
+    return [ payload ]
+}
+
+function buildRoiSpectrumTraceGroups( settings, roiPayloads, spectralAxisValues = [], xaxis = "x2", yaxis = "y2" ){
+
+    const baseStyle = resolveRoiSpectrumStyle( settings )
+    const payloads = normalizeSpectrumPayloadList( roiPayloads )
+    const fallbackAxisLength = Array.isArray( spectralAxisValues ) && spectralAxisValues.length > 0 ? spectralAxisValues.length : 1
+    var traces = []
+    var axisValues = resolveSeriesXValues( spectralAxisValues, fallbackAxisLength )
+    var usingSpectrum = false
+
+    for( const payload of payloads ){
+        const resolvedLineColor = resolveColorString( payload?.lineColor, baseStyle.lineColor )
+        const intervalFallback = typeof payload?.lineColor === "string" && payload.lineColor.length > 0
+            ? payload.lineColor
+            : resolvedLineColor
+        const resolvedIntervalColor = resolveColorString( payload?.intervalColor, intervalFallback )
+        const group = buildSpectrumTraceGroup(
+            {
+                ...baseStyle,
+                lineColor: resolvedLineColor,
+                intervalColor: resolvedIntervalColor,
+                intervalFillColor: colorWithAlpha( resolvedIntervalColor, baseStyle.intervalOpacity ),
+                traceLabel: typeof payload?.name === "string" ? payload.name : "",
+                traceKey: typeof payload?.traceGroupKey === "string" ? payload.traceGroupKey : "",
+                showLegend: true
+            },
+            payload,
+            spectralAxisValues,
+            xaxis,
+            yaxis
+        )
+
+        traces.push( ...group.traces )
+
+        if( group.usingSpectrum ){
+            axisValues = group.axisValues
+            usingSpectrum = true
+        }
+    }
+
+    return {
+        traces,
+        axisValues,
+        usingSpectrum
+    }
+}
+
 function buildLowerSpectrumTraces( settings, selectedSpectrum, spectralAxisValues = [], xaxis = "x2", yaxis = "y2" ){
-    const group = buildSpectrumTraceGroup( resolveQueriedSpectrumStyle( settings ), selectedSpectrum, spectralAxisValues, xaxis, yaxis )
+    const group = buildSpectrumTraceGroup(
+        {
+            ...resolveQueriedSpectrumStyle( settings ),
+            showLegend: true
+        },
+        selectedSpectrum,
+        spectralAxisValues,
+        xaxis,
+        yaxis
+    )
     return {
         ...group,
         message: group.usingSpectrum ? "" : LOWER_LEFT_INSTRUCTION_TEXT
@@ -2297,20 +2727,23 @@ function buildLowerSpectrumTraces( settings, selectedSpectrum, spectralAxisValue
 
 function buildBottomLeftTraces( settings, bottomLeftSpectrum, selectedSpectrum, spectralAxisValues = [], xaxis = "x2", yaxis = "y2" ){
 
-    const roiPayload = bottomLeftSpectrum?.roi ?? null
+    const roiPayloads = normalizeSpectrumPayloadList( bottomLeftSpectrum?.rois ?? bottomLeftSpectrum?.roi ?? null )
     const currentPayload = bottomLeftSpectrum?.current ?? null
-    const hasCompositePayload = roiPayload !== null || currentPayload !== null
+    const hasCompositePayload = roiPayloads.length > 0 || currentPayload !== null
 
     if( hasCompositePayload ){
-        const roiGroup = buildSpectrumTraceGroup(
-            resolveRoiSpectrumStyle( settings ),
-            roiPayload,
+        const roiGroup = buildRoiSpectrumTraceGroups(
+            settings,
+            roiPayloads,
             spectralAxisValues,
             xaxis,
             yaxis
         )
         const currentGroup = buildSpectrumTraceGroup(
-            resolveQueriedSpectrumStyle( settings ),
+            {
+                ...resolveQueriedSpectrumStyle( settings ),
+                showLegend: true
+            },
             currentPayload,
             spectralAxisValues,
             xaxis,
@@ -2346,20 +2779,23 @@ function buildBottomLeftTraces( settings, bottomLeftSpectrum, selectedSpectrum, 
 
 function buildTopLeftTraces( settings, topLeftSpectrum, spectralAxisValues = [], fallbackTraces = [], fallbackLabel = "" ){
 
-    const roiPayload = topLeftSpectrum?.roi ?? null
+    const roiPayloads = normalizeSpectrumPayloadList( topLeftSpectrum?.rois ?? topLeftSpectrum?.roi ?? null )
     const currentPayload = topLeftSpectrum?.current ?? null
-    const hasCompositePayload = roiPayload !== null || currentPayload !== null
+    const hasCompositePayload = roiPayloads.length > 0 || currentPayload !== null
 
     if( hasCompositePayload ){
-        const roiGroup = buildSpectrumTraceGroup(
-            resolveRoiSpectrumStyle( settings ),
-            roiPayload,
+        const roiGroup = buildRoiSpectrumTraceGroups(
+            settings,
+            roiPayloads,
             spectralAxisValues,
             "x",
             "y"
         )
         const currentGroup = buildSpectrumTraceGroup(
-            resolveQueriedSpectrumStyle( settings ),
+            {
+                ...resolveQueriedSpectrumStyle( settings ),
+                showLegend: true
+            },
             currentPayload,
             spectralAxisValues,
             "x",
@@ -2631,6 +3067,9 @@ function buildLoadingTraces( loadingsPayload, options = {}, xaxis = "x", yaxis =
         const traceLabel = typeof selected === "object" && typeof selected.label === "string" && selected.label.length > 0
             ? selected.label
             : "PC" + String( componentIndex ).padStart( 2, "0" )
+        const traceGroupKey = typeof selected === "object" && typeof selected.legendKey === "string" && selected.legendKey.length > 0
+            ? selected.legendKey
+            : `loading-${componentIndex}`
 
         var trace = {}
         trace.type = "scatter"
@@ -2640,6 +3079,9 @@ function buildLoadingTraces( loadingsPayload, options = {}, xaxis = "x", yaxis =
         trace.xaxis = xaxis
         trace.yaxis = yaxis
         trace.line = { color, width: 2 }
+        trace.name = traceLabel
+        trace.showlegend = true
+        trace.legendgroup = traceGroupKey
         trace.hovertemplate = traceLabel + ": (%{x}, %{y})<extra></extra>"
 
         traces.push( trace )
@@ -2706,7 +3148,8 @@ function normalizeLoadingSeries( loadingSeries ){
         normalized.push({
             componentIndex,
             label: typeof seriesEntry?.label === "string" ? seriesEntry.label : "",
-            color: typeof seriesEntry?.color === "string" ? seriesEntry.color : ""
+            color: typeof seriesEntry?.color === "string" ? seriesEntry.color : "",
+            legendKey: typeof seriesEntry?.legendKey === "string" ? seriesEntry.legendKey : ""
         })
     }
 
@@ -2844,6 +3287,7 @@ function buildStandaloneUpperPanelLayout( graphContainer, settings, topLeftPlot 
     layout.paper_bgcolor = "white"
     layout.plot_bgcolor = "white"
     layout.showlegend = false
+    layout.legend = defaultSpectrumLegendLayout()
     layout.margin = {
         t: 20,
         r: 32,
@@ -2898,10 +3342,11 @@ function buildStandaloneLowerPanelLayout( graphContainer, settings, lowerPlot, a
     layout.paper_bgcolor = "white"
     layout.plot_bgcolor = "white"
     layout.showlegend = false
+    layout.legend = defaultSpectrumLegendLayout()
     layout.margin = {
         t: 20,
         r: 32,
-        b: 52,
+        b: 40 + labelFontSize,
         l: 56
     }
     layout.xaxis = {
@@ -2916,7 +3361,8 @@ function buildStandaloneLowerPanelLayout( graphContainer, settings, lowerPlot, a
         showticklabels: showSpectrum,
         title: {
             text: showSpectrum ? spectralTitle : "",
-            font: { size: labelFontSize }
+            font: { size: labelFontSize },
+            standoff: 2
         }
     }
     layout.yaxis = {
@@ -3039,6 +3485,7 @@ function buildUpperPanelFigure( graphContainer, settings, options = {} ){
     return {
         traces: topLeftPlot.traces,
         layout: buildStandaloneUpperPanelLayout( graphContainer, settings, topLeftPlot ),
+        externalLegendToggle: true,
         spectrumGridAxisKeys: STANDALONE_SPECTRUM_GRID_AXIS_KEYS,
         spectrumGridAvailability: buildSpectrumGridAvailabilityMap(
             STANDALONE_SPECTRUM_GRID_AXIS_KEYS,
@@ -3504,6 +3951,7 @@ function buildBaseLayout( width, height, graphContainer, settings, upperLeftLabe
     layout.paper_bgcolor = "white"
     layout.plot_bgcolor = "white"
     layout.showlegend = false
+    layout.legend = defaultSpectrumLegendLayout()
 
     layout.margin = {}
     layout.margin.t = 20
@@ -5579,5 +6027,8 @@ export default {
     prewarmPcaRgbHeatmapRendererPayloadAsync,
     prewarmZBlendHeatmapRendererPayload,
     updateZBlendHeatmapPayload,
-    setSpectrumGridlinesVisible
+    setSpectrumGridlinesVisible,
+    setSpectrumHighlightGroup,
+    setSpectrumHiddenGroups,
+    syncHeatmapModebarState
 }

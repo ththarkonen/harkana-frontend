@@ -11,6 +11,13 @@
 			<Sidebar :style = "sidebarStyle">
 				<Logo></Logo>
 
+				<div v-if = "sidebarInferenceStatusText.length > 0"
+					 class = "mt-2 flex items-center gap-2 rounded-lg border border-brand/60 bg-gray-800 px-3 py-2 text-sm text-white"
+					 aria-live = "polite">
+					<Spinner class = "h-4 w-4 shrink-0 text-brand"></Spinner>
+					<span>{{ sidebarInferenceStatusText }}</span>
+				</div>
+
 				<div class = "mt-2 p-2 shadow-md shadow-black border-2 border-gray bg-gray-800 rounded-lg"
 					 data-tutorial = "display-section">
 					<div class = "flex items-center justify-between gap-1 mb-2">
@@ -44,48 +51,6 @@
 								<i class = "fas fa-ellipsis-v" aria-hidden = "true" title = "Display options"></i>
 							</template>
 
-							<li class = "px-4 pt-2 pb-1 text-xs uppercase tracking-wide text-white/70">
-								Heatmap interaction
-							</li>
-							<li>
-								<button @click = "setHeatmapInteractionMode('select')"
-										class = "flex w-full items-center justify-between gap-3 px-4 py-2 text-left text-sm text-white transition hover:bg-brand hover:text-white">
-									<span>Select spectra</span>
-									<i :class = "heatmapInteractionMode === 'select' ? 'fas fa-check text-brand' : 'fas fa-check opacity-0'"
-									   aria-hidden = "true"></i>
-								</button>
-							</li>
-							<li>
-								<button @click = "setHeatmapInteractionMode('zoom')"
-										class = "flex w-full items-center justify-between gap-3 px-4 py-2 text-left text-sm text-white transition hover:bg-brand hover:text-white">
-									<span>Zoom</span>
-									<i :class = "heatmapInteractionMode === 'zoom' ? 'fas fa-check text-brand' : 'fas fa-check opacity-0'"
-									   aria-hidden = "true"></i>
-								</button>
-							</li>
-
-							<li><hr class = "h-0.5 bg-gray border-0"></li>
-							<li class = "px-4 pt-2 pb-1 text-xs uppercase tracking-wide text-white/70">
-								Zoom aspect ratio
-							</li>
-							<li>
-								<button @click = "setHeatmapZoomAspectRatio('square')"
-										class = "flex w-full items-center justify-between gap-3 px-4 py-2 text-left text-sm text-white transition hover:bg-brand hover:text-white">
-									<span>Lock square</span>
-									<i :class = "heatmapZoomAspectRatio === 'square' ? 'fas fa-check text-brand' : 'fas fa-check opacity-0'"
-									   aria-hidden = "true"></i>
-								</button>
-							</li>
-							<li>
-								<button @click = "setHeatmapZoomAspectRatio('free')"
-										class = "flex w-full items-center justify-between gap-3 px-4 py-2 text-left text-sm text-white transition hover:bg-brand hover:text-white">
-									<span>Free</span>
-									<i :class = "heatmapZoomAspectRatio === 'free' ? 'fas fa-check text-brand' : 'fas fa-check opacity-0'"
-									   aria-hidden = "true"></i>
-								</button>
-							</li>
-
-								<li><hr class = "h-0.5 bg-gray border-0"></li>
 								<li class = "px-4 pt-2 pb-1 text-xs uppercase tracking-wide text-white/70">
 									Selected region/pixel spectra
 								</li>
@@ -108,7 +73,7 @@
 
 								<li><hr class = "h-0.5 bg-gray border-0"></li>
 								<li class = "px-4 pt-2 pb-1 text-xs uppercase tracking-wide text-white/70">
-									Selection confidence level (%)
+									Selection uncertainty level
 								</li>
 								<li>
 									<button @click = "setSelectedConfidenceLevel( CONFIDENCE_NONE_VALUE )"
@@ -602,7 +567,7 @@
 
 							<li><hr class = "h-0.5 bg-gray border-0"></li>
 							<li class = "px-4 pt-2 pb-1 text-xs uppercase tracking-wide text-white/70">
-								Uncertainty level
+								Selection uncertainty level
 							</li>
 							<li>
 								<button @click = "setSelectedConfidenceLevel( CONFIDENCE_NONE_VALUE )"
@@ -670,7 +635,7 @@
 												class = "flex w-full items-center gap-3 px-4 py-2 text-left text-sm text-white transition hover:bg-brand hover:text-white disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent">
 											<i :class = "showAllRoiOverlays ? 'fas fa-eye-slash' : 'fas fa-eye'"
 											   aria-hidden = "true"></i>
-											<span>{{ showAllRoiOverlays ? "Hide all ROI boxes" : "Show all ROI boxes" }}</span>
+											<span>{{ showAllRoiOverlays ? "Hide all ROIs" : "Show all ROIs" }}</span>
 										</button>
 									</li>
 									<li>
@@ -682,37 +647,96 @@
 										</button>
 									</li>
 
+										<li><hr class = "h-0.5 bg-gray border-0"></li>
+										<li class = "px-4 pt-2 pb-1 text-xs uppercase tracking-wide text-white/70">
+											Selection uncertainty level
+										</li>
+										<li>
+											<button @click = "setSelectedConfidenceLevel( CONFIDENCE_NONE_VALUE )"
+													class = "flex w-full items-center justify-between gap-3 px-4 py-2 text-left text-sm text-white transition hover:bg-brand hover:text-white">
+												<span>No uncertainty</span>
+												<i :class = "selectedConfidenceLevelValue === CONFIDENCE_NONE_VALUE ? 'fas fa-check text-brand' : 'fas fa-check opacity-0'"
+												   aria-hidden = "true"></i>
+											</button>
+										</li>
+										<li v-for = "level in confidenceLevelOptions"
+											:key = "'roi-selection-confidence-' + level">
+											<button @click = "setSelectedConfidenceLevel( level )"
+													class = "flex w-full items-center justify-between gap-3 px-4 py-2 text-left text-sm text-white transition hover:bg-brand hover:text-white">
+												<span>{{ level }}%</span>
+												<i :class = "selectedConfidenceLevelValue === level ? 'fas fa-check text-brand' : 'fas fa-check opacity-0'"
+												   aria-hidden = "true"></i>
+											</button>
+										</li>
 										<template v-if = "hasEstimatedRamanSpectraReady">
 										<li><hr class = "h-0.5 bg-gray border-0"></li>
 										<li class = "px-4 pt-2 pb-1 text-xs uppercase tracking-wide text-white/70">
-											Estimate ROI uncertainty
+											Estimate uncertainty level
 										</li>
 										<li>
-											<button @click = "setRoiEstimateUncertaintyMode('show')"
+											<button @click = "setRoiEstimateUncertaintyLevel( CONFIDENCE_NONE_VALUE )"
 													class = "flex w-full items-center justify-between gap-3 px-4 py-2 text-left text-sm text-white transition hover:bg-brand hover:text-white">
-												<span>Show uncertainty</span>
-												<i :class = "roiEstimateUncertaintyMode === 'show' ? 'fas fa-check text-brand' : 'fas fa-check opacity-0'"
+												<span>No uncertainty</span>
+												<i :class = "roiEstimateUncertaintyLevelValue === CONFIDENCE_NONE_VALUE ? 'fas fa-check text-brand' : 'fas fa-check opacity-0'"
 												   aria-hidden = "true"></i>
 											</button>
 										</li>
-										<li>
-											<button @click = "setRoiEstimateUncertaintyMode('hide')"
+										<li v-for = "level in confidenceLevelOptions"
+											:key = "'roi-estimate-confidence-' + level">
+											<button @click = "setRoiEstimateUncertaintyLevel( level )"
 													class = "flex w-full items-center justify-between gap-3 px-4 py-2 text-left text-sm text-white transition hover:bg-brand hover:text-white">
-												<span>Hide uncertainty</span>
-												<i :class = "roiEstimateUncertaintyMode === 'hide' ? 'fas fa-check text-brand' : 'fas fa-check opacity-0'"
+												<span>{{ level }}%</span>
+												<i :class = "roiEstimateUncertaintyLevelValue === level ? 'fas fa-check text-brand' : 'fas fa-check opacity-0'"
 												   aria-hidden = "true"></i>
 											</button>
 										</li>
-									</template>
+										</template>
 								</BaseDropdown>
 							</div>
 						</div>
 
-						<FloatingLabelSelect :model-value = "selectedRoiId"
-											 @update:model-value = "setSelectedRoiId"
-											 :options = "roiSelectOptions"
-											 variant = "soft"
-											 menu-class = "fixed z-[45] min-w-[16rem] w-max max-w-[50vw] origin-top-left rounded-md bg-dark-gray shadow-lg ring-1 ring-black/30"></FloatingLabelSelect>
+						<BaseDropdown root-class = "relative block w-full text-left"
+									  :show-chevron = "false"
+									  :close-on-select = "false"
+									  :teleport-to-body = "true"
+									  portal-placement = "bottom-start"
+									  trigger-class = "group w-full rounded-xl text-white transition focus:outline-none"
+									  menu-class = "fixed z-[45] min-w-[16rem] w-max max-w-[50vw] origin-top-left rounded-md bg-dark-gray shadow-lg ring-1 ring-black/30">
+							<template v-slot:trigger>
+								<div class = "flex items-center gap-2.5 rounded-xl border border-white/10 bg-gray-700/90 px-2.5 py-1.5 transition group-focus:border-white/10 group-focus:bg-gray-700 group-focus:ring-2 group-focus:ring-brand">
+									<div class = "min-w-0 flex-1 text-left">
+										<div class = "truncate text-sm font-semibold text-white">{{ roiDropdownSummaryLabel }}</div>
+									</div>
+
+									<div class = "inline-flex h-8 w-8 items-center justify-center rounded-full text-white/75 transition bg-white/8 group-focus:bg-white/10">
+										<i class = "fas fa-chevron-down text-xs" aria-hidden = "true"></i>
+									</div>
+								</div>
+							</template>
+
+							<li>
+								<button type = "button"
+										@click = "clearSelectedRois"
+										class = "flex w-full items-center gap-3 px-4 py-2 text-left text-sm text-white transition hover:bg-brand hover:text-white">
+									<i class = "fas fa-eye text-white/70" aria-hidden = "true"></i>
+									<span>Clear plotted ROIs</span>
+								</button>
+							</li>
+							<li><hr class = "h-0.5 bg-gray border-0"></li>
+							<li v-for = "option in roiSelectOptions"
+								:key = "option.value">
+								<button type = "button"
+										@click = "toggleSelectedRoiId( option.value )"
+										class = "flex w-full items-center justify-between gap-3 px-4 py-2 text-left text-sm text-white transition hover:bg-brand hover:text-white">
+									<span class = "truncate">{{ option.label }}</span>
+									<span class = "inline-flex h-4 min-w-[1rem] items-center justify-center text-sm font-semibold leading-none text-brand"
+										  :class = "isSelectedRoiId( option.value ) ? 'opacity-100' : 'opacity-0'"
+										  aria-hidden = "true">
+										&#10003;
+									</span>
+								</button>
+							</li>
+						</BaseDropdown>
 
 					<div class = "mt-2 flex flex-wrap items-center gap-1.5">
 						<button v-if = "canMutateRois"
@@ -726,26 +750,26 @@
 
 						<button v-if = "canMutateRois"
 								@click = "openRoiDeleteModal"
-								:disabled = "!selectedRoi"
+								:disabled = "selectedRois.length === 0"
 								class = "h-8 w-8 inline-flex items-center justify-center rounded-md text-white transition-colors hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-brand disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
-								title = "Delete selected ROI"
-								aria-label = "Delete selected ROI">
+								title = "Delete selected ROIs"
+								aria-label = "Delete selected ROIs">
 							<i class = "fas fa-trash" aria-hidden = "true"></i>
 						</button>
 
 						<button @click = "openRoiDescriptionModal"
-								:disabled = "!selectedRoi"
+								:disabled = "selectedRois.length === 0"
 								class = "h-8 w-8 inline-flex items-center justify-center rounded-md text-white transition-colors hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-brand disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
-								title = "Show ROI description"
-								aria-label = "Show ROI description">
+								title = "Show ROI details"
+								aria-label = "Show ROI details">
 							<i class = "fas fa-info-circle" aria-hidden = "true"></i>
 						</button>
 
 						<button @click = "downloadSelectedRoi"
-								:disabled = "!selectedRoi"
+								:disabled = "selectedRois.length === 0"
 								class = "h-8 w-8 inline-flex items-center justify-center rounded-md text-white transition-colors hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-brand disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
-								title = "Download selected ROI"
-								aria-label = "Download selected ROI">
+								title = "Download selected ROIs"
+								aria-label = "Download selected ROIs">
 							<i class = "fas fa-download" aria-hidden = "true"></i>
 						</button>
 
@@ -875,13 +899,49 @@
 		<!-- Main Content -->
 			<main class="relative z-0 bg-dark-gray rounded-lg overflow-hidden shadow-sm p-0">
 				<template v-if = "heatmapRendererMode === 'deckgl'">
-					<div ref = "deckLayoutContainer" class = "flex h-full min-h-0 gap-1 p-2">
+					<div ref = "deckLayoutContainer" class = "flex h-full min-h-0 gap-0 p-2">
 						<div ref = "deckSpectraPaneContainer"
-							 class = "grid h-full min-h-0 min-w-0 flex-1 md:min-w-[20rem]"
+							 class = "relative grid h-full min-h-0 min-w-0 flex-1 md:min-w-[20rem]"
 							 :style = "deckSpectraPaneGridStyle"
 							 data-tutorial = "spectra-panels">
-							<div class = "min-h-0 overflow-hidden rounded-lg bg-white">
-								<div ref = "deckTopPanelGraph" class = "h-full w-full bg-white"></div>
+							<div class = "relative min-h-0 overflow-hidden rounded-lg bg-white">
+								<div class = "flex h-full min-h-0 flex-col">
+									<div v-if = "topSpectrumPaneLegendVisible && topSpectrumPaneLegendEntries.length > 0"
+										 class = "shrink-0 border-b border-gray/20 px-2 py-1.5">
+										<div class = "flex flex-wrap items-center gap-1.5">
+											<span class = "text-[10px] font-semibold uppercase tracking-[0.18em] text-black/45">
+												Legend
+											</span>
+											<button v-for = "entry in topSpectrumPaneLegendEntries"
+												  :key = "entry.key"
+												  type = "button"
+												  :title = "isSpectrumLegendHidden( entry.key ) ? 'Show' : 'Hide'"
+												  @click = "toggleSpectrumLegendTraceVisibility( entry.key )"
+												  @mouseenter = "hoveredSpectrumLegendKey = entry.key"
+												  @mouseleave = "hoveredSpectrumLegendKey = ''"
+												  @focus = "hoveredSpectrumLegendKey = entry.key"
+												  @blur = "hoveredSpectrumLegendKey = ''"
+												  :class = "[
+													  isSpectrumLegendHidden( entry.key ) ? 'border-gray/25 bg-white text-black/35 opacity-55' : '',
+													  hoveredSpectrumLegendKey === entry.key ? 'border-black/25 bg-black/5 text-black shadow-sm' : 'border-gray/30 bg-white text-black/70'
+												  ]"
+												  class = "inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-[11px] transition-colors focus:outline-none">
+												<span class = "h-2.5 w-2.5 rounded-sm"
+													  :style = "{ backgroundColor: entry.color }"></span>
+												<span>{{ entry.label }}</span>
+											</button>
+										</div>
+									</div>
+									<div class = "relative min-h-0 flex-1">
+										<div ref = "deckTopPanelGraph" class = "h-full w-full bg-white"></div>
+										<div v-if = "topSpectrumPaneQuerying"
+											 class = "pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-white/45">
+											<div class = "inline-flex items-center justify-center rounded-full bg-dark-gray/85 p-3 text-brand shadow-sm">
+												<Spinner class = "h-6 w-6"></Spinner>
+											</div>
+										</div>
+									</div>
+								</div>
 							</div>
 							<div class = "relative h-5 shrink-0 cursor-row-resize select-none touch-none"
 								 title = "Resize spectra panes"
@@ -896,8 +956,18 @@
 									</span>
 								</div>
 							</div>
-							<div class = "min-h-0 overflow-hidden rounded-lg bg-white">
-								<div ref = "deckBottomPanelGraph" class = "h-full w-full bg-white"></div>
+							<div class = "relative min-h-0 overflow-hidden rounded-lg bg-white">
+								<div class = "flex h-full min-h-0 flex-col">
+									<div class = "relative min-h-0 flex-1">
+										<div ref = "deckBottomPanelGraph" class = "h-full w-full bg-white"></div>
+										<div v-if = "bottomSpectrumPaneQuerying"
+											 class = "pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-white/45">
+											<div class = "inline-flex items-center justify-center rounded-full bg-dark-gray/85 p-3 text-brand shadow-sm">
+												<Spinner class = "h-6 w-6"></Spinner>
+											</div>
+										</div>
+									</div>
+								</div>
 							</div>
 						</div>
 						<div class = "relative w-5 shrink-0 cursor-col-resize touch-none"
@@ -913,10 +983,13 @@
 								</span>
 							</div>
 						</div>
-							<div class = "relative h-full shrink-0 overflow-hidden rounded-lg bg-white"
+							<div :class = "[
+									 'deck-heatmap-pane relative h-full shrink-0 overflow-visible rounded-lg bg-white',
+									 { 'tutorial-modebar-visible': isHeatmapTutorialStepActive }
+								 ]"
 								 data-tutorial = "heatmap-pane"
 								 :style = "deckHeatmapPaneStyle">
-								<div class = "absolute inset-1">
+								<div class = "absolute inset-x-1 bottom-1 top-10">
 									<div class = "relative h-full w-full">
 										<div ref = "graph" class = "w-full h-full bg-white rounded-lg"></div>
 										<HeatmapRendererPane :renderer-mode = "heatmapRendererMode"
@@ -948,14 +1021,10 @@
 	<ShareModal ref = "shareModal" :project = "project"></ShareModal>
 	<ZenodoModal ref = "zenodoModal" :project = "project"></ZenodoModal>
 	<RoiDescriptionModal ref = "roiDescriptionModal"
-						 :roi-name = "selectedRoi ? selectedRoi.name : ''"
-						 :roi-description = "selectedRoi ? selectedRoi.description : ''"
-						 :pixel-count = "selectedRoi ? selectedRoi.pixelCount : 0"
-						 :bounding-box = "selectedRoi ? selectedRoi.boundingBox : null"></RoiDescriptionModal>
+						 :rois = "selectedRois"></RoiDescriptionModal>
 	<RoiSaveModal ref = "roiSaveModal" :saving = "savingRoi" @save = "saveRoi"></RoiSaveModal>
 	<RoiDeleteModal ref = "roiDeleteModal"
-					:roi-name = "selectedRoi ? selectedRoi.name : ''"
-					:roi-description = "selectedRoi ? selectedRoi.description : ''"
+					:rois = "selectedRois"
 					:deleting = "deletingRoi"
 					@confirm = "deleteSelectedRoi"></RoiDeleteModal>
 	<GpuInferenceModal ref = "gpuInferenceModal"
@@ -1074,6 +1143,9 @@ const displayInfoTrigger = ref(null)
 const displayOptionsDropdown = ref(null)
 const projectMenuDropdown = ref(null)
 const displaySelectDropdown = ref(null)
+const topSpectrumPaneLegendVisible = ref(true)
+const hoveredSpectrumLegendKey = ref("")
+const hiddenSpectrumLegendKeys = ref([])
 const showDisplayInfoTooltip = ref(false)
 const displayInfoTooltipStyle = ref({
 	left: "0px",
@@ -1202,6 +1274,9 @@ const DEFAULT_HYPERSPECTRUM_PRIORITIZATION = {
 }
 const VIEWER_TUTORIAL_STORAGE_KEY = "harkana.viewerTutorial.v1"
 const SPECTRUM_GRIDLINE_CHANGE_EVENT = "harkana:spectrum-gridlines-change"
+const SPECTRUM_LEGEND_CHANGE_EVENT = "harkana:spectrum-chip-legend-change"
+const HEATMAP_INTERACTION_CHANGE_EVENT = "harkana:heatmap-interaction-change"
+const HEATMAP_RESET_VIEW_EVENT = "harkana:heatmap-reset-view"
 const PREPARATION_TARGET_ORDER = [
 	"mip",
 	"mip_hsv",
@@ -1311,7 +1386,7 @@ const DISPLAY_MODE_LABELS = {
 	rpca_rgb: "RPCA RGB"
 }
 const selectedConfidenceLevel = ref(95)
-const roiEstimateUncertaintyMode = ref("show")
+const roiEstimateUncertaintyLevel = ref(95)
 const billingSettings = ref({ groupID: "" })
 const gpuInferenceJobId = ref("")
 const gpuInferenceStatus = ref("")
@@ -1327,7 +1402,7 @@ const latestMeasurementSelectedSpectrum = shallowRef(null)
 const latestRamanSingleSpectrum = shallowRef(null)
 const latestRamanMeanSpectrum = shallowRef(null)
 const latestRamanSelectedSpectrum = shallowRef(null)
-const ramanRoiSpectrum = shallowRef(null)
+const ramanRoiSpectraById = shallowRef({})
 const estimatedRoiList = ref([])
 const estimatedRoiListMode = ref("")
 const estimatedRoiListAttempted = ref(false)
@@ -1361,14 +1436,11 @@ const activeEstimatedRpcaClassificationRequestID = ref(0)
 const activeEstimatedRpcaClassificationMipRequestID = ref(0)
 const activeEstimatedRpcaMipRequestID = ref(0)
 const activeEstimatedRpcaLoadingsRequestID = ref(0)
-const activeMeasurementSingleSpectrumRequestID = ref(0)
-const activeMeasurementMeanSpectrumRequestID = ref(0)
-const activeRamanSingleSpectrumRequestID = ref(0)
-const activeRamanMeanSpectrumRequestID = ref(0)
-const activeRamanRoiRequestID = ref(0)
+const activeMeasurementSelectionSpectrumRequestID = ref(0)
+const activeRamanSelectionSpectrumRequestID = ref(0)
+const activeRamanRoiRequestIDs = ref({})
 const rois = ref([])
-const selectedRoiId = ref("")
-const showAllRoiOverlays = ref(false)
+const selectedRoiIds = ref([])
 const refreshingRois = ref(false)
 const savingRoi = ref(false)
 const deletingRoi = ref(false)
@@ -1376,6 +1448,8 @@ const savingXyz = ref(false)
 const showPcaLoadings = ref(false)
 const showSelectedSpectra = ref(true)
 const projectChatOpen = ref(false)
+const measurementSelectionSpectrumQuerying = ref(false)
+const ramanSelectionSpectrumQuerying = ref(false)
 const isRoiRefreshDisabled = computed(() => refreshingRois.value)
 
 let heatmapViewportSyncHandler = null
@@ -1409,6 +1483,19 @@ const DEFAULT_PCA_COMPONENT_COLORS = {
 	10: "#7f7f7f"
 }
 
+const DEFAULT_ROI_SPECTRUM_PALETTE = [
+	"#ff7f0e",
+	"#2ca02c",
+	"#d62728",
+	"#9467bd",
+	"#8c564b",
+	"#e377c2",
+	"#7f7f7f",
+	"#bcbd22",
+	"#17becf",
+	"#333333"
+]
+
 const pcaLegend = computed(() => {
 	return pcaComponentIndices.map(( componentIndex ) => {
 		const savedColor = settings.value?.hyperspectrumColors?.pcaComponents?.[componentIndex]
@@ -1427,6 +1514,9 @@ var resizeObserver = null
 let deckPaneResizeSession = null
 let deckPaneResponsiveResizeQueued = false
 let spectrumGridlineGraphListeners = []
+let spectrumLegendGraphListeners = []
+let heatmapModebarGraphListeners = []
+let queuedSpectraPanelRender = Promise.resolve()
 
 const MIN_DECK_HEATMAP_PANE_WIDTH = 320
 const MIN_DECK_SPECTRA_PANE_WIDTH = 360
@@ -1507,23 +1597,136 @@ const canEditXyz = computed(() => {
 })
 
 const selectedRoi = computed(() => {
-	if( selectedRoiId.value === "" ) return null
+	if( selectedRoiIds.value.length !== 1 ) return null
 
-	return rois.value.find(( roi ) => roi.roiId === selectedRoiId.value ) ?? null
+	const selectedId = String( selectedRoiIds.value[0] ?? "" ).trim()
+	return rois.value.find(( roi ) => String( roi?.roiId ?? "" ).trim() === selectedId ) ?? null
+})
+
+const selectedRoiIdSet = computed(() => {
+	return new Set(
+		( Array.isArray( selectedRoiIds.value ) ? selectedRoiIds.value : [] )
+			.map(( roiId ) => String( roiId ?? "" ).trim() )
+			.filter(( roiId ) => roiId.length > 0 )
+	)
+})
+
+const isSelectedRoiId = ( roiId ) => {
+	const normalizedId = String( roiId ?? "" ).trim()
+	if( normalizedId.length === 0 ) return false
+
+	return selectedRoiIdSet.value.has( normalizedId )
+}
+
+const selectedRois = computed(() => {
+	const selectedIds = selectedRoiIdSet.value
+
+	if( selectedIds.size === 0 ){
+		return []
+	}
+
+	return rois.value.filter(( roi ) => selectedIds.has( String( roi?.roiId ?? "" ).trim() ))
+})
+
+const showAllRoiOverlays = computed(() => {
+	return rois.value.length > 0 && selectedRois.value.length === rois.value.length
 })
 
 const roiSelectOptions = computed(() => {
-	return [
-		{ value: "", label: "No region selected" },
-		...rois.value.map(( roi ) => ({
-			value: String( roi?.roiId ?? "" ),
-			label: String( roi?.name ?? "Unnamed ROI" )
-		}))
-	]
+	return rois.value.map(( roi ) => ({
+		value: String( roi?.roiId ?? "" ),
+		label: String( roi?.name ?? "Unnamed ROI" )
+	}))
 })
 
-const setSelectedRoiId = ( nextValue ) => {
-	selectedRoiId.value = String( nextValue ?? "" )
+const roiDropdownSummaryLabel = computed(() => {
+	if( selectedRoiIdSet.value.size === 0 ){
+		return "No regions selected"
+	}
+
+	if( selectedRoiIdSet.value.size === 1 ){
+		return selectedRois.value[0]?.name ?? "1 region selected"
+	}
+
+	return `${selectedRoiIdSet.value.size} regions selected`
+})
+
+const activeDisplayedRois = computed(() => {
+	return selectedRois.value
+})
+
+const resolvedRoiSpectrumPalette = computed(() => {
+	const storedPalette = Array.isArray( settings.value?.hyperspectrumColors?.roiPalette )
+		? settings.value.hyperspectrumColors.roiPalette
+		: []
+	const normalizedPalette = storedPalette
+		.map(( entry ) => String( entry ?? "" ).trim() )
+		.filter(( entry ) => entry.length > 0 )
+
+	if( normalizedPalette.length > 0 ){
+		return normalizedPalette
+	}
+
+	const storedPrimaryColor = String( settings.value?.hyperspectrumColors?.roiSpectrum ?? "" ).trim()
+	if( storedPrimaryColor.length > 0 ){
+		return [ storedPrimaryColor, ...DEFAULT_ROI_SPECTRUM_PALETTE.slice( 1 ) ]
+	}
+
+	return DEFAULT_ROI_SPECTRUM_PALETTE
+})
+
+const roiDisplayStylesById = computed(() => {
+	const activeRois = activeDisplayedRois.value
+	var styles = {}
+	const roiBoxColor = settings.value?.hyperspectrumColors?.roiBox ??
+		settings.value?.hyperspectrumColors?.roiOverlay ??
+		"#ffffff"
+	const roiTitleColor = settings.value?.hyperspectrumColors?.roiTitle ??
+		settings.value?.hyperspectrumColors?.roiOverlay ??
+		roiBoxColor
+	const spectrumPalette = resolvedRoiSpectrumPalette.value
+
+	for( let index = 0; index < activeRois.length; index++ ){
+		const roi = activeRois[index] ?? null
+		const roiId = String( roi?.roiId ?? "" ).trim()
+		if( roiId.length === 0 ) continue
+
+		const color = spectrumPalette[ index % spectrumPalette.length ]
+		styles[roiId] = {
+			lineColor: color,
+			intervalColor: color,
+			boxColor: roiBoxColor,
+			titleColor: roiTitleColor
+		}
+	}
+
+	return styles
+})
+
+const clearSelectedRois = () => {
+	selectedRoiIds.value = []
+}
+
+const toggleSelectedRoiId = ( nextValue ) => {
+	const normalizedId = String( nextValue ?? "" ).trim()
+	if( normalizedId.length === 0 ){
+		clearSelectedRois()
+		return
+	}
+
+	if( selectedRoiIdSet.value.has( normalizedId ) ){
+		selectedRoiIds.value = selectedRoiIds.value
+			.map(( roiId ) => String( roiId ?? "" ).trim() )
+			.filter(( roiId ) => roiId.length > 0 && roiId !== normalizedId )
+		return
+	}
+
+	selectedRoiIds.value = [
+		...selectedRoiIds.value
+			.map(( roiId ) => String( roiId ?? "" ).trim() )
+			.filter(( roiId ) => roiId.length > 0 ),
+		normalizedId
+	]
 }
 
 const hasSelectedRegion = computed(() => {
@@ -1540,6 +1743,48 @@ const visiblePcaLoadingCount = computed(() => {
 
 const visiblePcaLegendEntries = computed(() => {
 	return pcaLegend.value.slice( 0, visiblePcaLoadingCount.value )
+})
+
+const queriedSpectrumLegendColor = computed(() => {
+	const configuredColor = String( settings.value?.hyperspectrumColors?.queriedSpectrum ?? "" ).trim()
+	return configuredColor.length > 0 ? configuredColor : "#1f77b4"
+})
+
+const activeLoadingLegendEntries = computed(() => {
+	if( activePlot.value === "pca_rgb" || activePlot.value === "rpca_rgb" ){
+		return [
+			{
+				key: `loading-r-${pcaRgbChannels.value.r}`,
+				label: "R - PC" + String( pcaRgbChannels.value.r ).padStart( 2, "0" ),
+				color: "rgb(239, 68, 68)"
+			},
+			{
+				key: `loading-g-${pcaRgbChannels.value.g}`,
+				label: "G - PC" + String( pcaRgbChannels.value.g ).padStart( 2, "0" ),
+				color: "rgb(34, 197, 94)"
+			},
+			{
+				key: `loading-b-${pcaRgbChannels.value.b}`,
+				label: "B - PC" + String( pcaRgbChannels.value.b ).padStart( 2, "0" ),
+				color: "rgb(59, 130, 246)"
+			}
+		]
+	}
+
+	const componentIndices = activePlot.value === "pca_mip" || activePlot.value === "rpca_mip"
+		? pcaMipLoadingComponents()
+		: ( activePlot.value === "pca" || activePlot.value === "rpca"
+			? pcaClassificationLoadingComponents()
+			: [] )
+	const activeComponentSet = new Set( componentIndices )
+
+	return pcaLegend.value
+		.filter(( entry ) => activeComponentSet.has( entry.componentIndex ))
+		.map(( entry ) => ({
+			key: `loading-${entry.componentIndex}`,
+			label: entry.label,
+			color: entry.color
+		}))
 })
 
 const maxLayerIndex = computed(() => {
@@ -1597,6 +1842,16 @@ const hasEstimatedRamanSpectraReady = computed(() => {
 	return gpuInferenceEstimateSpectraReady.value === true || hasSuccessfulRamanInference.value
 })
 
+const sidebarInferenceStatusText = computed(() => {
+	if( GPU_NON_TERMINAL_STATUSES.has( normalizedGpuInferenceStatus( gpuInferenceStatus.value )) === false ){
+		return ""
+	}
+
+	return hasEstimatedRamanSpectraReady.value
+		? "Image analysis running"
+		: "Raman inference running"
+})
+
 const activeViewerTutorialStepId = computed(() => {
 	return viewerTutorialVisible.value
 		? viewerTutorialSteps.value[ viewerTutorialStepIndex.value ]?.id ?? ""
@@ -1605,6 +1860,10 @@ const activeViewerTutorialStepId = computed(() => {
 
 const isDisplayOptionsTutorialStepActive = computed(() => {
 	return activeViewerTutorialStepId.value === "display-options"
+})
+
+const isHeatmapTutorialStepActive = computed(() => {
+	return activeViewerTutorialStepId.value === "heatmap"
 })
 
 const isProjectMenuTutorialStepActive = computed(() => {
@@ -1711,6 +1970,100 @@ const bottomSpectrumGridlineSourceKey = () => {
 
 	return spectrumGridlineSourceKeyForSpectrumSource( bottomSource )
 }
+
+const selectionSpectrumQueryingRefForSource = ( source ) => {
+	return normalizeSpectrumSource( source ) === "raman"
+		? ramanSelectionSpectrumQuerying
+		: measurementSelectionSpectrumQuerying
+}
+
+const selectionSpectrumRequestIDRefForSource = ( source ) => {
+	return normalizeSpectrumSource( source ) === "raman"
+		? activeRamanSelectionSpectrumRequestID
+		: activeMeasurementSelectionSpectrumRequestID
+}
+
+const setSelectionSpectrumQuerying = ( source, querying ) => {
+	selectionSpectrumQueryingRefForSource( source ).value = querying === true
+}
+
+const isSelectionSpectrumQuerying = ( source ) => {
+	return selectionSpectrumQueryingRefForSource( source ).value === true
+}
+
+const startSelectionSpectrumQuery = ( source ) => {
+	const requestIDRef = selectionSpectrumRequestIDRefForSource( source )
+	const nextRequestID = requestIDRef.value + 1
+	requestIDRef.value = nextRequestID
+	setSelectionSpectrumQuerying( source, true )
+	return nextRequestID
+}
+
+const isSelectionSpectrumQueryCurrent = ( source, requestID ) => {
+	return selectionSpectrumRequestIDRefForSource( source ).value === requestID
+}
+
+const finishSelectionSpectrumQuery = ( source, requestID ) => {
+	if( isSelectionSpectrumQueryCurrent( source, requestID ) ){
+		setSelectionSpectrumQuerying( source, false )
+	}
+}
+
+const cancelSelectionSpectrumQuery = ( source ) => {
+	const requestIDRef = selectionSpectrumRequestIDRefForSource( source )
+	requestIDRef.value += 1
+	setSelectionSpectrumQuerying( source, false )
+}
+
+const cancelSelectionSpectrumQueriesForInactiveSources = ( sources ) => {
+
+	const activeSources = new Set(
+		( Array.isArray( sources ) ? sources : [] )
+			.map(( source ) => normalizeSpectrumSource( source ))
+	)
+
+	for( const source of [ "measurement", "raman" ] ){
+		if( activeSources.has( source ) === false ){
+			cancelSelectionSpectrumQuery( source )
+		}
+	}
+}
+
+const topSpectrumPaneSelectionSource = computed(() => {
+	if( showSelectedSpectra.value === false ){
+		return null
+	}
+
+	const mode = spectrumSelectionMode.value
+	if( mode === "both" ){
+		return resolvedSecondarySpectrumSource() ?? "measurement"
+	}
+
+	return activeDisplayedRois.value.length === 0 ? null : mode
+})
+
+const bottomSpectrumPaneSelectionSource = computed(() => {
+	if( showSelectedSpectra.value === false ){
+		return null
+	}
+
+	const mode = spectrumSelectionMode.value
+	return mode === "both" ? resolvedPrimarySpectrumSource() : mode
+})
+
+const topSpectrumPaneQuerying = computed(() => {
+	const source = topSpectrumPaneSelectionSource.value
+	return typeof source === "string" && source.length > 0
+		? isSelectionSpectrumQuerying( source )
+		: false
+})
+
+const bottomSpectrumPaneQuerying = computed(() => {
+	const source = bottomSpectrumPaneSelectionSource.value
+	return typeof source === "string" && source.length > 0
+		? isSelectionSpectrumQuerying( source )
+		: false
+})
 
 const loadingsSource = () => {
 
@@ -1875,7 +2228,7 @@ const viewerTutorialSteps = computed(() => {
 			id: "display-options",
 			kind: "menu",
 			title: "Display options",
-			body: "This menu controls how you interact with the heatmap, including spectrum selection and zoom behavior.",
+			body: "This menu controls spectrum display options, including whether selected spectra and uncertainty are shown.",
 			target: "display-options",
 			placement: "right"
 		},
@@ -1883,7 +2236,7 @@ const viewerTutorialSteps = computed(() => {
 			id: "heatmap",
 			kind: "highlight",
 			title: "Heatmap interaction",
-			body: "Clicking or selecting a region updates the spectra panels to show the spectral signals at that pixel or region. Hovering shows pixel indices.",
+			body: "Use the toolbar above the image to switch between selecting spectra, square zoom, free zoom, and reset zoom. Clicking or selecting a region updates the spectra panels to show the spectral signals at that pixel or region. Hovering shows pixel indices.",
 			target: "heatmap-pane",
 			placement: "left"
 		},
@@ -2172,9 +2525,7 @@ const resetEstimatedVisualizationState = () => {
 	activeEstimatedRpcaClassificationMipRequestID.value += 1
 	activeEstimatedRpcaMipRequestID.value += 1
 	activeEstimatedRpcaLoadingsRequestID.value += 1
-	activeRamanSingleSpectrumRequestID.value += 1
-	activeRamanMeanSpectrumRequestID.value += 1
-	activeRamanRoiRequestID.value += 1
+	cancelSelectionSpectrumQuery( "raman" )
 
 	estimatedMip.value = null
 	estimatedMipHsv.value = null
@@ -2196,7 +2547,6 @@ const resetEstimatedVisualizationState = () => {
 	latestRamanSingleSpectrum.value = null
 	latestRamanMeanSpectrum.value = null
 	latestRamanSelectedSpectrum.value = null
-	ramanRoiSpectrum.value = null
 	resetEstimatedRoiArtifacts()
 }
 
@@ -2817,10 +3167,6 @@ const normalizeShowHideMode = ( value, fallback = "hide" ) => {
 	return fallback === "show" ? "show" : "hide"
 }
 
-const normalizeRoiEstimateUncertaintyMode = ( value ) => {
-	return normalizeShowHideMode( value, "show" ) === "hide" ? "hide" : "show"
-}
-
 const normalizeConfidenceLevel = ( value ) => {
 
 	if( String( value ?? "" ).trim().toLowerCase() === CONFIDENCE_NONE_VALUE ){
@@ -2837,6 +3183,19 @@ const normalizeConfidenceLevel = ( value ) => {
 	}
 
 	return 95
+}
+
+const normalizeRoiEstimateUncertaintyLevel = ( value ) => {
+	const normalized = String( value ?? "" ).trim().toLowerCase()
+	if( normalized === "show" ){
+		return 95
+	}
+
+	if( normalized === "hide" ){
+		return CONFIDENCE_NONE_VALUE
+	}
+
+	return normalizeConfidenceLevel( value )
 }
 
 const normalizeGridlineVisibility = ( value, fallback = false ) => {
@@ -2881,8 +3240,8 @@ const defaultFalseColoringBasis = () => {
 		: "measurement"
 }
 
-const defaultRoiEstimateUncertaintyMode = () => {
-	return normalizeRoiEstimateUncertaintyMode( settings.value?.hyperspectrumDefaults?.roiEstimateUncertainty )
+const defaultRoiEstimateUncertaintyLevel = () => {
+	return normalizeRoiEstimateUncertaintyLevel( settings.value?.hyperspectrumDefaults?.roiEstimateUncertainty )
 }
 
 const defaultProjectSpectrumGridlinesVisible = () => {
@@ -3416,12 +3775,20 @@ const spectrumPayloadRenderKey = ( payload ) => {
 	].join( "," )
 }
 
+const spectrumPayloadListRenderKey = ( payloads ) => {
+	if( Array.isArray( payloads ) === false ){
+		return spectrumPayloadRenderKey( payloads ?? null )
+	}
+
+	return payloads.map(( payload ) => spectrumPayloadRenderKey( payload )).join( ";" )
+}
+
 const upperPanelRenderKey = ( options ) => {
 	return [
 		"settings=" + deckPanelSettingsKey(),
 		"source=" + String( options?.topSpectrumGridlineSource ?? "" ),
 		"axes=" + deckPanelObjectKey( options?.axes ?? null ),
-		"roi=" + spectrumPayloadRenderKey( options?.topLeftSpectrum?.roi ?? null ),
+		"roi=" + spectrumPayloadListRenderKey( options?.topLeftSpectrum?.rois ?? options?.topLeftSpectrum?.roi ?? null ),
 		"current=" + spectrumPayloadRenderKey( options?.topLeftSpectrum?.current ?? null ),
 		"showFallback=" + String( options?.topLeftSpectrum?.showFallback === true ),
 		"loadings=" + deckPanelObjectKey( options?.loadings ?? null ),
@@ -3436,7 +3803,7 @@ const lowerPanelRenderKey = ( options ) => {
 		"source=" + String( options?.bottomSpectrumGridlineSource ?? "" ),
 		"axes=" + deckPanelObjectKey( options?.axes ?? null ),
 		"selected=" + spectrumPayloadRenderKey( options?.selectedSpectrum ?? null ),
-		"roi=" + spectrumPayloadRenderKey( options?.bottomLeftSpectrum?.roi ?? null ),
+		"roi=" + spectrumPayloadListRenderKey( options?.bottomLeftSpectrum?.rois ?? options?.bottomLeftSpectrum?.roi ?? null ),
 		"current=" + spectrumPayloadRenderKey( options?.bottomLeftSpectrum?.current ?? null )
 	].join( "|" )
 }
@@ -3477,6 +3844,16 @@ const selectedConfidenceLevelValue = computed(() => {
 const selectedConfidenceNumericLevel = computed(() => {
 	return typeof selectedConfidenceLevelValue.value === "number"
 		? selectedConfidenceLevelValue.value
+		: 95
+})
+
+const roiEstimateUncertaintyLevelValue = computed(() => {
+	return normalizeRoiEstimateUncertaintyLevel( roiEstimateUncertaintyLevel.value )
+})
+
+const roiEstimateUncertaintyNumericLevel = computed(() => {
+	return typeof roiEstimateUncertaintyLevelValue.value === "number"
+		? roiEstimateUncertaintyLevelValue.value
 		: 95
 })
 
@@ -3549,6 +3926,35 @@ const withSelectedConfidenceBounds = ( payload ) => {
 	}
 }
 
+const withSpectrumLegendName = ( payload, name = "Selection" ) => {
+
+	if( payload === null || payload === undefined ){
+		return null
+	}
+
+	if( Array.isArray( payload ) ){
+		return {
+			spectrum: payload,
+			name,
+			traceGroupKey: "selection"
+		}
+	}
+
+	if( typeof payload !== "object" ){
+		return payload
+	}
+
+	return {
+		...payload,
+		name: typeof payload?.name === "string" && payload.name.trim().length > 0
+			? payload.name
+			: name,
+		traceGroupKey: typeof payload?.traceGroupKey === "string" && payload.traceGroupKey.trim().length > 0
+			? payload.traceGroupKey
+			: "selection"
+	}
+}
+
 const normalizeSpectrumSource = ( source ) => {
 	const normalized = String( source ?? "" ).trim().toLowerCase()
 	return normalized === "raman" ? "raman" : "measurement"
@@ -3572,12 +3978,18 @@ const setSelectedConfidenceLevel = ( level ) => {
 	selectedConfidenceLevel.value = normalizeConfidenceLevel( level )
 }
 
+const setRoiEstimateUncertaintyLevel = ( level ) => {
+	roiEstimateUncertaintyLevel.value = normalizeRoiEstimateUncertaintyLevel( level )
+}
+
 const setHeatmapInteractionMode = ( mode ) => {
 	heatmapInteractionMode.value = mode === "zoom" ? "zoom" : "select"
+	hyperspectrum.syncHeatmapModebarState( graph.value, heatmapInteractionMode.value, heatmapZoomAspectRatio.value )
 }
 
 const setHeatmapZoomAspectRatio = ( mode ) => {
 	heatmapZoomAspectRatio.value = normalizeHeatmapZoomAspectRatio( mode )
+	hyperspectrum.syncHeatmapModebarState( graph.value, heatmapInteractionMode.value, heatmapZoomAspectRatio.value )
 }
 
 const setActiveDisplayMode = ( nextValue ) => {
@@ -3799,55 +4211,122 @@ const selectedSpectrumPayloadBySource = ( source ) => {
 			latestRamanSingleSpectrum.value?.response ??
 			latestRamanMeanSpectrum.value?.response ??
 			null
-		return withSelectedConfidenceBounds( payload )
+		return withSpectrumLegendName( withSelectedConfidenceBounds( payload ), "Selection" )
 	}
 
 	const payload = latestMeasurementSelectedSpectrum.value ??
 		latestMeasurementSingleSpectrum.value?.response ??
 		latestMeasurementMeanSpectrum.value?.response ??
 		null
-	return withSelectedConfidenceBounds( payload )
+	return withSpectrumLegendName( withSelectedConfidenceBounds( payload ), "Selection" )
 }
 
-const roiSpectrumPayloadBySource = ( source ) => {
+const cachedRamanRoiSpectrumForId = ( roiId ) => {
+	const normalizedId = String( roiId ?? "" ).trim()
+	if( normalizedId.length === 0 ) return null
 
-	const normalizedSource = normalizeSpectrumSource( source )
+	return ramanRoiSpectraById.value?.[ normalizedId ] ?? null
+}
 
-	if( selectedRoi.value === null ){
+const estimatedRoiSpectrumForId = ( roiId ) => {
+	const normalizedId = String( roiId ?? "" ).trim()
+	if( normalizedId.length === 0 ) return null
+
+	return estimatedRoiList.value.find(( roi ) => roi.roiId === normalizedId ) ?? null
+}
+
+const roiSpectrumStyleForId = ( roiId ) => {
+	const normalizedId = String( roiId ?? "" ).trim()
+	const fallbackColor = resolvedRoiSpectrumPalette.value[0] ?? "#333333"
+	const fallbackBoxColor = settings.value?.hyperspectrumColors?.roiBox ??
+		settings.value?.hyperspectrumColors?.roiOverlay ??
+		"#ffffff"
+	const fallbackTitleColor = settings.value?.hyperspectrumColors?.roiTitle ??
+		settings.value?.hyperspectrumColors?.roiOverlay ??
+		fallbackBoxColor
+	return roiDisplayStylesById.value?.[ normalizedId ] ?? {
+		lineColor: fallbackColor,
+		intervalColor: fallbackColor,
+		boxColor: fallbackBoxColor,
+		titleColor: fallbackTitleColor
+	}
+}
+
+const measurementRoiSpectrumPayloadForEntry = ( roi ) => {
+	const spectrum = Array.isArray( roi?.meanSpectrum ) ? roi.meanSpectrum : null
+	if( spectrum === null ) return null
+
+	const roiId = String( roi?.roiId ?? "" ).trim()
+	const style = roiSpectrumStyleForId( roiId )
+
+	return withSelectedConfidenceBounds({
+		roiId,
+		name: String( roi?.name ?? "" ).trim(),
+		traceGroupKey: `roi-${roiId}`,
+		spectrum,
+		lowerBound: roi?.lowerBound ?? null,
+		upperBound: roi?.upperBound ?? null,
+		lineColor: style.lineColor,
+		intervalColor: style.intervalColor
+	})
+}
+
+const ramanRoiSpectrumPayloadForEntry = ( roi ) => {
+	const roiId = String( roi?.roiId ?? "" ).trim()
+	if( roiId.length === 0 ) return null
+
+	const estimatedRoi = estimatedRoiSpectrumForId( roiId )
+	const payload = estimatedRoi !== null && Array.isArray( estimatedRoi.meanSpectrum )
+		? {
+			spectrum: estimatedRoi.meanSpectrum,
+			lowerBound: estimatedRoi.lowerBound ?? null,
+			upperBound: estimatedRoi.upperBound ?? null
+		}
+		: cachedRamanRoiSpectrumForId( roiId )
+	if( payload === null || payload === undefined ){
 		return null
 	}
 
-	if( normalizedSource === "raman" ){
-		const payload = ramanRoiSpectrum.value
-		if( payload === null || payload === undefined ){
-			return null
-		}
-
-		const resolvedPayload = {
-			...payload,
-			lowerBound: resolveConfidenceBoundSeries( payload.lowerBound, selectedConfidenceNumericLevel.value ),
-			upperBound: resolveConfidenceBoundSeries( payload.upperBound, selectedConfidenceNumericLevel.value )
-		}
-
-		if( roiEstimateUncertaintyMode.value === "hide" ){
-			return {
-				...resolvedPayload,
-				lowerBound: null,
-				upperBound: null
-			}
-		}
-
-		return resolvedPayload
+	const style = roiSpectrumStyleForId( roiId )
+	const resolvedPayload = {
+		...payload,
+		roiId,
+		name: String( roi?.name ?? "" ).trim(),
+		traceGroupKey: `roi-${roiId}`,
+		lowerBound: payload.lowerBound ?? null,
+		upperBound: payload.upperBound ?? null,
+		lineColor: style.lineColor,
+		intervalColor: style.intervalColor
 	}
 
-	const spectrum = Array.isArray( selectedRoi.value.meanSpectrum ) ? selectedRoi.value.meanSpectrum : null
-	if( spectrum === null ) return null
+	if( roiEstimateUncertaintyLevelValue.value === CONFIDENCE_NONE_VALUE ){
+		return {
+			...resolvedPayload,
+			lowerBound: null,
+			upperBound: null
+		}
+	}
 
-	return withSelectedConfidenceBounds({
-		spectrum,
-		lowerBound: selectedRoi.value.lowerBound ?? null,
-		upperBound: selectedRoi.value.upperBound ?? null
-	})
+	return {
+		...resolvedPayload,
+		lowerBound: resolveConfidenceBoundSeries( resolvedPayload.lowerBound, roiEstimateUncertaintyNumericLevel.value ),
+		upperBound: resolveConfidenceBoundSeries( resolvedPayload.upperBound, roiEstimateUncertaintyNumericLevel.value )
+	}
+}
+
+const roiSpectrumPayloadsBySource = ( source ) => {
+	const normalizedSource = normalizeSpectrumSource( source )
+	const activeRois = activeDisplayedRois.value
+
+	if( activeRois.length === 0 ){
+		return []
+	}
+
+	return activeRois
+		.map(( roi ) => normalizedSource === "raman"
+			? ramanRoiSpectrumPayloadForEntry( roi )
+			: measurementRoiSpectrumPayloadForEntry( roi ))
+		.filter(( payload ) => payload !== null )
 }
 
 const topLeftSpectrumOptions = () => {
@@ -3858,7 +4337,7 @@ const topLeftSpectrumOptions = () => {
 		? showPcaLoadings.value
 		: false
 
-	if( selectedRoi.value === null && showLoadingsFallback ){
+	if( activeDisplayedRois.value.length === 0 && showLoadingsFallback ){
 		return {
 			showFallback: true
 		}
@@ -3871,24 +4350,18 @@ const topLeftSpectrumOptions = () => {
 		? selectedSpectrumPayloadBySource( topSource )
 		: null
 
-	if( selectedRoi.value === null ){
+	const roiPayloads = roiSpectrumPayloadsBySource( topSource )
+
+	if( roiPayloads.length === 0 ){
 		if( mode === "both" && current !== null ){
 			return { current }
 		}
 
-		return {}
-	}
-
-	const roiPayload = roiSpectrumPayloadBySource( topSource )
-	if( roiPayload === null ){
-		return {
-			current,
-			showFallback: showLoadingsFallback
-		}
+		return showLoadingsFallback ? { current, showFallback: true } : {}
 	}
 
 	return {
-		roi: roiPayload,
+		rois: roiPayloads,
 		current: current
 	}
 }
@@ -3903,11 +4376,13 @@ const bottomLeftSpectrumOptions = () => {
 		? selectedSpectrumPayloadBySource( lowerSource )
 		: null
 
-	if( mode === "both" && selectedRoi.value !== null ){
+	const roiPayloads = roiSpectrumPayloadsBySource( lowerSource )
+
+	if( mode === "both" && roiPayloads.length > 0 ){
 		return {
 			selectedSpectrum: current,
 			bottomLeftSpectrum: {
-				roi: roiSpectrumPayloadBySource( lowerSource ),
+				rois: roiPayloads,
 				current
 			}
 		}
@@ -3919,6 +4394,87 @@ const bottomLeftSpectrumOptions = () => {
 	}
 }
 
+const buildSpectrumPaneLegendEntries = ( roiPayloads, currentPayload, fallbackEntries = [] ) => {
+
+	const entries = []
+	const normalizedRoiPayloads = Array.isArray( roiPayloads ) ? roiPayloads : []
+
+	if( currentPayload !== null && currentPayload !== undefined ){
+		entries.push({
+			key: String( currentPayload?.traceGroupKey ?? "selection" ),
+			label: String( currentPayload?.name ?? "Selection" ).trim() || "Selection",
+			color: queriedSpectrumLegendColor.value
+		})
+	}
+
+	for( const payload of normalizedRoiPayloads ){
+		if( payload === null || payload === undefined ) continue
+
+		entries.push({
+			key: String( payload?.traceGroupKey ?? `roi-${String( payload?.roiId ?? payload?.name ?? entries.length )}` ),
+			label: String( payload?.name ?? "Region of interest" ).trim() || "Region of interest",
+			color: String( payload?.lineColor ?? "" ).trim() || ( resolvedRoiSpectrumPalette.value[0] ?? "#333333" )
+		})
+	}
+
+	if( entries.length > 0 ){
+		return entries
+	}
+
+	return ( Array.isArray( fallbackEntries ) ? fallbackEntries : [] )
+		.filter(( entry ) => entry !== null && entry !== undefined )
+		.map(( entry, index ) => ({
+			key: String( entry?.key ?? `fallback-${index}` ),
+			label: String( entry?.label ?? "" ).trim(),
+			color: String( entry?.color ?? "" ).trim()
+		}))
+		.filter(( entry ) => entry.label.length > 0 && entry.color.length > 0 )
+}
+
+const normalizedHiddenSpectrumLegendKeys = computed(() => {
+	return Array.from( new Set(
+		( Array.isArray( hiddenSpectrumLegendKeys.value ) ? hiddenSpectrumLegendKeys.value : [] )
+			.map(( key ) => String( key ?? "" ).trim() )
+			.filter(( key ) => key.length > 0 )
+	))
+})
+
+const isSpectrumLegendHidden = ( legendKey ) => {
+	const normalizedKey = String( legendKey ?? "" ).trim()
+	if( normalizedKey.length === 0 ){
+		return false
+	}
+
+	return normalizedHiddenSpectrumLegendKeys.value.includes( normalizedKey )
+}
+
+const toggleSpectrumLegendTraceVisibility = ( legendKey ) => {
+	const normalizedKey = String( legendKey ?? "" ).trim()
+	if( normalizedKey.length === 0 ){
+		return
+	}
+
+	if( isSpectrumLegendHidden( normalizedKey ) ){
+		hiddenSpectrumLegendKeys.value = normalizedHiddenSpectrumLegendKeys.value
+			.filter(( entry ) => entry !== normalizedKey )
+		return
+	}
+
+	hiddenSpectrumLegendKeys.value = [
+		...normalizedHiddenSpectrumLegendKeys.value,
+		normalizedKey
+	]
+}
+
+const topSpectrumPaneLegendEntries = computed(() => {
+	const options = topLeftSpectrumOptions()
+	return buildSpectrumPaneLegendEntries(
+		options?.rois ?? [],
+		options?.current ?? null,
+		options?.showFallback === true ? activeLoadingLegendEntries.value : []
+	)
+})
+
 const setPcaLoadingsVisibility = async ( shouldShowLoadings ) => {
 
 	if( shouldShowLoadings ){
@@ -3927,8 +4483,8 @@ const setPcaLoadingsVisibility = async ( shouldShowLoadings ) => {
 		}
 
 		showPcaLoadings.value = true
-		if( selectedRoiId.value !== "" ){
-			selectedRoiId.value = ""
+		if( selectedRoiIds.value.length > 0 ){
+			clearSelectedRois()
 			return
 		}
 	} else {
@@ -3965,18 +4521,18 @@ const roiOverlayFromEntry = ( roi ) => {
 		return null
 	}
 
+	const roiId = String( roi?.roiId ?? "" ).trim()
+	const style = roiSpectrumStyleForId( roiId )
+
 	return {
 		name: roi.name,
+		legendKey: `roi-${roiId}`,
 		x0: roi.boundingBox.minX - 0.5,
 		x1: roi.boundingBox.maxX + 0.5,
 		y0: roi.boundingBox.minY - 0.5,
 		y1: roi.boundingBox.maxY + 0.5,
-		boxColor: settings.value?.hyperspectrumColors?.roiBox ??
-			settings.value?.hyperspectrumColors?.roiOverlay ??
-			"#ffffff",
-		titleColor: settings.value?.hyperspectrumColors?.roiTitle ??
-			settings.value?.hyperspectrumColors?.roiOverlay ??
-			"#ffffff",
+		boxColor: style.boxColor,
+		titleColor: style.titleColor,
 		opacity: normalizeOpacity( settings.value?.hyperspectrumRoi?.overlayOpacity, 0.25 )
 	}
 }
@@ -3992,6 +4548,7 @@ const currentSelectionOverlay = () => {
 
 	return {
 		name: "",
+		legendKey: "selection",
 		showTitle: false,
 		x0: boundingBox.minX - 0.5,
 		x1: boundingBox.maxX + 0.5,
@@ -4006,22 +4563,29 @@ const currentSelectionOverlay = () => {
 const activeRoiOverlays = () => {
 
 	var overlays = []
+	const highlightedLegendKey = String( hoveredSpectrumLegendKey.value ?? "" ).trim()
+	const highlightsOverlay = highlightedLegendKey === "selection" || highlightedLegendKey.startsWith( "roi-" )
 
-	if( showAllRoiOverlays.value ){
-		overlays = rois.value
-			.map(( roi ) => roiOverlayFromEntry( roi ))
-			.filter(( overlay ) => overlay !== null )
-	} else if( selectedRoi.value !== null ){
-		const selectedOverlay = roiOverlayFromEntry( selectedRoi.value )
-		overlays = selectedOverlay === null ? [] : [ selectedOverlay ]
-	}
+	overlays = activeDisplayedRois.value
+		.map(( roi ) => roiOverlayFromEntry( roi ))
+		.filter(( overlay ) => overlay !== null )
 
 	const selectionOverlay = currentSelectionOverlay()
 	if( selectionOverlay !== null ){
 		overlays.push( selectionOverlay )
 	}
 
-	return overlays
+	return overlays.map(( overlay ) => {
+		const legendKey = String( overlay?.legendKey ?? "" ).trim()
+		const isEmphasized = highlightsOverlay && legendKey === highlightedLegendKey
+		const isDimmed = highlightsOverlay && legendKey.length > 0 && legendKey !== highlightedLegendKey
+
+		return {
+			...overlay,
+			isEmphasized,
+			isDimmed
+		}
+	})
 }
 
 const loadRoiList = async ( forceRefresh = false ) => {
@@ -4032,12 +4596,9 @@ const loadRoiList = async ( forceRefresh = false ) => {
 
 	rois.value = Array.isArray( loadedRois ) ? loadedRois : []
 
-	if( selectedRoiId.value.length > 0 ){
-		const stillExists = rois.value.some(( roi ) => roi.roiId === selectedRoiId.value )
-		if( stillExists === false ){
-			selectedRoiId.value = ""
-		}
-	}
+	selectedRoiIds.value = selectedRoiIds.value.filter(( roiId ) => {
+		return rois.value.some(( roi ) => String( roi?.roiId ?? "" ).trim() === String( roiId ?? "" ).trim() )
+	})
 
 	await loadEstimatedRoiList( forceRefresh )
 }
@@ -4244,6 +4805,8 @@ const resetEstimatedRoiArtifacts = () => {
 	estimatedRoiList.value = []
 	estimatedRoiListMode.value = ""
 	estimatedRoiListAttempted.value = false
+	ramanRoiSpectraById.value = {}
+	activeRamanRoiRequestIDs.value = {}
 }
 
 const syncEstimatedRoiCachesFromRois = () => {
@@ -4269,45 +4832,58 @@ const loadEstimatedRoiList = async ( forceRefresh = false ) => {
 	syncEstimatedRoiCachesFromRois()
 }
 
-const refreshRamanRoiSpectrum = async () => {
+const cacheRamanRoiSpectrum = ( roiId, payload ) => {
+	const normalizedId = String( roiId ?? "" ).trim()
+	if( normalizedId.length === 0 ) return
 
-	if( selectedRoi.value === null ){
-		ramanRoiSpectrum.value = null
-		return
+	ramanRoiSpectraById.value = {
+		...ramanRoiSpectraById.value,
+		[ normalizedId ]: payload ?? null
+	}
+}
+
+const nextRamanRoiRequestID = ( roiId ) => {
+	const normalizedId = String( roiId ?? "" ).trim()
+	const nextRequestID = Number( activeRamanRoiRequestIDs.value?.[ normalizedId ] ?? 0 ) + 1
+
+	activeRamanRoiRequestIDs.value = {
+		...activeRamanRoiRequestIDs.value,
+		[ normalizedId ]: nextRequestID
 	}
 
-	const needsRaman = spectrumSelectionMode.value === "raman" || spectrumSelectionMode.value === "both"
-	if( needsRaman === false || hasEstimatedRamanSpectraReady.value === false ){
-		ramanRoiSpectrum.value = null
-		return
-	}
+	return nextRequestID
+}
 
-	const roiId = String( selectedRoi.value.roiId ?? "" ).trim()
-	if( roiId.length === 0 ){
-		ramanRoiSpectrum.value = null
-		return
-	}
+const isCurrentRamanRoiRequest = ( roiId, requestID ) => {
+	const normalizedId = String( roiId ?? "" ).trim()
+	return Number( activeRamanRoiRequestIDs.value?.[ normalizedId ] ?? 0 ) === requestID
+}
 
-	await loadEstimatedRoiList()
+const ensureRamanRoiSpectrumForEntry = async ( roi ) => {
 
-	const matchedEstimatedRoi = estimatedRoiList.value.find(( roi ) => roi.roiId === roiId ) ?? null
-	if( matchedEstimatedRoi !== null && Array.isArray( matchedEstimatedRoi.meanSpectrum )){
-		ramanRoiSpectrum.value = {
-			spectrum: matchedEstimatedRoi.meanSpectrum,
-			lowerBound: matchedEstimatedRoi.lowerBound ?? null,
-			upperBound: matchedEstimatedRoi.upperBound ?? null
+	const roiId = String( roi?.roiId ?? "" ).trim()
+	if( roiId.length === 0 ) return null
+
+	const cachedEstimatedRoi = estimatedRoiSpectrumForId( roiId )
+	if( cachedEstimatedRoi !== null && Array.isArray( cachedEstimatedRoi.meanSpectrum ) ){
+		return {
+			spectrum: cachedEstimatedRoi.meanSpectrum,
+			lowerBound: cachedEstimatedRoi.lowerBound ?? null,
+			upperBound: cachedEstimatedRoi.upperBound ?? null
 		}
-		return
 	}
 
-	const boundingBox = normalizeSelectionBoundingBox( selectedRoi.value?.boundingBox )
+	const cachedPayload = cachedRamanRoiSpectrumForId( roiId )
+	if( cachedPayload !== null ){
+		return cachedPayload
+	}
+
+	const boundingBox = normalizeSelectionBoundingBox( roi?.boundingBox )
 	if( boundingBox === null ){
-		ramanRoiSpectrum.value = null
-		return
+		return null
 	}
 
-	const requestID = activeRamanRoiRequestID.value + 1
-	activeRamanRoiRequestID.value = requestID
+	const requestID = nextRamanRoiRequestID( roiId )
 
 	try{
 		const response = await hyperspectra.meanSpectrum(
@@ -4320,13 +4896,36 @@ const refreshRamanRoiSpectrum = async () => {
 			confidenceLevelsForSpectrumSource( "raman" )
 		)
 
-		if( requestID !== activeRamanRoiRequestID.value ) return
+		if( isCurrentRamanRoiRequest( roiId, requestID ) === false ) return null
 
-		ramanRoiSpectrum.value = response ?? null
+		cacheRamanRoiSpectrum( roiId, response ?? null )
+
+		if( graph.value !== null && currentMatrix() !== null ){
+			await queueSpectraPanelRender()
+		}
+
+		return response ?? null
 	} catch( error ){
-		if( requestID !== activeRamanRoiRequestID.value ) return
-		ramanRoiSpectrum.value = null
+		if( isCurrentRamanRoiRequest( roiId, requestID ) === false ) return null
+		console.log( error )
+		return null
 	}
+}
+
+const refreshRamanRoiSpectrum = async () => {
+
+	const needsRaman = spectrumSelectionMode.value === "raman" || spectrumSelectionMode.value === "both"
+	if( needsRaman === false || hasEstimatedRamanSpectraReady.value === false ){
+		return
+	}
+
+	const activeRois = activeDisplayedRois.value
+	if( activeRois.length === 0 ){
+		return
+	}
+
+	await loadEstimatedRoiList()
+	await Promise.all( activeRois.map(( roi ) => ensureRamanRoiSpectrumForEntry( roi )))
 }
 
 const newestMatchingRoiId = ( name, description ) => {
@@ -4365,14 +4964,14 @@ const openRoiSaveModal = () => {
 const openRoiDeleteModal = () => {
 
 	if( canMutateRois.value === false ) return
-	if( selectedRoi.value === null ) return
+	if( selectedRois.value.length === 0 ) return
 
 	roiDeleteModal.value?.open()
 }
 
 const openRoiDescriptionModal = () => {
 
-	if( selectedRoi.value === null ) return
+	if( selectedRois.value.length === 0 ) return
 	roiDescriptionModal.value?.open()
 }
 
@@ -4837,6 +5436,74 @@ const syncSpectrumGridlineGraphListeners = () => {
 	}
 }
 
+const clearSpectrumLegendGraphListeners = () => {
+
+	for( const listenerEntry of spectrumLegendGraphListeners ){
+		listenerEntry.element.removeEventListener( SPECTRUM_LEGEND_CHANGE_EVENT, listenerEntry.handler )
+	}
+
+	spectrumLegendGraphListeners = []
+}
+
+const syncSpectrumLegendGraphListeners = () => {
+
+	clearSpectrumLegendGraphListeners()
+
+	if( deckTopPanelGraph.value === null ){
+		return
+	}
+
+	const handler = ( event ) => {
+		topSpectrumPaneLegendVisible.value = event?.detail?.visible !== false
+	}
+
+	deckTopPanelGraph.value.addEventListener( SPECTRUM_LEGEND_CHANGE_EVENT, handler )
+	spectrumLegendGraphListeners.push({
+		element: deckTopPanelGraph.value,
+		handler
+	})
+}
+
+const clearHeatmapModebarGraphListeners = () => {
+
+	for( const listenerEntry of heatmapModebarGraphListeners ){
+		listenerEntry.element.removeEventListener( listenerEntry.eventName, listenerEntry.handler )
+	}
+
+	heatmapModebarGraphListeners = []
+}
+
+const syncHeatmapModebarGraphListeners = () => {
+
+	clearHeatmapModebarGraphListeners()
+
+	if( graph.value === null ) return
+
+	const interactionHandler = ( event ) => {
+		if( typeof event?.detail?.zoomAspectRatio === "string" ){
+			setHeatmapZoomAspectRatio( event.detail.zoomAspectRatio )
+		}
+		setHeatmapInteractionMode( event?.detail?.mode )
+	}
+	const resetHandler = () => {
+		void handleHeatmapResetZoom()
+	}
+
+	graph.value.addEventListener( HEATMAP_INTERACTION_CHANGE_EVENT, interactionHandler )
+	graph.value.addEventListener( HEATMAP_RESET_VIEW_EVENT, resetHandler )
+
+	heatmapModebarGraphListeners.push({
+		element: graph.value,
+		eventName: HEATMAP_INTERACTION_CHANGE_EVENT,
+		handler: interactionHandler
+	})
+	heatmapModebarGraphListeners.push({
+		element: graph.value,
+		eventName: HEATMAP_RESET_VIEW_EVENT,
+		handler: resetHandler
+	})
+}
+
 const loadZBlendPreset = async ( requestID = null ) => {
 
 	ensureDefaultZBlendState()
@@ -5295,11 +5962,23 @@ const triggerJsonDownload = ( filename, payload ) => {
 
 const downloadSelectedRoi = () => {
 
-	if( selectedRoi.value === null ) return
+	if( selectedRois.value.length === 0 ) return
 
-	const roi = roiWithXAxis( selectedRoi.value )
-	const roiName = sanitizeRoiFilenameToken( selectedRoi.value?.name, "roi" )
-	triggerJsonDownload( `roi_${roiName}.json`, roi )
+	if( selectedRois.value.length === 1 ){
+		const roi = roiWithXAxis( selectedRois.value[0] )
+		const roiName = sanitizeRoiFilenameToken( selectedRois.value[0]?.name, "roi" )
+		triggerJsonDownload( `roi_${roiName}.json`, roi )
+		return
+	}
+
+	const projectToken = sanitizeRoiFilenameToken( project.value?.id, "project" )
+	const payload = {
+		projectID: project.value?.id ?? "",
+		roiCount: selectedRois.value.length,
+		rois: selectedRois.value.map(( roi ) => roiWithXAxis( roi ))
+	}
+
+	triggerJsonDownload( `selected_rois_${projectToken}.json`, payload )
 }
 
 const downloadAllRois = () => {
@@ -5404,22 +6083,16 @@ const saveXyzSettings = async ( payload ) => {
 	}
 }
 
-const toggleAllRoiOverlays = async () => {
+const toggleAllRoiOverlays = () => {
 
-	showAllRoiOverlays.value = !showAllRoiOverlays.value
-
-	if( graph.value === null ) return
-	if( currentMatrix() === null ) return
-
-	try{
-		await renderCurrentMatrix()
-	} catch( error ){
-		console.log( error )
+	if( showAllRoiOverlays.value ){
+		clearSelectedRois()
+		return
 	}
-}
 
-const setRoiEstimateUncertaintyMode = ( mode ) => {
-	roiEstimateUncertaintyMode.value = mode === "hide" ? "hide" : "show"
+	selectedRoiIds.value = rois.value
+		.map(( roi ) => String( roi?.roiId ?? "" ).trim() )
+		.filter(( roiId ) => roiId.length > 0 )
 }
 
 const saveRoi = async ( payload ) => {
@@ -5449,7 +6122,7 @@ const saveRoi = async ( payload ) => {
 
 		const matchedRoiId = newestMatchingRoiId( payload?.name, payload?.description ?? "" )
 		if( matchedRoiId.length > 0 ){
-			selectedRoiId.value = matchedRoiId
+			selectedRoiIds.value = [ matchedRoiId ]
 		}
 
 		roiSaveModal.value?.close()
@@ -5464,18 +6137,30 @@ const deleteSelectedRoi = async () => {
 
 	if( deletingRoi.value ) return
 	if( canMutateRois.value === false ) return
-	if( selectedRoi.value === null ) return
+	if( selectedRois.value.length === 0 ) return
 
-	const roiId = selectedRoi.value.roiId
+	const roiIds = selectedRois.value
+		.map(( roi ) => String( roi?.roiId ?? "" ).trim() )
+		.filter(( roiId ) => roiId.length > 0 )
+	if( roiIds.length === 0 ) return
 	deletingRoi.value = true
 
 	try{
-		await hyperspectra.deleteRoi( project.value, roiId )
-		selectedRoiId.value = ""
+		const deletionResults = await Promise.allSettled(
+			roiIds.map(( roiId ) => hyperspectra.deleteRoi( project.value, roiId ))
+		)
+		selectedRoiIds.value = selectedRoiIds.value.filter(( value ) => {
+			return roiIds.includes( String( value ?? "" ).trim() ) === false
+		})
 		await loadRoiList( true )
 		resetEstimatedRoiArtifacts()
 		await loadEstimatedRoiList( true )
 		roiDeleteModal.value?.close()
+
+		const failedDeletion = deletionResults.find(( result ) => result.status === "rejected" )
+		if( failedDeletion?.status === "rejected" ){
+			throw failedDeletion.reason
+		}
 	} catch( error ){
 		console.log( error )
 	} finally {
@@ -5547,14 +6232,14 @@ const updateLatestMeanSpectrum = ( source, xIndices, yIndices, boundingBox, resp
 	latestMeasurementSelectedSpectrum.value = response ?? null
 }
 
-const queryPointSpectrumForSource = async ( source, x, y ) => {
+const cancelSelectionSpectrumQueryState = () => {
+	cancelSelectionSpectrumQuery( "measurement" )
+	cancelSelectionSpectrumQuery( "raman" )
+}
+
+const queryPointSpectrumForSource = async ( source, x, y, requestID ) => {
 
 	const normalizedSource = normalizeSpectrumSource( source )
-	const requestIDRef = normalizedSource === "raman"
-		? activeRamanSingleSpectrumRequestID
-		: activeMeasurementSingleSpectrumRequestID
-	const requestID = requestIDRef.value + 1
-	requestIDRef.value = requestID
 
 	try{
 		const response = await hyperspectra.spectrum(
@@ -5567,22 +6252,20 @@ const queryPointSpectrumForSource = async ( source, x, y ) => {
 			confidenceLevelsForSpectrumSource( normalizedSource )
 		)
 
-		if( requestID !== requestIDRef.value ) return
+		if( isSelectionSpectrumQueryCurrent( normalizedSource, requestID ) === false ) return
 
 		updateLatestSingleSpectrum( normalizedSource, x, y, response )
+		await queueSpectraPanelRender()
 	} catch( error ){
 		console.log( error )
+	} finally {
+		finishSelectionSpectrumQuery( normalizedSource, requestID )
 	}
 }
 
-const queryMeanSpectrumForSource = async ( source, xIndices, yIndices, boundingBox ) => {
+const queryMeanSpectrumForSource = async ( source, xIndices, yIndices, boundingBox, requestID ) => {
 
 	const normalizedSource = normalizeSpectrumSource( source )
-	const requestIDRef = normalizedSource === "raman"
-		? activeRamanMeanSpectrumRequestID
-		: activeMeasurementMeanSpectrumRequestID
-	const requestID = requestIDRef.value + 1
-	requestIDRef.value = requestID
 
 	try{
 		const response = await hyperspectra.meanSpectrum(
@@ -5595,11 +6278,14 @@ const queryMeanSpectrumForSource = async ( source, xIndices, yIndices, boundingB
 			confidenceLevelsForSpectrumSource( normalizedSource )
 		)
 
-		if( requestID !== requestIDRef.value ) return
+		if( isSelectionSpectrumQueryCurrent( normalizedSource, requestID ) === false ) return
 
 		updateLatestMeanSpectrum( normalizedSource, xIndices, yIndices, boundingBox, response )
+		await queueSpectraPanelRender()
 	} catch( error ){
 		console.log( error )
+	} finally {
+		finishSelectionSpectrumQuery( normalizedSource, requestID )
 	}
 }
 
@@ -5625,8 +6311,12 @@ const handleHeatmapPointSelection = async ( selection ) => {
 	})
 
 	const sources = spectrumSourcesToQuery()
-	await Promise.all( sources.map(( source ) => queryPointSpectrumForSource( source, x, y )))
-	await renderCurrentMatrix()
+	cancelSelectionSpectrumQueriesForInactiveSources( sources )
+
+	for( const source of sources ){
+		const requestID = startSelectionSpectrumQuery( source )
+		void queryPointSpectrumForSource( source, x, y, requestID )
+	}
 }
 
 const handleHeatmapRegionSelection = async ( selection ) => {
@@ -5647,8 +6337,12 @@ const handleHeatmapRegionSelection = async ( selection ) => {
 	selectedHeatmapBoundingBox.value = boundingBox
 
 	const sources = spectrumSourcesToQuery()
-	await Promise.all( sources.map(( source ) => queryMeanSpectrumForSource( source, xIndices, yIndices, boundingBox )))
-	await renderCurrentMatrix()
+	cancelSelectionSpectrumQueriesForInactiveSources( sources )
+
+	for( const source of sources ){
+		const requestID = startSelectionSpectrumQuery( source )
+		void queryMeanSpectrumForSource( source, xIndices, yIndices, boundingBox, requestID )
+	}
 }
 
 const handleHeatmapZoomRange = async ( payload ) => {
@@ -7100,16 +7794,19 @@ const resolveCurrentPlotRenderSpec = ( sharedOptions ) => {
 				loadingSeries: [
 					{
 						componentIndex: pcaRgbChannels.value.r,
+						legendKey: `loading-r-${pcaRgbChannels.value.r}`,
 						label: "R - PC" + redComponentLabel,
 						color: "rgb(239, 68, 68)"
 					},
 					{
 						componentIndex: pcaRgbChannels.value.g,
+						legendKey: `loading-g-${pcaRgbChannels.value.g}`,
 						label: "G - PC" + greenComponentLabel,
 						color: "rgb(34, 197, 94)"
 					},
 					{
 						componentIndex: pcaRgbChannels.value.b,
+						legendKey: `loading-b-${pcaRgbChannels.value.b}`,
 						label: "B - PC" + blueComponentLabel,
 						color: "rgb(59, 130, 246)"
 					}
@@ -7168,6 +7865,12 @@ const renderDeckSidePanels = async ( plotOptions, initialize = false ) => {
 		return
 	}
 
+	deckTopPanelGraph.value.__harkanaSpectrumLegendVisible = topSpectrumPaneLegendVisible.value
+	deckTopPanelGraph.value.__harkanaSpectrumHighlightGroup = hoveredSpectrumLegendKey.value
+	deckBottomPanelGraph.value.__harkanaSpectrumHighlightGroup = hoveredSpectrumLegendKey.value
+	deckTopPanelGraph.value.__harkanaHiddenSpectrumTraceGroups = normalizedHiddenSpectrumLegendKeys.value
+	deckBottomPanelGraph.value.__harkanaHiddenSpectrumTraceGroups = normalizedHiddenSpectrumLegendKeys.value
+
 	const nextUpperKey = upperPanelRenderKey( plotOptions )
 	const nextLowerKey = lowerPanelRenderKey( plotOptions )
 	const shouldRenderUpper = initialize ||
@@ -7211,6 +7914,49 @@ const renderDeckHeatmapPane = async ( matrix, plotSpec, initialize = false ) => 
 	lastDeckHeatmapPaneKey.value = nextPaneKey
 }
 
+const currentPlotSharedOptions = () => {
+
+	const bottomLeftOptions = bottomLeftSpectrumOptions()
+
+	return {
+		selectedSpectrum: bottomLeftOptions.selectedSpectrum,
+		bottomLeftSpectrum: bottomLeftOptions.bottomLeftSpectrum,
+		topLeftSpectrum: topLeftSpectrumOptions(),
+		topSpectrumGridlineSource: topSpectrumGridlineSourceKey(),
+		bottomSpectrumGridlineSource: bottomSpectrumGridlineSourceKey(),
+		projectSpectrumGridlines: normalizeProjectSpectrumGridlineState( projectSpectrumGridlinesVisible.value ),
+		roiOverlays: activeRoiOverlays(),
+		axes: plotAxes(),
+		heatmapRenderer: heatmapRendererMode.value
+	}
+}
+
+const renderCurrentSpectraPanels = async () => {
+
+	if( graph.value === null ) return
+
+	const matrix = currentMatrix()
+	if( matrix === null ) return
+
+	const plotSpec = resolveCurrentPlotRenderSpec( currentPlotSharedOptions() )
+
+	if( heatmapRendererMode.value === "deckgl" ){
+		await renderDeckSidePanels( plotSpec.options, false )
+		return
+	}
+
+	const renderFunction = plotlyGraphHasData( graph.value ) ? plotSpec.update : plotSpec.initialize
+	await renderFunction( matrix, graph.value, settings.value, plotSpec.options )
+}
+
+const queueSpectraPanelRender = () => {
+	queuedSpectraPanelRender = queuedSpectraPanelRender
+		.catch(() => {})
+		.then(() => renderCurrentSpectraPanels() )
+
+	return queuedSpectraPanelRender
+}
+
 const togglePcaComponent = async ( componentIndex ) => {
 
 	const normalizedComponent = Number.parseInt( componentIndex, 10 )
@@ -7225,8 +7971,8 @@ const togglePcaComponent = async ( componentIndex ) => {
 
 	showPcaLoadings.value = activePcaComponents.value.length > 0
 
-	if( selectedRoiId.value !== "" ){
-		selectedRoiId.value = ""
+	if( selectedRoiIds.value.length > 0 ){
+		clearSelectedRois()
 		return
 	}
 
@@ -7252,6 +7998,9 @@ const renderCurrentMatrix = async ( initialize = false ) => {
 	}
 
 	syncSpectrumGridlineGraphListeners()
+	syncSpectrumLegendGraphListeners()
+	syncHeatmapModebarGraphListeners()
+	hyperspectrum.syncHeatmapModebarState( graph.value, heatmapInteractionMode.value, heatmapZoomAspectRatio.value )
 	await applyProjectSpectrumGridlineState( projectSpectrumGridlinesVisible.value )
 
 	const matrix = currentMatrix()
@@ -7274,19 +8023,7 @@ const renderCurrentMatrix = async ( initialize = false ) => {
 	} else {
 		pendingDeckRenderBenchmark.value = null
 	}
-	const bottomLeftOptions = bottomLeftSpectrumOptions()
-	const sharedOptions = {
-		selectedSpectrum: bottomLeftOptions.selectedSpectrum,
-		bottomLeftSpectrum: bottomLeftOptions.bottomLeftSpectrum,
-		topLeftSpectrum: topLeftSpectrumOptions(),
-		topSpectrumGridlineSource: topSpectrumGridlineSourceKey(),
-		bottomSpectrumGridlineSource: bottomSpectrumGridlineSourceKey(),
-		projectSpectrumGridlines: normalizeProjectSpectrumGridlineState( projectSpectrumGridlinesVisible.value ),
-		roiOverlays: activeRoiOverlays(),
-		axes: plotAxes(),
-		heatmapRenderer: heatmapRendererMode.value
-	}
-	const plotSpec = resolveCurrentPlotRenderSpec( sharedOptions )
+	const plotSpec = resolveCurrentPlotRenderSpec( currentPlotSharedOptions() )
 
 	if( heatmapRendererMode.value === "deckgl" ){
 		await renderDeckSidePanels( plotSpec.options, initialize )
@@ -7681,7 +8418,7 @@ const activePlotUsesRpcaLoadings = () => {
 const ensureActivePlotLoadings = async ( priority = "high" ) => {
 
 	if( showPcaLoadings.value === false ) return
-	if( selectedRoi.value !== null ) return
+	if( activeDisplayedRois.value.length > 0 ) return
 
 	if( activePlotUsesPcaLoadings() ){
 		if( usesEstimatedLoadings() ){
@@ -8367,6 +9104,8 @@ const resetViewerState = () => {
 	scheduledDisplayPayloadPrewarmTargets.clear()
 	debouncedSaveProjectSpectrumGridlinePreset.cancel()
 	clearSpectrumGridlineGraphListeners()
+	clearSpectrumLegendGraphListeners()
+	clearHeatmapModebarGraphListeners()
 	displayPayloadPrewarmRequestID += 1
 	activeLayerRequestID.value += 1
 	activeLayerPayloadPrewarmRequestID.value += 1
@@ -8432,7 +9171,7 @@ const resetViewerState = () => {
 		lastMeasuredAt: null
 	}
 	selectedConfidenceLevel.value = defaultSelectionConfidenceLevel()
-	roiEstimateUncertaintyMode.value = defaultRoiEstimateUncertaintyMode()
+	roiEstimateUncertaintyLevel.value = defaultRoiEstimateUncertaintyLevel()
 	mip.value = null
 	mipHsv.value = null
 	umap.value = null
@@ -8463,10 +9202,10 @@ const resetViewerState = () => {
 	rpcaLoadings.value = null
 	showPcaLoadings.value = defaultShowPcaLoadings()
 	showSelectedSpectra.value = true
+	cancelSelectionSpectrumQueryState()
 	rois.value = []
 	resetEstimatedRoiArtifacts()
-	selectedRoiId.value = ""
-	showAllRoiOverlays.value = false
+	selectedRoiIds.value = []
 	selectedHeatmapIndices.value = { xIndices: [], yIndices: [] }
 	selectedHeatmapBoundingBox.value = null
 	latestMeasurementSingleSpectrum.value = null
@@ -8475,7 +9214,6 @@ const resetViewerState = () => {
 	latestRamanSingleSpectrum.value = null
 	latestRamanMeanSpectrum.value = null
 	latestRamanSelectedSpectrum.value = null
-	ramanRoiSpectrum.value = null
 	activeLayerIndex.value = 0
 	activePcaClassificationComponentCount.value = 0
 	activePcaMipComponentCount.value = 0
@@ -8681,6 +9419,49 @@ watch( pcaLegend, async ( legendEntries ) => {
 	}
 }, { immediate: true })
 
+watch( [ topSpectrumPaneLegendVisible, () => topSpectrumPaneLegendEntries.value.length ], async () => {
+
+	hoveredSpectrumLegendKey.value = ""
+
+	await nextTick()
+	await new Promise(( resolve ) => requestAnimationFrame( resolve ))
+	await resizePlotlyContainer( deckTopPanelGraph.value )
+}, { flush: "post" })
+
+watch( topSpectrumPaneLegendEntries, ( legendEntries ) => {
+	const currentKey = String( hoveredSpectrumLegendKey.value ?? "" ).trim()
+	if( currentKey.length === 0 ){
+		return
+	}
+
+	const hasCurrentEntry = Array.isArray( legendEntries ) && legendEntries.some(( entry ) => entry?.key === currentKey )
+	if( hasCurrentEntry === false ){
+		hoveredSpectrumLegendKey.value = ""
+	}
+}, { flush: "post" })
+
+watch( hoveredSpectrumLegendKey, async ( nextKey ) => {
+	try{
+		await Promise.all([
+			hyperspectrum.setSpectrumHighlightGroup( deckTopPanelGraph.value, nextKey ),
+			hyperspectrum.setSpectrumHighlightGroup( deckBottomPanelGraph.value, nextKey )
+		])
+	} catch( error ){
+		console.log( error )
+	}
+}, { flush: "post" })
+
+watch( normalizedHiddenSpectrumLegendKeys, async ( nextKeys ) => {
+	try{
+		await Promise.all([
+			hyperspectrum.setSpectrumHiddenGroups( deckTopPanelGraph.value, nextKeys ),
+			hyperspectrum.setSpectrumHiddenGroups( deckBottomPanelGraph.value, nextKeys )
+		])
+	} catch( error ){
+		console.log( error )
+	}
+}, { flush: "post" })
+
 watch( () => route.params.id, async ( nextProjectID, previousProjectID ) => {
 
 	if( typeof nextProjectID !== "string" || nextProjectID.length === 0 ) return
@@ -8828,6 +9609,7 @@ watch( heatmapInteractionMode, async () => {
 		await applyHeatmapInteraction()
 		syncHeatmapViewportSyncListener()
 		await syncExternalHeatmapRenderer()
+		hyperspectrum.syncHeatmapModebarState( graph.value, heatmapInteractionMode.value, heatmapZoomAspectRatio.value )
 	} catch( error ){
 		console.log( error )
 	}
@@ -8875,9 +9657,14 @@ watch( heatmapRendererMode, async () => {
 	}
 })
 
-watch( selectedRoiId, async () => {
+watch( selectedRoiIds, async () => {
 
-	await refreshRamanRoiSpectrum()
+	await nextTick()
+	await new Promise(( resolve ) => {
+		window.requestAnimationFrame(() => resolve() )
+	})
+
+	void refreshRamanRoiSpectrum()
 
 	if( graph.value === null ) return
 
@@ -8974,15 +9761,16 @@ watch( selectedConfidenceLevel, async ( nextLevel ) => {
 	}
 })
 
-watch( roiEstimateUncertaintyMode, async ( nextMode ) => {
+watch( roiEstimateUncertaintyLevel, async ( nextLevel ) => {
 
-	if( nextMode !== "show" && nextMode !== "hide" ){
-		roiEstimateUncertaintyMode.value = "show"
+	const normalizedLevel = normalizeRoiEstimateUncertaintyLevel( nextLevel )
+	if( normalizedLevel !== nextLevel ){
+		roiEstimateUncertaintyLevel.value = normalizedLevel
 		return
 	}
 
 	if( graph.value === null ) return
-	if( selectedRoi.value === null ) return
+	if( activeDisplayedRois.value.length === 0 ) return
 
 	try{
 		await renderCurrentMatrix()
@@ -8996,7 +9784,9 @@ watch( hasEstimatedRamanSpectraReady, async ( isReady ) => {
 	if( isReady === false ){
 		spectrumDataSource.value = "measurement"
 		primarySpectrumSource.value = "measurement"
-		ramanRoiSpectrum.value = null
+		cancelSelectionSpectrumQuery( "raman" )
+		ramanRoiSpectraById.value = {}
+		activeRamanRoiRequestIDs.value = {}
 		latestRamanSingleSpectrum.value = null
 		latestRamanMeanSpectrum.value = null
 		latestRamanSelectedSpectrum.value = null
@@ -9062,7 +9852,10 @@ onBeforeUnmount( () => {
 	removeHeatmapViewportSyncListener()
 	stopDeckPaneResize()
 	debouncedSaveProjectSpectrumGridlinePreset.cancel()
+	cancelSelectionSpectrumQueryState()
 	clearSpectrumGridlineGraphListeners()
+	clearSpectrumLegendGraphListeners()
+	clearHeatmapModebarGraphListeners()
 	clearProjectBackgroundWork()
 	if( typeof removeProjectBackgroundInteractionListeners === "function" ){
 		removeProjectBackgroundInteractionListeners()
@@ -9112,6 +9905,27 @@ onBeforeUnmount( () => {
 .z-blend-value-input::-webkit-outer-spin-button {
 	-webkit-appearance: none;
 	margin: 0;
+}
+
+.deck-heatmap-pane :deep(.modebar-container) {
+	top: -2.25rem !important;
+	right: 0.25rem !important;
+	z-index: 30 !important;
+	pointer-events: none;
+}
+
+.deck-heatmap-pane :deep(.modebar) {
+	opacity: 0;
+	z-index: 31 !important;
+	pointer-events: none;
+	transition: opacity 0.15s ease;
+}
+
+.deck-heatmap-pane:hover :deep(.modebar),
+.deck-heatmap-pane:focus-within :deep(.modebar),
+.deck-heatmap-pane.tutorial-modebar-visible :deep(.modebar) {
+	opacity: 1;
+	pointer-events: auto;
 }
 
 .roi-refresh-spin {

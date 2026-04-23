@@ -75,6 +75,8 @@ const props = defineProps({
     }
 })
 
+const emit = defineEmits([ "close" ])
+
 const isVisible = ref(false)
 const dialog    = ref<HTMLElement | null>(null)
 var lastFocusedElement: HTMLElement | null = null
@@ -91,6 +93,7 @@ const open = async () => {
 const close = () => {
     isVisible.value = false
     lastFocusedElement?.focus()
+    emit( "close" )
 }
 
 /* ESC handler now respects showClose */

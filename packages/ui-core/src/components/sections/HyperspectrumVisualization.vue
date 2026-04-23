@@ -295,7 +295,7 @@
 					</label>
 
 					<label class = "block">
-						<div class = "mb-1 text-xs font-semibold uppercase tracking-wide text-black/70">Selection confidence level</div>
+						<div class = "mb-1 text-xs font-semibold uppercase tracking-wide text-black/70">Selection uncertainty level</div>
 						<select v-model = "viewerDefaults.selectionConfidenceLevel"
 								class = "w-full border-0 border-b border-black/35 bg-transparent px-0 py-1 text-sm font-medium text-slate-900 focus:border-brand focus:outline-none focus-visible:border-brand">
 							<option value = "none">No uncertainty</option>
@@ -316,12 +316,14 @@
 
 			<div class = "space-y-4">
 				<div class = "text-xs font-semibold uppercase tracking-wide text-black/70">ROI comparison plot</div>
+				<p class = "text-sm text-black/70">
+					These colors are applied to plotted regions of interest in order. The first plotted region uses the first color.
+				</p>
 				<div class = "grid gap-5 md:grid-cols-2">
-					<ColorPicker v-model = "roiColors.roiSpectrum"
-								 description = "ROI spectrum color">
-					</ColorPicker>
-					<ColorPicker v-model = "roiColors.roiInterval"
-								 description = "ROI interval color">
+					<ColorPicker v-for = "( color, index ) in roiPalette"
+								 :key = "'roi-palette-' + index"
+								 v-model = "roiPalette[index]"
+								 :description = "'ROI color ' + ( index + 1 )">
 					</ColorPicker>
 				</div>
 
@@ -345,11 +347,14 @@
 					</label>
 
 					<label class = "block">
-						<div class = "mb-1 text-xs font-semibold uppercase tracking-wide text-black/70">Estimate ROI uncertainty</div>
+						<div class = "mb-1 text-xs font-semibold uppercase tracking-wide text-black/70">Estimate uncertainty level</div>
 						<select v-model = "viewerDefaults.roiEstimateUncertainty"
 								class = "w-full border-0 border-b border-black/35 bg-transparent px-0 py-1 text-sm font-medium text-slate-900 focus:border-brand focus:outline-none focus-visible:border-brand">
-							<option value = "show">Show</option>
-							<option value = "hide">Hide</option>
+							<option value = "none">No uncertainty</option>
+							<option value = "50">50%</option>
+							<option value = "75">75%</option>
+							<option value = "90">90%</option>
+							<option value = "95">95%</option>
 						</select>
 					</label>
 				</div>
@@ -534,6 +539,18 @@ const DEFAULT_Z_BLEND_PALETTE = [
 	"#ff00ff",
 	"#ffff00"
 ]
+const DEFAULT_ROI_PALETTE = [
+	"#ff7f0e",
+	"#2ca02c",
+	"#d62728",
+	"#9467bd",
+	"#8c564b",
+	"#e377c2",
+	"#7f7f7f",
+	"#bcbd22",
+	"#17becf",
+	"#333333"
+]
 const DEFAULT_HYPERSPECTRUM_PRIORITIZATION = {
 	mip: true,
 	mip_hsv: true,
@@ -562,6 +579,7 @@ const prioritizationEntries = [
 ]
 
 const zBlendPalette = reactive([ ...DEFAULT_Z_BLEND_PALETTE ])
+const roiPalette = reactive([ ...DEFAULT_ROI_PALETTE ])
 
 const roiColors = reactive({
 	roiSpectrum: "#333333",
@@ -590,7 +608,7 @@ const viewerDefaults = reactive({
 	selectionConfidenceLevel: "95",
 	loadings: "hide",
 	falseColoringBasis: "measurement",
-	roiEstimateUncertainty: "show"
+	roiEstimateUncertainty: "95"
 })
 const prioritization = reactive({ ...DEFAULT_HYPERSPECTRUM_PRIORITIZATION })
 
@@ -654,6 +672,19 @@ const normalizeSelectionConfidenceLevel = ( value ) => {
 	return "95"
 }
 
+const normalizeRoiEstimateUncertaintyLevel = ( value ) => {
+	const normalized = String( value ?? "" ).trim().toLowerCase()
+	if( normalized === "show" ){
+		return "95"
+	}
+
+	if( normalized === "hide" ){
+		return "none"
+	}
+
+	return normalizeSelectionConfidenceLevel( value )
+}
+
 const normalizeShowHide = ( value, fallback = "hide" ) => {
 	const normalized = String( value ?? "" ).trim().toLowerCase()
 	if( normalized === "show" || normalized === "hide" ){
@@ -675,6 +706,24 @@ const normalizeZBlendPalette = ( value ) => {
 
 	while( resolvedPalette.length < DEFAULT_Z_BLEND_PALETTE.length ){
 		resolvedPalette.push( DEFAULT_Z_BLEND_PALETTE[resolvedPalette.length] )
+	}
+
+	return resolvedPalette
+}
+
+const normalizeRoiPalette = ( value, primaryFallback = DEFAULT_ROI_PALETTE[0] ) => {
+	const source = Array.isArray( value ) ? value : []
+	const fallbackPrimary = typeof primaryFallback === "string" && primaryFallback.trim().length > 0
+		? primaryFallback.trim()
+		: DEFAULT_ROI_PALETTE[0]
+	const defaultPalette = [ fallbackPrimary, ...DEFAULT_ROI_PALETTE.slice( 1 ) ]
+	const resolvedPalette = source
+		.map(( entry ) => String( entry ?? "" ).trim() )
+		.filter(( entry ) => entry.length > 0 )
+		.slice( 0, defaultPalette.length )
+
+	while( resolvedPalette.length < defaultPalette.length ){
+		resolvedPalette.push( defaultPalette[resolvedPalette.length] )
 	}
 
 	return resolvedPalette
@@ -750,6 +799,13 @@ const syncFromSettings = ( savedSettings ) => {
 		typeof savedSettings?.hyperspectrumColors?.selectionBox === "string" && savedSettings.hyperspectrumColors.selectionBox.length > 0
 			? savedSettings.hyperspectrumColors.selectionBox
 			: "#9ca3af"
+	const normalizedRoiPalette = normalizeRoiPalette(
+		savedSettings?.hyperspectrumColors?.roiPalette,
+		roiColors.roiSpectrum
+	)
+	for( let index = 0; index < DEFAULT_ROI_PALETTE.length; index++ ){
+		roiPalette[index] = normalizedRoiPalette[index]
+	}
 
 	umapChannelColors.r =
 		typeof savedSettings?.hyperspectrumColors?.umapChannels?.r === "string" && savedSettings.hyperspectrumColors.umapChannels.r.length > 0
@@ -814,9 +870,8 @@ const syncFromSettings = ( savedSettings ) => {
 	viewerDefaults.falseColoringBasis = normalizeFalseColoringBasis(
 		savedSettings?.hyperspectrumDefaults?.falseColoringBasis
 	)
-	viewerDefaults.roiEstimateUncertainty = normalizeShowHide(
-		savedSettings?.hyperspectrumDefaults?.roiEstimateUncertainty,
-		"show"
+	viewerDefaults.roiEstimateUncertainty = normalizeRoiEstimateUncertaintyLevel(
+		savedSettings?.hyperspectrumDefaults?.roiEstimateUncertainty
 	)
 	const normalizedPrioritization = normalizePrioritization(
 		savedSettings?.hyperspectrumPrioritization
@@ -882,12 +937,16 @@ const updateSettings = async () => {
 		layer: colormaps.layer
 	}
 
+	const normalizedRoiPalette = normalizeRoiPalette( roiPalette )
+	const primaryRoiColor = normalizedRoiPalette[0] ?? DEFAULT_ROI_PALETTE[0]
+
 	savedSettings.hyperspectrumColors = {
 		...( savedSettings.hyperspectrumColors ?? {} ),
 		queriedSpectrum: spectrumColors.queriedSpectrum,
 		queriedInterval: spectrumColors.queriedInterval,
-		roiSpectrum: roiColors.roiSpectrum,
-		roiInterval: roiColors.roiInterval,
+		roiSpectrum: primaryRoiColor,
+		roiInterval: primaryRoiColor,
+		roiPalette: normalizedRoiPalette,
 		roiBox: roiColors.roiBox,
 		roiTitle: roiColors.roiTitle,
 		selectionBox: roiColors.selectionBox,
@@ -930,7 +989,9 @@ const updateSettings = async () => {
 			: Number.parseInt( normalizeSelectionConfidenceLevel( viewerDefaults.selectionConfidenceLevel ), 10 ),
 		loadings: normalizeShowHide( viewerDefaults.loadings, "hide" ),
 		falseColoringBasis: normalizeFalseColoringBasis( viewerDefaults.falseColoringBasis ),
-		roiEstimateUncertainty: normalizeShowHide( viewerDefaults.roiEstimateUncertainty, "show" )
+		roiEstimateUncertainty: viewerDefaults.roiEstimateUncertainty === "none"
+			? "none"
+			: Number.parseInt( normalizeRoiEstimateUncertaintyLevel( viewerDefaults.roiEstimateUncertainty ), 10 )
 	}
 	savedSettings.hyperspectrumPrioritization = {
 		...( savedSettings.hyperspectrumPrioritization ?? {} ),

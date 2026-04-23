@@ -71,11 +71,11 @@ function buildSpectrumGridlineRelayout( graphContainer, showGrid, axisKeys = [] 
 }
 
 function normalizeModebarButtonSpacing( graphContainer ){
-    const customButton = graphContainer?.querySelector?.('.modebar-btn[data-attr="toggle-gridlines"]')
-    const customGroup = customButton?.closest?.('.modebar-group')
+    const modebarGroups = Array.from( graphContainer?.querySelectorAll?.(".modebar-group") ?? [] )
 
-    if( customGroup && customGroup.parentElement?.lastElementChild === customGroup ){
-        customGroup.style.marginLeft = "0px"
+    for( const group of modebarGroups ){
+        group.style.marginLeft = "0px"
+        group.style.paddingLeft = "0px"
     }
 }
 
