@@ -1,5 +1,6 @@
 import { Amplify } from 'aws-amplify'
 import { apiFetch, buildQueryString } from './http'
+import { parseJsonBytes, parseJsonString } from "../jsonParseWorkerClient.js"
 
 type ShareInfo = {
     projectId: string
@@ -67,28 +68,45 @@ var list = async () => {
     const shareInfos = await apiFetch<ShareInfo[]>( url )
     const nShares = shareInfos.length
 
-    if( nShares == 0 ) return []
+    if( nShares == 0 ) return {}
 
     var sharedProjects: SharedProjectsMap = {}
 
     for( var ii = 0; ii < nShares; ii++ ){
 
         const shareInfo = shareInfos[ii]
-        var projectInfo = await load( shareInfo, "info.json" ) as SharedProjectInfo
+        try{
+            var projectInfo = await load( shareInfo, "info.json" ) as SharedProjectInfo
 
-        projectInfo.shared = true
-        projectInfo.rawid = projectInfo.id
-        projectInfo.id = shareInfo.projectKey
-        projectInfo.shareInfo = shareInfo
+            if( projectInfo === null || typeof projectInfo !== "object" ){
+                continue
+            }
 
-        sharedProjects[ projectInfo.id ] = projectInfo
+            projectInfo.shared = true
+            projectInfo.rawid = projectInfo.id
+            projectInfo.id = shareInfo.projectKey
+            projectInfo.shareInfo = shareInfo
+
+            sharedProjects[ projectInfo.id ] = projectInfo
+        } catch( error ){
+            console.log( "Skipping unavailable shared project:", shareInfo.projectKey, error )
+            try{
+                await removeShared({
+                    id: shareInfo.projectKey,
+                    shared: true
+                })
+            } catch( removeError ){
+                console.log( "Failed to remove unavailable shared project:", shareInfo.projectKey, removeError )
+            }
+            continue
+        }
     }
 
     return sharedProjects
 }
 
 
-var load = async ( shareInfo: ShareInfo, fileName: string ) => {
+var load = async ( shareInfo: ShareInfo, fileName: string, options: Record<string, any> = {} ) => {
 
     var parameters = await apiParameters( { id: null } )
     parameters.projectID = shareInfo.projectId
@@ -99,8 +117,28 @@ var load = async ( shareInfo: ShareInfo, fileName: string ) => {
     const response = await apiFetch<ShareGetUrlResponse>( url )
 
     try{
-        var result = await fetch( response.url )
-        return await result.json()
+        const result = await fetch( response.url )
+
+        if( result.ok === false ){
+            throw new Error( "Shared file request failed with status " + String( result.status ))
+        }
+
+        try{
+            if( options?.priority === "low" ){
+                const resultBytes = await result.arrayBuffer()
+                return await parseJsonBytes( resultBytes, {
+                    useWorker: true
+                } )
+            }
+
+            const resultText = await result.text()
+            return await parseJsonString( resultText, {
+                useWorker: false
+            } )
+        } catch( parseError ){
+            console.log( parseError )
+            throw new Error( "Invalid shared file response for " + fileName )
+        }
     } catch( error ){
         console.log( error )
         throw new Error( "The shared project is not available at the moment. Please try again later." )

@@ -41,8 +41,6 @@
 		<tbody>
 			<tr v-for="(project, index) in sortedProjects"
 			    :key="project.id"
-                @click="navigation.showProject( project, $event)"
-                @click.middle="navigation.showProject( project, $event)"
 			    class = "border-b border-gray-700">
 
 				<td class="w-10 px-3 py-1 text-center align-middle">
@@ -73,7 +71,7 @@
 <script setup lang="ts">
 
 import { ref, computed, watchEffect} from 'vue'
-import { format, navigation} from '@harkana/tools';
+import { format } from '@harkana/tools';
 
 import ProjectTableSortIcon from './ProjectTableSortIcon.vue';
 
@@ -132,7 +130,6 @@ const sortBy = (key: 'name' | 'owner' | 'modified') => {
 }
 
 </script>
-
 
 
 

@@ -11,7 +11,7 @@
             <strong>Active token source:</strong><br>
             {{ billingSettings.groupName }}
         </div>
-        <hr>
+        <hr class = "h-0.5 bg-gray border-0 my-1">
     </li>
 
     <BaseDropdownItem @select = "goSettings">

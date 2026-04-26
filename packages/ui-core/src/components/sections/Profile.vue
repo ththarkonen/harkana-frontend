@@ -1,103 +1,103 @@
 <template>
 <div class="prose prose-gray max-w-none">
 
-    <div v-if = "showError" class = "mt-4">
+    <div v-if = "showError" class = "mt-4 rounded-lg border border-red-500/50 bg-red-100/70 px-3 py-2 text-sm text-red-800">
         {{ errorMessage }}
     </div>
 
-    <TextField description = "Given name" placeholder = "" v-model = "givenName">
+    <h3 class = "m-0 text-lg font-bold text-black">Name and login settings</h3>
 
-        <label class="block mt-4">
-            <h4 class="mb-2 text-sm font-semibold text-black">
-                Family name
-            </h4>
+    <div class = "mt-5 max-w-2xl space-y-8">
+        <section class = "space-y-4">
+            <div class = "space-y-4">
+                <label class = "block">
+                    <div class = "mb-1 text-xs font-semibold uppercase tracking-wide text-black/70">Given name</div>
+                    <input type = "text"
+                           v-model = "givenName"
+                           class = "w-full border-0 border-b border-black/35 bg-transparent px-0 py-1 text-sm font-medium text-slate-900 caret-brand transition-[border-color,color] duration-150 ease-out placeholder:text-black/40 focus:border-brand focus:outline-none focus-visible:border-brand focus-visible:outline-none" />
+                </label>
+                <label class = "block">
+                    <div class = "mb-1 text-xs font-semibold uppercase tracking-wide text-black/70">Family name</div>
+                    <input type = "text"
+                           v-model = "familyName"
+                           class = "w-full border-0 border-b border-black/35 bg-transparent px-0 py-1 text-sm font-medium text-slate-900 caret-brand transition-[border-color,color] duration-150 ease-out placeholder:text-black/40 focus:border-brand focus:outline-none focus-visible:border-brand focus-visible:outline-none" />
+                </label>
 
-            <input
-                type="text"
-                v-model="familyName"
-                placeholder="Dataset description"
-                class="w-full rounded border border-gray-300 px-3 py-2 text-sm
-                       focus:outline-none focus:ring-2 focus:ring-brand">
-            </input>
-        </label>
+                <SettingsButton @click = "updateName"
+                                :loading = "updatingName"
+                                class = "mt-3">
+                    Update name
+                </SettingsButton>
+            </div>
+        </section>
 
-        <SettingsButton @click = "updateName" :loading = "updatingName" class = "mt-4">
-            Update name
-        </SettingsButton>
-
-    </TextField>
-
-    <hr class="h-0.5 bg-gray border-0 my-4">
-
-    <TextField description = "Email address" placeholder = "" v-model = "email">
-
-        <SettingsButton v-if = "!showVerification" @click = "updateEmail" :loading = "updatingEmail" class = "mt-4">
-            Update email
-        </SettingsButton>
-
-        <div v-if = "showVerification">
-            
-            <label class="block mt-4">
-                <h4 class="mb-2 text-sm font-semibold text-black">
-                    You will be automatically signed out upon succesful verification. A verification code has been sent
-                    to your new email address. This can take a few minutes to appear in your inbox. Please enter the verification code sent to your new email to verify:
-                </h4>
-
-                <input
-                    type="text"
-                    v-model="emailVerificationCode"
-                    placeholder="Verification code"
-                    class="w-full rounded border border-gray-300 px-3 py-2 text-sm
-                        focus:outline-none focus:ring-2 focus:ring-brand">
-                </input>
+        <section class = "space-y-4 pt-3">
+            <label class = "block">
+                <div class = "mb-1 text-xs font-semibold uppercase tracking-wide text-black/70">Email address</div>
+                <input type = "text"
+                       v-model = "email"
+                       class = "w-full border-0 border-b border-black/35 bg-transparent px-0 py-1 text-sm font-medium text-slate-900 caret-brand transition-[border-color,color] duration-150 ease-out placeholder:text-black/40 focus:border-brand focus:outline-none focus-visible:border-brand focus-visible:outline-none" />
             </label>
-            
-            <SettingsButton @click = "verifyEmail" :loading = "verifyingEmail" class = "mt-4">
+
+            <SettingsButton v-if = "!showVerification"
+                            @click = "updateEmail"
+                            :loading = "updatingEmail"
+                            class = "mt-3">
+                Update email
+            </SettingsButton>
+        </section>
+
+        <div v-if = "showVerification" class = "space-y-3">
+            <label class = "block">
+                <div class = "mb-1 text-xs font-semibold uppercase tracking-wide text-black/70">Verification code</div>
+                <input type = "text"
+                       v-model = "emailVerificationCode"
+                       placeholder = "Verification code"
+                       class = "w-full border-0 border-b border-black/35 bg-transparent px-0 py-1 text-sm font-medium text-slate-900 caret-brand transition-[border-color,color] duration-150 ease-out placeholder:text-black/40 focus:border-brand focus:outline-none focus-visible:border-brand focus-visible:outline-none" />
+            </label>
+            <SettingsButton @click = "verifyEmail"
+                            :loading = "verifyingEmail">
                 Verify email
             </SettingsButton>
         </div>
-        
+    </div>
 
-    </TextField>
+    <div class = "mt-12 max-w-2xl space-y-4">
+        <div class = "text-xs font-semibold uppercase tracking-wide text-black/70">Multi-factor authentication (MFA)</div>
+        <p class = "mt-0 text-sm text-black/65">
+            Set up or replace your authenticator application for account sign-in.
+        </p>
 
-    <hr class="h-0.5 bg-gray border-0 my-4">
-
-    <div>
-
-        <SettingsButton @click = "setupMFA" :loading = "generatingTOTP" class = "mt-0">
+        <SettingsButton @click = "setupMFA" :loading = "generatingTOTP">
             Enable or update multi-factor authentication (MFA)
         </SettingsButton>
 
-        <div v-if = "qrDataUrl" class = "w-full mt-4">
-            <div class = "border-brand rounded-lg border-2 p-4 shadow-black shadow-lg">
-                Open your authorized authenticator application and scan the displayed QR code,
-                or enter the alphanumeric code provided below directly into your application.
-                Your application will generate a 6-digit verification code.
-                Enter the code into the input field to complete the authentication process.
-                <img :src="qrDataUrl" class = "w-max-50"/>
-                <p class="font-mono text-sm w-full">{{ secret }}</p>
+        <div v-if = "qrDataUrl" class = "space-y-5 pt-1">
+            <p class = "m-0 text-sm text-black/65">
+                Scan the QR code in your authenticator app or enter the secret manually, then confirm the generated 6-digit code.
+            </p>
 
-                <label class="block mt-4">
-                    <h4 class="mb-2 text-sm font-semibold text-black">
-                        Enter the 6-digit verification code in your authenticator to finalize MFA.
-                    </h4>
+            <img :src = "qrDataUrl" class = "h-48 w-48 rounded-lg border border-black/10 bg-white p-3" />
 
-                    <input
-                        type="text"
-                        v-model="emailVerificationCode"
-                        placeholder="Verification code"
-                        class="w-full rounded border border-gray-300 px-3 py-2 text-sm
-                            focus:outline-none focus:ring-2 focus:ring-brand">
-                    </input>
+            <div class = "space-y-2">
+                <div class = "text-xs font-semibold uppercase tracking-wide text-black/70">Authenticator secret</div>
+                <p class = "m-0 break-all font-mono text-sm text-black/70">{{ secret }}</p>
+            </div>
+
+            <div class = "space-y-3">
+                <label class = "block">
+                    <div class = "mb-1 text-xs font-semibold uppercase tracking-wide text-black/70">Verification code</div>
+                    <input type = "text"
+                           v-model = "totpVerificationCode"
+                           placeholder = "Verification code"
+                           class = "w-full border-0 border-b border-black/35 bg-transparent px-0 py-1 text-sm font-medium text-slate-900 caret-brand transition-[border-color,color] duration-150 ease-out placeholder:text-black/40 focus:border-brand focus:outline-none focus-visible:border-brand focus-visible:outline-none" />
                 </label>
 
-                <SettingsButton @click = "verifyMFA" :loading = "verifyingTOTP" class = "mt-4">
+                <SettingsButton @click = "verifyMFA" :loading = "verifyingTOTP">
                     Verify MFA
                 </SettingsButton>
-
             </div>
         </div>
-
     </div>
 
 </div>
@@ -116,7 +116,6 @@ import { utils } from "@harkana/tools"
 Amplify.configure( awsconfig )
 const Auth = Amplify.Auth
 
-import TextField from "../settings/TextField.vue"
 import SettingsButton from "../settings/SettingsButton.vue"
 
 const givenName = ref("")
@@ -268,9 +267,9 @@ onMounted( async () => {
 
 	const user = await Auth.currentAuthenticatedUser();
 
-	givenName.value = user.attributes.given_name;
-	familyName.value = user.attributes.family_name;
-	email.value = user.attributes.email;
+	if ( givenName.value === "" ) givenName.value = user.attributes.given_name ?? "";
+	if ( familyName.value === "" ) familyName.value = user.attributes.family_name ?? "";
+	if ( email.value === "" ) email.value = user.attributes.email ?? "";
 })
 
 </script>

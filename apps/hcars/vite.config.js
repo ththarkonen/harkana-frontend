@@ -2,15 +2,19 @@ import { defineConfig } from 'vite';
 import vue from '@vitejs/plugin-vue';
 import { fileURLToPath } from 'url';
 import path from 'path';
+import { defineFrontendVersion, resolveFrontendVersion } from '../../build/versioning.mjs';
 
 const filename = fileURLToPath(import.meta.url);
 const pathSegments = path.dirname(filename);
+const versionInfo = resolveFrontendVersion(import.meta.url);
 
 export default defineConfig({
   plugins: [vue()],
   resolve: {
     alias: {
       '@': path.resolve(pathSegments, './src'),
+      'child_process': path.resolve(pathSegments, './src/shims/browser-child-process.js'),
+      'node:child_process': path.resolve(pathSegments, './src/shims/browser-child-process.js'),
     },
     extensions: ['.mjs', '.js', '.ts', '.jsx', '.tsx', '.json', '.vue'],
   },
@@ -18,5 +22,6 @@ export default defineConfig({
     // By default, Vite doesn't include shims for NodeJS/
     // necessary for segment analytics lib to work
     global: {},
+    ...defineFrontendVersion(versionInfo),
   },
 })

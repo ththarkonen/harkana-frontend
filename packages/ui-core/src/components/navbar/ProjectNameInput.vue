@@ -67,8 +67,13 @@ const update = async () => {
   props.project.name = newProjectName.value
   hide()
 }
-</script>
 
+const focusNameEdit = async () => {
+  await startEditing()
+}
+
+defineExpose({ focusNameEdit })
+</script>
 
 
 

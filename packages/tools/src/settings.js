@@ -42,6 +42,8 @@ var get = async function(){
 var getDefaultSettings = async function() {
 
     const isHyperspectrum = import.meta.env.VITE_DATA_TYPE === "hypercars"
+    const defaultSpectrumColor = "#1f77b4"
+    const defaultComparisonSpectrumColor = "#d62728"
 
     return {
         layout: {
@@ -54,7 +56,12 @@ var getDefaultSettings = async function() {
             horizontal: isHyperspectrum ? "x" : "\\nu",
             vertical: "y",
             spectral: "\\nu",
+            intensity: "I",
             showUnits: true
+        },
+        gridlines: {
+            spectra: true,
+            hyperspectra: false
         },
         legends: {
             data: "y",
@@ -72,15 +79,15 @@ var getDefaultSettings = async function() {
             }
         },
         colors: {
-            data: "#1f77b4",
-            median: "#333333",
-            area: "#333333",
+            data: defaultSpectrumColor,
+            median: defaultSpectrumColor,
+            area: defaultSpectrumColor,
             opacity: 0.15
         },
         comparisonColors: {
-            data: "#d62728",
-            median: "#d62728",
-            area: "#d62728",
+            data: defaultComparisonSpectrumColor,
+            median: defaultComparisonSpectrumColor,
+            area: defaultComparisonSpectrumColor,
             opacity: 0.15
         },
         colormaps: {
@@ -92,9 +99,39 @@ var getDefaultSettings = async function() {
             queriedInterval: "#1f77b4",
             roiSpectrum: "#333333",
             roiInterval: "#333333",
+            roiPalette: [
+                "#ff7f0e",
+                "#2ca02c",
+                "#d62728",
+                "#9467bd",
+                "#8c564b",
+                "#e377c2",
+                "#7f7f7f",
+                "#bcbd22",
+                "#17becf",
+                "#333333"
+            ],
             roiBox: "#ffffff",
             roiTitle: "#ffffff",
+            selectionBox: "#9ca3af",
             roiOverlay: "#ffffff",
+            zBlendPalette: [
+                "#0000ff",
+                "#00ff00",
+                "#ff00ff",
+                "#ffff00",
+                "#00ffff",
+                "#ff0000",
+                "#0000ff",
+                "#00ff00",
+                "#ff00ff",
+                "#ffff00"
+            ],
+            umapChannels: {
+                r: "#ff0000",
+                g: "#00ff00",
+                b: "#0000ff"
+            },
             pcaComponents: {
                 1: "#0072b2",
                 2: "#e69f00",
@@ -109,8 +146,6 @@ var getDefaultSettings = async function() {
             }
         },
         hyperspectrumSpectrum: {
-            lowerBoundPercentage: 7.5,
-            upperBoundPercentage: 97.5,
             showInterval: true,
             intervalOpacity: 0.25
         },
@@ -118,6 +153,29 @@ var getDefaultSettings = async function() {
             showInterval: true,
             intervalOpacity: 0.25,
             overlayOpacity: 0.25
+        },
+        hyperspectrumDefaults: {
+            displayMode: "umap",
+            heatmapInteraction: "select",
+            heatmapRenderer: "deckgl",
+            heatmapZoomAspectRatio: "square",
+            selectionConfidenceLevel: 95,
+            loadings: "hide",
+            falseColoringBasis: "measurement",
+            roiEstimateUncertainty: 95
+        },
+        hyperspectrumPrioritization: {
+            mip: true,
+            mip_hsv: true,
+            umap: true,
+            z_blend: false,
+            layer_window: true,
+            pca: false,
+            pca_mip: false,
+            pca_rgb: false,
+            rpca: false,
+            rpca_mip: false,
+            rpca_rgb: false
         },
         visibility: {
             plot: {
@@ -196,19 +254,20 @@ var getZenodo = async function(){
 
     const key = "zenodo.json"
     const accessSettings = { level: "private", download: true}
+    const defaultZenodoSettings = await getDefaultZenodo()
 
     var result
 
     try {
         result = await Storage.get( key, accessSettings)
     } catch (error) {
-        return await getDefaultSettings()
+        return defaultZenodoSettings
     }
 
     const settingsString = await new Response( result.Body ).text()
     const settings = JSON.parse( settingsString )
 
-    return settings
+    return mergeSettings( defaultZenodoSettings, settings )
 }
 
 var setBilling = async function( settings ){
@@ -255,13 +314,22 @@ var getBilling = async function(){
 
 var getDefaultZenodo = async function() {
 
-    const dataType = import.meta.env.VITE_APP_NAME
+    const dataType = String( import.meta.env.VITE_DATA_TYPE ?? "" ).toLowerCase()
+    const labelsByDataType = {
+        cars: "CARS",
+        raman: "Raman",
+        hypercars: "Hyperspectral CARS",
+        hyperraman: "Hyperspectral Raman"
+    }
+    const datasetLabel = labelsByDataType.hasOwnProperty( dataType )
+        ? labelsByDataType[dataType]
+        : "Raman"
 
     return {
-        title: dataType + " dataset for [SAMPLE]. These are default values which you can edit and save.",
-        description: "This is a " + dataType + " measurement of [SAMPLE]. The dataset contains the measurement data, estimated spectrum with uncertainty estimates, and metadata.",
-        keywords: dataType + ", measurement",
-        token: "123456789"
+        title: datasetLabel + " dataset for [Sample name]",
+        description: "This dataset contains " + datasetLabel + " measurements, analysis outputs, and metadata.",
+        keywords: [ datasetLabel, "spectroscopy", "microscopy" ],
+        token: ""
     };
 }
 

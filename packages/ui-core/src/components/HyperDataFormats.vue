@@ -1,6 +1,6 @@
 <template>
 <!-- Outer frame -->
-<div class="bg-brand min-h-screen p-[2px]">
+<div class="bg-brand min-h-screen p-[2px] overflow-y:hidden">
 
     <!-- Mobile overlay -->
     <div v-if="sidebarOpen" @click="sidebarOpen = false" class="fixed inset-0 bg-black/40 z-30 md:hidden"></div>
@@ -10,12 +10,6 @@
 
         <Sidebar :style="sidebarStyle">
             <Logo></Logo>
-
-            <SidebarButton @click="navigation.route('Main menu', {})" class="my-2">
-                Project menu
-            </SidebarButton>
-
-            <hr class="h-0.5 bg-gray border-0 my-4">
 
             <h3 class="px-4 pl-0 mb-2 text-lg font-semibold text-white">
                 Input data formats
@@ -49,6 +43,7 @@
         <NavigationBar>
             <template v-slot:left-items>
                 <button @click="sidebarOpen = true" class="md:hidden px-3 py-2 rounded bg-slate-100">☰</button>
+                <MenuDropdown></MenuDropdown>
             </template>
             <template v-slot:right-items>
                 <AccountDropdown></AccountDropdown>
@@ -56,10 +51,16 @@
         </NavigationBar>
 
         <!-- Main Content -->
-        <main class="bg-dark-gray rounded-lg shadow-sm p-4 overflow-y-auto">
-            <div class="w-full max-w-3xl bg-white rounded-lg shadow p-6">
+        <main class="min-h-0 bg-white rounded-lg shadow-sm p-4 overflow-y-auto">
+            <div class="w-full max-w-3xl rounded-lg font-sans">
+                <div class="mb-6 space-y-2">
+                    <div class="text-xs font-semibold uppercase tracking-wide text-black/70">
+                        {{ selected === 'Output' ? 'Output format' : 'Input data format' }}
+                    </div>
+                    <h3 class="m-0 text-lg font-bold text-black">{{ selectedLabel }}</h3>
+                </div>
 
-                <div v-if="selected === 'OIR'" class="prose prose-gray max-w-none">
+                <div v-if="selected === 'OIR'" class="data-format-content">
                     <p>
                         <strong>OIR</strong> is a proprietary <em>binary microscopy image format</em> used by
                         Olympus / Evident imaging systems for multidimensional image acquisition. Within this
@@ -140,12 +141,121 @@ output hypercube shape = [L, Y, X]</pre>
                             multidimensional image cube, the parse job fails and no analysis artifacts are produced.
                         </li>
                     </ul>
-                    <a href="/examples/data.oir" download class="text-brand underline hover:opacity-80">
-                        Download example OIR file
+                </div>
+
+                <div v-else-if="selected === 'TIFF'" class="data-format-content">
+                    <p>
+                        <strong>TIFF</strong> is a widely used <em>raster image container format</em> for
+                        scientific imaging, microscopy, and image exchange. Within this platform, TIFF files are
+                        supported as raw input for the hyperspectral workflow when the acquisition is available as a
+                        <code class="bg-gray-100 px-1 rounded">.tif</code> or
+                        <code class="bg-gray-100 px-1 rounded">.tiff</code> image stack.
+                    </p>
+                    <p>
+                        Although TIFF is broadly supported, files can vary substantially in dimensional organization,
+                        metadata richness, and axis annotations depending on how they were written. The platform
+                        therefore normalizes supported TIFF inputs into a standardized downstream artifact structure
+                        intended for visualization, quantitative analysis, and reuse.
+                    </p>
+                    <ul>
+                        <li>
+                            <strong>File extensions:</strong> The expected source files use
+                            <code class="bg-gray-100 px-1 rounded">.tif</code> or
+                            <code class="bg-gray-100 px-1 rounded">.tiff</code>.
+                        </li>
+                        <li>
+                            <strong>Analytical role:</strong> In this workflow, the TIFF file is treated as the raw
+                            image source from which standardized downstream artifacts are derived.
+                        </li>
+                        <li>
+                            <strong>Metadata handling:</strong> When available, OME-TIFF metadata and ImageJ metadata
+                            are preserved in the parsed metadata payload for downstream inspection.
+                        </li>
+                        <li>
+                            <strong>Series handling:</strong> If the TIFF contains multiple image series, the backend
+                            currently reads the first series only.
+                        </li>
+                    </ul>
+
+                    <h4 class="text-lg font-semibold mt-6 mb-3">Dimensional structure</h4>
+                    <p>
+                        TIFF does not enforce one universal axis convention, so the backend infers spatial dimensions
+                        from axis metadata when available. If valid axis labels include
+                        <code class="bg-gray-100 px-1 rounded">Y</code> and
+                        <code class="bg-gray-100 px-1 rounded">X</code>, those axes are used as spatial image axes.
+                        If axis metadata is missing or ambiguous, the backend falls back to interpreting the last two
+                        dimensions as
+                        <code class="bg-gray-100 px-1 rounded">Y</code> and
+                        <code class="bg-gray-100 px-1 rounded">X</code>.
+                    </p>
+                    <p>
+                        For numerical analysis, all non-spatial dimensions are consolidated into a single layer axis.
+                        Internally, the normalized representation is treated as
+                        <code class="bg-gray-100 px-1 rounded">TCZYX</code>, while TIFF inputs are effectively mapped into:
+                    </p>
+                    <pre class="bg-gray-900 text-gray-100 rounded p-4 text-sm overflow-x-auto whitespace-pre-wrap">L = product of all non-spatial dimensions
+output hypercube shape = [L, Y, X]</pre>
+                    <p>Examples:</p>
+                    <ul>
+                        <li>A 2D TIFF becomes a single-layer cube with shape <code class="bg-gray-100 px-1 rounded">[1, Y, X]</code>.</li>
+                        <li>A multi-page or multidimensional TIFF becomes a cube where every non-spatial slice is flattened into the layer axis.</li>
+                    </ul>
+
+                    <h4 class="text-lg font-semibold mt-6 mb-3">Additional backend expectations and behavior</h4>
+                    <ul>
+                        <li>
+                            <strong>Minimum dimensionality:</strong> The TIFF input must have at least two dimensions.
+                            Files with fewer than two dimensions are rejected.
+                        </li>
+                        <li>
+                            <strong>Normalization:</strong> The exported hypercube is converted to
+                            <code class="bg-gray-100 px-1 rounded">float32</code> and normalized by the global maximum
+                            so that the maximum of the flattened dataset is
+                            <code class="bg-gray-100 px-1 rounded">1.0</code>.
+                        </li>
+                        <li>
+                            <strong>Axis vectors:</strong> X and Y axis vectors are derived from physical calibration
+                            metadata when possible. If calibration metadata is unavailable, the backend falls back to
+                            integer index coordinates.
+                        </li>
+                        <li>
+                            <strong>XY calibration source:</strong> Physical pixel spacing is derived from TIFF
+                            resolution tags when possible. Resolution units of inches or centimeters are converted
+                            into micrometers.
+                        </li>
+                        <li>
+                            <strong>Z calibration:</strong> The TIFF reader does not currently recover a physical Z
+                            spacing, so the third axis defaults to index-based coordinates unless other downstream
+                            logic overrides it.
+                        </li>
+                        <li>
+                            <strong>Units:</strong> If usable physical calibration is available, X and Y units are
+                            exported as physical units. Otherwise the exported units default to
+                            <code class="bg-gray-100 px-1 rounded">index</code>.
+                        </li>
+                        <li>
+                            <strong>Channel naming:</strong> The TIFF reader currently generates placeholder layer
+                            names such as
+                            <code class="bg-gray-100 px-1 rounded">channel_000</code>,
+                            <code class="bg-gray-100 px-1 rounded">channel_001</code>, and so on, rather than
+                            preserving semantic channel labels.
+                        </li>
+                        <li>
+                            <strong>Failure mode:</strong> If the TIFF cannot be interpreted as at least a
+                            two-dimensional image with valid spatial axes, the parse job fails and no analysis
+                            artifacts are produced.
+                        </li>
+                    </ul>
+                    <p>
+                        This organization standardizes TIFF inputs into a consistent hyperspectral representation while
+                        preserving usable structural and calibration metadata when available.
+                    </p>
+                    <a href="/examples/data/example_data.tif" download class="text-brand underline hover:opacity-80">
+                        Download example TIFF file (example_data.tif)
                     </a>
                 </div>
 
-                <div v-else class="prose prose-gray max-w-none">
+                <div v-else class="data-format-content">
                     <p>
                         The following output files are common to the hyperspectral workflow and are intended to be
                         shared across currently supported and upcoming hyperspectral input formats. After a successful
@@ -273,13 +383,11 @@ output hypercube shape = [L, Y, X]</pre>
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { navigation } from '@harkana/tools'
-
 import Sidebar from './sidebar/Sidebar.vue'
 import Logo from "./sidebar/Logo.vue"
-import SidebarButton from './sidebar/SidebarButton.vue'
 
 import NavigationBar from './navbar/NavigationBar.vue'
+import MenuDropdown from './navbar/MenuDropdown.vue'
 import AccountDropdown from './navbar/AccountDropdown.vue'
 
 const route = useRoute()
@@ -294,8 +402,18 @@ const sidebarStyle = computed(() => {
         : { left: 'calc(-16rem - 2px)' }
 })
 
-const sections = ['OIR']
-const selected = ref(route.query.section || 'OIR')
+const sections = ['OIR', 'TIFF']
+const selected = ref(
+    sections.includes(String(route.query.section ?? ''))
+        ? String(route.query.section)
+        : 'OIR'
+)
+const selectedLabel = computed(() => {
+    if (selected.value === 'Output') {
+        return 'Output files'
+    }
+    return selected.value
+})
 
 const selectSection = (section) => {
     selected.value = section
@@ -320,3 +438,75 @@ onMounted(() => {
     emit('loaded')
 })
 </script>
+
+<style scoped>
+.data-format-content {
+    color: rgb(0 0 0 / 0.72);
+    font-size: 0.9375rem;
+    line-height: 1.7;
+}
+
+.data-format-content > * + * {
+    margin-top: 1rem;
+}
+
+.data-format-content h4 {
+    color: rgb(0 0 0);
+    font-size: 1rem;
+    font-weight: 700;
+    line-height: 1.4;
+}
+
+.data-format-content p,
+.data-format-content ul,
+.data-format-content pre {
+    margin-top: 0;
+    margin-bottom: 0;
+}
+
+.data-format-content ul {
+    padding-left: 1.25rem;
+}
+
+.data-format-content li + li {
+    margin-top: 0.75rem;
+}
+
+.data-format-content strong {
+    color: rgb(0 0 0);
+    font-weight: 600;
+}
+
+.data-format-content code {
+    border-radius: 0.375rem;
+    background: rgb(15 23 42 / 0.06);
+    color: rgb(15 23 42);
+    font-size: 0.875em;
+    padding: 0.1rem 0.35rem;
+}
+
+.data-format-content pre {
+    overflow-x: auto;
+    border-radius: 0.75rem;
+    background: rgb(15 23 42);
+    color: rgb(241 245 249);
+    font-size: 0.8125rem;
+    line-height: 1.6;
+    padding: 1rem;
+}
+
+.data-format-content pre code {
+    background: transparent;
+    color: inherit;
+    padding: 0;
+}
+
+.data-format-content a {
+    text-decoration: underline;
+    text-underline-offset: 0.15em;
+}
+
+.data-format-content a:hover {
+    opacity: 0.8;
+}
+</style>

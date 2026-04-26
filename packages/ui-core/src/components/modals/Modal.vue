@@ -10,15 +10,14 @@
 
     <div v-if = "isVisible"
         @keydown.esc = "onEsc"
-        class = "fixed inset-0 z-50
-                flex items-center justify-center
-                bg-black/50">
+        :class = "overlayClasses">
 
         <!-- Modal -->
         <div ref = "dialog"
             class = "relative w-full max-w-2xl border-2 border-brand
                     rounded-lg bg-dark-gray shadow-xl max-h-[90vh]
                     flex flex-col"
+            :class = "panelClass"
             role = "dialog"
             aria-modal = "true"
             tabindex = "-1">
@@ -37,7 +36,12 @@
             </div>
 
             <!-- Main -->
-            <div class = "px-4 py-0  overflow-y-auto">
+            <div class = "px-4 py-0"
+                 :class = "[
+                     alwaysShowScrollbar ? 'overflow-y-scroll' : 'overflow-y-auto',
+                     hideScrollbar ? 'modal-scrollbar-hidden' : ''
+                 ]"
+                 :style = "hideScrollbar ? '' : 'scrollbar-gutter: stable;'">
                 <slot name = "main"></slot>
             </div>
 
@@ -59,7 +63,19 @@ const props = defineProps({
     title: { type: String, default: "Modal Title" },
     actionText: { type: String, default: "Apply" },
     showClose: { type: Boolean, default: true },
+    alwaysShowScrollbar: { type: Boolean, default: false },
+    hideScrollbar: { type: Boolean, default: false },
+    overlayClass: {
+        type: String,
+        default: "fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+    },
+    panelClass: {
+        type: String,
+        default: ""
+    }
 })
+
+const emit = defineEmits([ "close" ])
 
 const isVisible = ref(false)
 const dialog    = ref<HTMLElement | null>(null)
@@ -77,6 +93,7 @@ const open = async () => {
 const close = () => {
     isVisible.value = false
     lastFocusedElement?.focus()
+    emit( "close" )
 }
 
 /* ESC handler now respects showClose */
@@ -103,6 +120,8 @@ const trapFocus = (e: KeyboardEvent) => {
     }
 }
 
+const overlayClasses = props.overlayClass
+
 watch( isVisible, (visible) => {
     if (visible) document.addEventListener('keydown', trapFocus)
     else document.removeEventListener('keydown', trapFocus)
@@ -111,3 +130,15 @@ watch( isVisible, (visible) => {
 defineExpose({ open, close })
 </script>
 
+<style scoped>
+.modal-scrollbar-hidden {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
+.modal-scrollbar-hidden::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+}
+</style>

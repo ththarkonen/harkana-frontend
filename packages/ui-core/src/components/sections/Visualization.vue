@@ -1,228 +1,522 @@
 <template>
 <div class="prose prose-gray max-w-none">
+	<div class="not-prose space-y-8">
+		<div class="flex w-full max-w-2xl flex-wrap gap-2 rounded-lg border border-black/10 bg-black/[0.03] p-2"
+			 role = "tablist"
+			 aria-label = "Spectrum visualization settings sections">
+			<button v-for = "tab in visualizationTabs"
+					:key = "tab.id"
+					type = "button"
+					role = "tab"
+					:aria-selected = "activeVisualizationTab === tab.id ? 'true' : 'false'"
+					:tabindex = "activeVisualizationTab === tab.id ? 0 : -1"
+					@click = "activeVisualizationTab = tab.id"
+					class = "inline-flex items-center justify-center rounded-full px-3 py-1.5 text-xs font-semibold transition-colors"
+					:class = "activeVisualizationTab === tab.id
+						? 'bg-brand text-white'
+						: 'bg-transparent text-black/70 hover:bg-black/5 hover:text-black'">
+				{{ tab.label }}
+			</button>
+		</div>
 
-    <div class = "border-2 border-brand rounded-lg p-4 mb-8
-                  shadow-black shadow-lg">
-        <p>
-            <strong>Visualization Settings</strong> let you customize how analytical results and 
-            data visualizations are displayed. These options give you control over layout, labeling, 
-            colors, and typography so that figures match your preferred appearance standards.
-        </p>
-        <br></br>
-        <ul>
-            <li>
-            <strong>Layout:</strong>  
-            Choose the graph layout style (e.g., vertical, horizontal, or single) and optionally 
-            reverse the horizontal axis for mirrored visualizations.
-            </li>
-            <br></br>
-            <li>
-            <strong>Axis Labels:</strong>  
-            Define axis labels using LaTeX-style notation to ensure consistent scientific formatting.
-            </li>
-            <br></br>
+		<div v-show = "activeVisualizationTab === 'axis'" role = "tabpanel" class = "max-w-2xl space-y-8">
+			<p class = "text-sm text-black/70">
+				Control the pane layout, horizontal axis orientation, default gridlines, and font sizes for spectrum plots.
+			</p>
 
-            <li>
-            <strong>Graph Legends:</strong>  
-            Customize legend entries for data points, median estimates, and uncertainty intervals 
-            (50%, 75%, 90%, and 95%). Each legend supports LaTeX formatting for precise mathematical display.
-            </li>
-            <br></br>
+			<div class = "space-y-4">
+				<div class = "text-xs font-semibold uppercase tracking-wide text-black/70">Layout</div>
+				<div class = "grid gap-5 md:grid-cols-2">
+					<label class = "block">
+						<div class = "mb-1 text-xs font-semibold uppercase tracking-wide text-black/70">Graph layout</div>
+						<select v-model = "layout.layout"
+								class = "w-full border-0 border-b border-black/35 bg-transparent px-0 py-1 text-sm font-medium text-slate-900 focus:border-brand focus:outline-none focus-visible:border-brand">
+							<option value = "vertical">Vertical panes</option>
+							<option value = "horizontal">Horizontal panes</option>
+							<option value = "single">Single pane</option>
+						</select>
+					</label>
 
-            <li>
-            <strong>Graph Colors and Opacity:</strong>  
-            Adjust the colors for measurement data, median estimates, and uncertainty areas.  
-            You can also control the opacity of uncertainty regions to balance clarity and visual emphasis.
-            </li>
-            <br></br>
+					<label class = "block">
+						<div class = "mb-1 text-xs font-semibold uppercase tracking-wide text-black/70">Reverse horizontal axis</div>
+						<select v-model = "layout.reversed"
+								class = "w-full border-0 border-b border-black/35 bg-transparent px-0 py-1 text-sm font-medium text-slate-900 focus:border-brand focus:outline-none focus-visible:border-brand">
+							<option value = "true">True</option>
+							<option value = "false">False</option>
+						</select>
+					</label>
+				</div>
 
-            <li>
-            <strong>Font Sizes:</strong>  
-            Fine-tune font sizes for axis ticks, axis labels, and legends.  
-            This ensures consistent readability across different display scales or exported figures.
-            </li>
-            <br></br>
+				<label class = "flex items-center gap-3 text-sm text-black">
+					<input v-model = "gridlines.spectra"
+						   type = "checkbox"
+						   class = "h-4 w-4 rounded border-gray-300 accent-brand focus:ring-brand"/>
+					<span>Show spectrum gridlines by default</span>
+				</label>
+			</div>
 
-            <li>
-            <strong>Initial Graph Visibility:</strong>  
-            Select which elements of the project graphs should be shown by default.  
-            This applies to single project graphs as well as graphs in comparison views.
-            </li>
-        </ul>
+			<div class = "space-y-4">
+				<div class = "text-xs font-semibold uppercase tracking-wide text-black/70">Axis label</div>
+				<div class = "grid gap-5 md:grid-cols-2">
+					<LatexField description = "Horizontal axis label" v-model = "labels.horizontal"></LatexField>
+				</div>
+			</div>
 
-            <br></br>
-        <p>
-            Together, these visualization controls provide a flexible and professional way to adapt 
-            plots to your personal preferences or the visual standards of your research group.
-        </p>
-    </div>
+			<div class = "space-y-4">
+				<div class = "text-xs font-semibold uppercase tracking-wide text-black/70">Font sizes</div>
+				<div class = "grid gap-5 md:grid-cols-2">
+					<label class = "block">
+						<div class = "mb-1 text-xs font-semibold uppercase tracking-wide text-black/70">Axis tick font size</div>
+						<input v-model.number = "fontSizes.axis"
+							   class = "w-full border-0 border-b border-black/35 bg-transparent px-0 py-1 text-sm font-medium text-slate-900 focus:border-brand focus:outline-none focus-visible:border-brand"
+							   type = "number"
+							   min = "8"
+							   max = "72"
+							   step = "1"
+							   inputmode = "numeric"
+							   spellcheck = "false"/>
+					</label>
 
-    <div class = "border-2 border-brand rounded-lg p-4 mb-8
-                  shadow-black shadow-lg">
+					<label class = "block">
+						<div class = "mb-1 text-xs font-semibold uppercase tracking-wide text-black/70">Axis label font size</div>
+						<input v-model.number = "fontSizes.label"
+							   class = "w-full border-0 border-b border-black/35 bg-transparent px-0 py-1 text-sm font-medium text-slate-900 focus:border-brand focus:outline-none focus-visible:border-brand"
+							   type = "number"
+							   min = "8"
+							   max = "72"
+							   step = "1"
+							   inputmode = "numeric"
+							   spellcheck = "false"/>
+					</label>
 
-        <h3 class = "font-semibold">Reverse horizontal axis</h3>
-        <select v-model = "layout.reversed"
-                class="w-full border border-gray-600 rounded px-3 py-2 mt-2 bg-white
-                text-black focus:outline-none focus:ring-2 focus:ring-brand">
-            <option value="true">True</option>
-            <option value="false">False</option>
-        </select>
-                  
-        <h3 class = "font-semibold mt-4">Graph layout</h3>
-        <select v-model = "layout.layout"
-                class="w-full border border-gray-600 rounded px-3 py-2 mt-2 bg-white
-                text-black focus:outline-none focus:ring-2 focus:ring-brand">
-            <option value="vertical">Vertical</option>
-            <option value="horizontal">Horizontal</option>
-            <option value="single">Single</option>
-        </select>
+					<label class = "block">
+						<div class = "mb-1 text-xs font-semibold uppercase tracking-wide text-black/70">Legend font size</div>
+						<input v-model.number = "fontSizes.legend"
+							   class = "w-full border-0 border-b border-black/35 bg-transparent px-0 py-1 text-sm font-medium text-slate-900 focus:border-brand focus:outline-none focus-visible:border-brand"
+							   type = "number"
+							   min = "8"
+							   max = "72"
+							   step = "1"
+							   inputmode = "numeric"
+							   spellcheck = "false"/>
+					</label>
+				</div>
+			</div>
+		</div>
 
-        <hr class="h-0.5 bg-gray border-0 my-4">
+		<div v-show = "activeVisualizationTab === 'legends'" role = "tabpanel" class = "max-w-2xl space-y-8">
+			<p class = "text-sm text-black/70">
+				Adjust the legend labels for measurement, median estimate, and uncertainty intervals. LaTeX formatting is supported.
+			</p>
 
-        <LatexField description = "Horizontal axis label" v-model = "labels.horizontal"></LatexField>
-        <LatexField description = "Measurement data legend" v-model = "legends.data" class = "mt-4"/>
-        <LatexField description = "Median estimate legend" v-model = "legends.median" class = "mt-4"/>
-        <LatexField description = "Marginal 50% uncertainty estimate legend" v-model = "legends.interval50" class = "mt-4"/>
-        <LatexField description = "Marginal 75% uncertainty estimate legend" v-model = "legends.interval75" class = "mt-4"/>
-        <LatexField description = "Marginal 90% uncertainty estimate legend" v-model = "legends.interval90" class = "mt-4"/>
-        <LatexField description = "Marginal 95% uncertainty estimate legend" v-model = "legends.interval95" class = "mt-4"/>
+			<div class = "space-y-4">
+				<div class = "text-xs font-semibold uppercase tracking-wide text-black/70">Legend labels</div>
+				<div class = "grid gap-5 md:grid-cols-2">
+					<LatexField description = "Measurement data legend" v-model = "legends.data"></LatexField>
+					<LatexField description = "Median estimate legend" v-model = "legends.median"></LatexField>
+					<LatexField description = "Marginal 50% uncertainty legend" v-model = "legends.interval50"></LatexField>
+					<LatexField description = "Marginal 75% uncertainty legend" v-model = "legends.interval75"></LatexField>
+					<LatexField description = "Marginal 90% uncertainty legend" v-model = "legends.interval90"></LatexField>
+					<LatexField description = "Marginal 95% uncertainty legend" v-model = "legends.interval95"></LatexField>
+				</div>
+			</div>
+		</div>
 
-        <hr class="h-0.5 bg-gray border-0 my-4">
+		<div v-show = "activeVisualizationTab === 'colors'" role = "tabpanel" class = "max-w-2xl space-y-8">
+			<p class = "text-sm text-black/70">
+				Set the default colors for measurement, estimate, and uncertainty styling in both standard and comparison views.
+			</p>
 
-        <ColorPicker v-model = "colors.data" description = "Measurement data color" class = "mt-4"></ColorPicker>
-        <ColorPicker v-model = "colors.median" description = "Median estimate color" class = "mt-4"></ColorPicker>
-        <ColorPicker v-model = "colors.area" description = "Uncertainty estimate color" class = "mt-4"></ColorPicker>
-        <OpacityPicker v-model = "colors.opacity" :color = "colors.area" class = "mt-4"
-                        description = "Uncertainty estimate opacity"></OpacityPicker>
+			<div class = "space-y-4">
+				<div class = "text-xs font-semibold uppercase tracking-wide text-black/70">Primary plot colors</div>
+				<div class = "grid gap-5 md:grid-cols-2">
+					<ColorPicker v-model = "colors.data" description = "Measurement data color"></ColorPicker>
+					<ColorPicker v-model = "colors.median" description = "Median estimate color"></ColorPicker>
+					<ColorPicker v-model = "colors.area" description = "Uncertainty estimate color"></ColorPicker>
+					<label class = "block">
+						<div class = "mb-1 text-xs font-semibold uppercase tracking-wide text-black/70">Uncertainty estimate opacity</div>
+						<input v-model.number = "colors.opacity"
+							   class = "w-full border-0 border-b border-black/35 bg-transparent px-0 py-1 text-sm font-medium text-slate-900 focus:border-brand focus:outline-none focus-visible:border-brand"
+							   type = "number"
+							   min = "0"
+							   max = "1"
+							   step = "0.01"
+							   inputmode = "decimal"
+							   spellcheck = "false"/>
+					</label>
+				</div>
+			</div>
 
-        <hr class="h-0.5 bg-gray border-0 my-4">
+			<div class = "space-y-4">
+				<div class = "text-xs font-semibold uppercase tracking-wide text-black/70">Comparison plot colors</div>
+				<div class = "grid gap-5 md:grid-cols-2">
+					<ColorPicker v-model = "comparisonColors.data" description = "Comparison data color"></ColorPicker>
+					<ColorPicker v-model = "comparisonColors.median" description = "Comparison median estimate color"></ColorPicker>
+					<ColorPicker v-model = "comparisonColors.area" description = "Comparison uncertainty estimate color"></ColorPicker>
+					<label class = "block">
+						<div class = "mb-1 text-xs font-semibold uppercase tracking-wide text-black/70">Comparison uncertainty opacity</div>
+						<input v-model.number = "comparisonColors.opacity"
+							   class = "w-full border-0 border-b border-black/35 bg-transparent px-0 py-1 text-sm font-medium text-slate-900 focus:border-brand focus:outline-none focus-visible:border-brand"
+							   type = "number"
+							   min = "0"
+							   max = "1"
+							   step = "0.01"
+							   inputmode = "decimal"
+							   spellcheck = "false"/>
+					</label>
+				</div>
+			</div>
+		</div>
 
-        <ColorPicker v-model = "comparisonColors.data" description = "Comparison data color" class = "mt-4"></ColorPicker>
-        <ColorPicker v-model = "comparisonColors.median" description = "Comparison median estimate color" class = "mt-4"></ColorPicker>
-        <ColorPicker v-model = "comparisonColors.area" description = "Comparison uncertainty estimate color" class = "mt-4"></ColorPicker>
-        <OpacityPicker v-model = "comparisonColors.opacity" :color = "comparisonColors.area" class = "mt-4"
-                         description = "Comparison uncertainty estimate opacity"></OpacityPicker>
+		<div v-show = "activeVisualizationTab === 'visibility'" role = "tabpanel" class = "max-w-2xl space-y-8">
+			<p class = "text-sm text-black/70">
+				Choose which traces should be visible by default in project plots and comparison views.
+			</p>
 
-        <hr class="h-0.5 bg-gray border-0 my-4">
+			<div class = "space-y-4">
+				<div class = "text-xs font-semibold uppercase tracking-wide text-black/70">Initial graph visibility</div>
+				<div class = "grid gap-3 md:grid-cols-2">
+					<label v-for = "entry in visibilityEntries"
+						   :key = "'visibility-' + entry.key"
+						   class = "flex items-center gap-3 text-sm text-black">
+						<input v-model = "visibility[ entry.key ]"
+							   type = "checkbox"
+							   class = "h-4 w-4 rounded border-gray-300 accent-brand focus:ring-brand"/>
+						<span>{{ entry.label }}</span>
+					</label>
+				</div>
+			</div>
 
-        <div class="flex flex-col gap-2 rounded-lg border-2 border-brand bg-black/5 p-4 shadow-sm mt-4">
-            <h4 class=" font-semibold text-black">Axis tick font size</h4>
-            <input v-model = "font.sizes.axis" class = "flex-1 rounded-md border border-gray-300 bg-gray-50 px-3 py-2 text-sm font-mono text-gray-800
-                            focus:outline-none focus:ring-2 focus:ring-brand"
-                            type ="number" min = "8" max = "72" step = "1"/>
-        </div>
+			<div class = "space-y-4">
+				<div class = "text-xs font-semibold uppercase tracking-wide text-black/70">Comparison initial graph visibility</div>
+				<div class = "grid gap-3 md:grid-cols-2">
+					<label v-for = "entry in visibilityEntries"
+						   :key = "'comparison-visibility-' + entry.key"
+						   class = "flex items-center gap-3 text-sm text-black">
+						<input v-model = "comparisonVisibility[ entry.key ]"
+							   type = "checkbox"
+							   class = "h-4 w-4 rounded border-gray-300 accent-brand focus:ring-brand"/>
+						<span>{{ entry.label }}</span>
+					</label>
+				</div>
+			</div>
+		</div>
 
-        <div class="flex flex-col gap-2 rounded-lg border-2 border-brand bg-black/5 p-4 shadow-sm mt-4">
-            <h4 class=" font-semibold text-black">Axis label font size</h4>
-            <input v-model = "font.sizes.label" class = "flex-1 rounded-md border border-gray-300 bg-gray-50 px-3 py-2 text-sm font-mono text-gray-800
-                            focus:outline-none focus:ring-2 focus:ring-brand"
-                            type ="number" min = "8" max = "72" step = "1"/>
-        </div>
+		<div class = "flex flex-wrap gap-3 max-w-2xl">
+			<SettingsButton @click = "updateSettings" :loading = "updating" class = "disabled:cursor-not-allowed disabled:opacity-50">
+				Update visualization settings
+			</SettingsButton>
 
-        <div class="flex flex-col gap-2 rounded-lg border-2 border-brand bg-black/5 p-4 shadow-sm mt-4">
-            <h4 class=" font-semibold text-black">Legend font size</h4>
-            <input v-model = "font.sizes.legend" class = "flex-1 rounded-md border border-gray-300 bg-gray-50 px-3 py-2 text-sm font-mono text-gray-800
-                            focus:outline-none focus:ring-2 focus:ring-brand"
-                            type ="number" min = "8" max = "72" step = "1"/>
-        </div>
-
-        <hr class="h-0.5 bg-gray border-0 my-4">
-
-        <TickboxGroup v-model = "visibility" title = "Initial graph visibility"></TickboxGroup>
-        <TickboxGroup v-model = "comparisonVisibility" title = "Comparison initial graph visibility" class = "mt-4"></TickboxGroup>
-        
-        <SettingsButton @click = "updateSettings" :loading = "updating" class = "mt-4 disabled:opacity-50 disabled:cursor-not-allowed">
-            Update visualization settings
-        </SettingsButton>
-
-    </div>
-
+			<SettingsButton @click = "resetSettings"
+							:loading = "updating"
+							class = "disabled:cursor-not-allowed disabled:opacity-50">
+				Reset to default settings
+			</SettingsButton>
+		</div>
+	</div>
 </div>
 </template>
 
 <script setup>
 
-import { ref, onMounted} from "vue"
-import { settings as settingslib, utils} from "@harkana/tools"
+import { reactive, ref, onMounted } from "vue"
+import { settings as settingslib, utils } from "@harkana/tools"
 
 import SettingsButton from "../settings/SettingsButton.vue"
 import LatexField from "../settings/LatexField.vue"
 import ColorPicker from "../settings/ColorPicker.vue"
-import OpacityPicker from "../settings/OpacityPicker.vue"
-import TickboxGroup from "../settings/TickboxGroup.vue"
 
-const updating = ref(false)
+const visualizationTabs = [
+	{ id: "axis", label: "Axis settings" },
+	{ id: "legends", label: "Legends" },
+	{ id: "colors", label: "Colors" },
+	{ id: "visibility", label: "Visibility" }
+]
 
-const layout = ref({})
-const labels = ref({})
-const legends = ref({})
+const visibilityEntries = [
+	{ key: "data", label: "Measurement data" },
+	{ key: "median", label: "Median estimate" },
+	{ key: "interval50", label: "Marginal 50% uncertainty estimate" },
+	{ key: "interval75", label: "Marginal 75% uncertainty estimate" },
+	{ key: "interval90", label: "Marginal 90% uncertainty estimate" },
+	{ key: "interval95", label: "Marginal 95% uncertainty estimate" }
+]
 
-const font = ref({ sizes: {}})
-const colors = ref({})
-const comparisonColors = ref({})
+const updating = ref( false )
+const activeVisualizationTab = ref( "axis" )
 
-const visibility = ref([])
-const comparisonVisibility = ref([])
+const layout = reactive({
+	reversed: "true",
+	layout: "vertical"
+})
+
+const labels = reactive({
+	horizontal: "\\nu"
+})
+
+const legends = reactive({
+	data: "y",
+	median: "\\text{Im}\\,\\mathcal{X}^{(3)}_{\\text{median}}( \\nu )",
+	interval50: "\\text{Im}\\,\\mathcal{X}^{(3)}_{50\\%}( \\nu )",
+	interval75: "\\text{Im}\\,\\mathcal{X}^{(3)}_{75\\%}( \\nu )",
+	interval90: "\\text{Im}\\,\\mathcal{X}^{(3)}_{90\\%}( \\nu )",
+	interval95: "\\text{Im}\\,\\mathcal{X}^{(3)}_{95\\%}( \\nu )"
+})
+
+const gridlines = reactive({
+	spectra: true
+})
+
+const fontSizes = reactive({
+	axis: 16,
+	label: 16,
+	legend: 16
+})
+
+const colors = reactive({
+	data: "#1f77b4",
+	median: "#1f77b4",
+	area: "#1f77b4",
+	opacity: 0.15
+})
+
+const comparisonColors = reactive({
+	data: "#d62728",
+	median: "#d62728",
+	area: "#d62728",
+	opacity: 0.15
+})
+
+const visibility = reactive({
+	data: true,
+	median: true,
+	interval50: true,
+	interval75: true,
+	interval90: true,
+	interval95: true
+})
+
+const comparisonVisibility = reactive({
+	data: true,
+	median: true,
+	interval50: false,
+	interval75: false,
+	interval90: false,
+	interval95: true
+})
+
+const normalizeCheckbox = ( value, fallback = true ) => {
+	if( typeof value === "boolean" ){
+		return value
+	}
+
+	if( typeof value === "string" ){
+		if( value === "true" ) return true
+		if( value === "false" ) return false
+	}
+
+	return fallback
+}
+
+const normalizeText = ( value, fallback = "" ) => {
+	return typeof value === "string" && value.length > 0 ? value : fallback
+}
+
+const normalizeOpacity = ( value, fallback = 0.15 ) => {
+	const numeric = Number( value )
+	if( Number.isFinite( numeric ) === false ){
+		return fallback
+	}
+
+	return Math.min( 1, Math.max( 0, numeric ))
+}
+
+const normalizeFontSize = ( value, fallback = 16 ) => {
+	const numeric = Number( value )
+	if( Number.isFinite( numeric ) === false ){
+		return fallback
+	}
+
+	return Math.min( 72, Math.max( 8, Math.round( numeric ) ))
+}
+
+const normalizeLayoutMode = ( value ) => {
+	const normalized = String( value ?? "" ).trim().toLowerCase()
+	if([ "vertical", "horizontal", "single" ].includes( normalized )){
+		return normalized
+	}
+
+	return "vertical"
+}
+
+const normalizeReversed = ( value ) => {
+	return String( value ?? "" ).trim().toLowerCase() === "false" ? "false" : "true"
+}
+
+const syncVisibility = ( target, source, fallbacks ) => {
+	for( const entry of visibilityEntries ){
+		target[ entry.key ] = normalizeCheckbox(
+			source?.[ entry.key ],
+			fallbacks[ entry.key ]
+		)
+	}
+}
+
+const syncFromSettings = ( savedSettings ) => {
+	layout.reversed = normalizeReversed( savedSettings?.layout?.reversed )
+	layout.layout = normalizeLayoutMode( savedSettings?.layout?.layout )
+
+	labels.horizontal = normalizeText( savedSettings?.labels?.horizontal, "\\nu" )
+
+	legends.data = normalizeText( savedSettings?.legends?.data, "y" )
+	legends.median = normalizeText( savedSettings?.legends?.median, "\\text{Im}\\,\\mathcal{X}^{(3)}_{\\text{median}}( \\nu )" )
+	legends.interval50 = normalizeText( savedSettings?.legends?.interval50, "\\text{Im}\\,\\mathcal{X}^{(3)}_{50\\%}( \\nu )" )
+	legends.interval75 = normalizeText( savedSettings?.legends?.interval75, "\\text{Im}\\,\\mathcal{X}^{(3)}_{75\\%}( \\nu )" )
+	legends.interval90 = normalizeText( savedSettings?.legends?.interval90, "\\text{Im}\\,\\mathcal{X}^{(3)}_{90\\%}( \\nu )" )
+	legends.interval95 = normalizeText( savedSettings?.legends?.interval95, "\\text{Im}\\,\\mathcal{X}^{(3)}_{95\\%}( \\nu )" )
+
+	gridlines.spectra = normalizeCheckbox( savedSettings?.gridlines?.spectra, true )
+
+	fontSizes.axis = normalizeFontSize( savedSettings?.font?.sizes?.axis, 16 )
+	fontSizes.label = normalizeFontSize( savedSettings?.font?.sizes?.label, 16 )
+	fontSizes.legend = normalizeFontSize( savedSettings?.font?.sizes?.legend, 16 )
+
+	colors.data = normalizeText( savedSettings?.colors?.data, "#1f77b4" )
+	colors.median = normalizeText( savedSettings?.colors?.median, colors.data )
+	colors.area = normalizeText( savedSettings?.colors?.area, colors.data )
+	colors.opacity = normalizeOpacity( savedSettings?.colors?.opacity, 0.15 )
+
+	comparisonColors.data = normalizeText( savedSettings?.comparisonColors?.data, "#d62728" )
+	comparisonColors.median = normalizeText( savedSettings?.comparisonColors?.median, comparisonColors.data )
+	comparisonColors.area = normalizeText( savedSettings?.comparisonColors?.area, comparisonColors.data )
+	comparisonColors.opacity = normalizeOpacity( savedSettings?.comparisonColors?.opacity, 0.15 )
+
+	syncVisibility(
+		visibility,
+		savedSettings?.visibility?.plot,
+		{
+			data: true,
+			median: true,
+			interval50: true,
+			interval75: true,
+			interval90: true,
+			interval95: true
+		}
+	)
+
+	syncVisibility(
+		comparisonVisibility,
+		savedSettings?.visibility?.comparison,
+		{
+			data: true,
+			median: true,
+			interval50: false,
+			interval75: false,
+			interval90: false,
+			interval95: true
+		}
+	)
+}
 
 const updateSettings = async () => {
+	updating.value = true
 
-    updating.value = true
+	const savedSettings = await settingslib.get()
 
-    var settings = await settingslib.get()
-    
-    settings.font = font.value
-    settings.layout = layout.value
-    settings.labels = labels.value
-    settings.legends = legends.value
+	savedSettings.layout = {
+		...( savedSettings.layout ?? {} ),
+		reversed: layout.reversed,
+		layout: layout.layout
+	}
 
-    settings.colors = colors.value
-    settings.comparisonColors = comparisonColors.value
-    
-    settings.visibility.plot.data = visibility.value[0]
-    settings.visibility.plot.median = visibility.value[1]
-    settings.visibility.plot.interval50 = visibility.value[2]
-    settings.visibility.plot.interval75 = visibility.value[3]
-    settings.visibility.plot.interval90 = visibility.value[4]
-    settings.visibility.plot.interval95 = visibility.value[5]
-    
-    settings.visibility.comparison.data = comparisonVisibility.value[0]
-    settings.visibility.comparison.median = comparisonVisibility.value[1]
-    settings.visibility.comparison.interval50 = comparisonVisibility.value[2]
-    settings.visibility.comparison.interval75 = comparisonVisibility.value[3]
-    settings.visibility.comparison.interval90 = comparisonVisibility.value[4]
-    settings.visibility.comparison.interval95 = comparisonVisibility.value[5]
+	savedSettings.labels = {
+		...( savedSettings.labels ?? {} ),
+		horizontal: labels.horizontal
+	}
 
-    await settingslib.set( settings )
+	savedSettings.legends = {
+		...( savedSettings.legends ?? {} ),
+		data: legends.data,
+		median: legends.median,
+		interval50: legends.interval50,
+		interval75: legends.interval75,
+		interval90: legends.interval90,
+		interval95: legends.interval95
+	}
 
-    await utils.wait( 1000 )
-    updating.value = false
+	savedSettings.gridlines = {
+		...( savedSettings.gridlines ?? {} ),
+		spectra: gridlines.spectra === true
+	}
+
+	savedSettings.font = {
+		...( savedSettings.font ?? {} ),
+		sizes: {
+			...( savedSettings.font?.sizes ?? {} ),
+			axis: normalizeFontSize( fontSizes.axis, 16 ),
+			label: normalizeFontSize( fontSizes.label, 16 ),
+			legend: normalizeFontSize( fontSizes.legend, 16 )
+		}
+	}
+
+	savedSettings.colors = {
+		...( savedSettings.colors ?? {} ),
+		data: colors.data,
+		median: colors.median,
+		area: colors.area,
+		opacity: normalizeOpacity( colors.opacity, 0.15 )
+	}
+
+	savedSettings.comparisonColors = {
+		...( savedSettings.comparisonColors ?? {} ),
+		data: comparisonColors.data,
+		median: comparisonColors.median,
+		area: comparisonColors.area,
+		opacity: normalizeOpacity( comparisonColors.opacity, 0.15 )
+	}
+
+	savedSettings.visibility = {
+		...( savedSettings.visibility ?? {} ),
+		plot: {
+			...( savedSettings.visibility?.plot ?? {} ),
+			data: visibility.data === true,
+			median: visibility.median === true,
+			interval50: visibility.interval50 === true,
+			interval75: visibility.interval75 === true,
+			interval90: visibility.interval90 === true,
+			interval95: visibility.interval95 === true
+		},
+		comparison: {
+			...( savedSettings.visibility?.comparison ?? {} ),
+			data: comparisonVisibility.data === true,
+			median: comparisonVisibility.median === true,
+			interval50: comparisonVisibility.interval50 === true,
+			interval75: comparisonVisibility.interval75 === true,
+			interval90: comparisonVisibility.interval90 === true,
+			interval95: comparisonVisibility.interval95 === true
+		}
+	}
+
+	await settingslib.set( savedSettings )
+
+	await utils.wait( 1000 )
+	updating.value = false
+}
+
+const resetSettings = async () => {
+	updating.value = true
+
+	const defaultSettings = await settingslib.getDefaultSettings()
+	await settingslib.set( defaultSettings )
+	syncFromSettings( defaultSettings )
+
+	await utils.wait( 1000 )
+	updating.value = false
 }
 
 onMounted( async () => {
-
-	var settings = await settingslib.get()
-    
-	font.value = settings.font
-	layout.value = settings.layout
-	labels.value = settings.labels
-	legends.value = settings.legends
-	
-	colors.value = settings.colors
-	comparisonColors.value = settings.comparisonColors
-
-    visibility.value[0] = settings.visibility.plot.data
-    visibility.value[1] = settings.visibility.plot.median
-    visibility.value[2] = settings.visibility.plot.interval50
-    visibility.value[3] = settings.visibility.plot.interval75
-    visibility.value[4] = settings.visibility.plot.interval90
-    visibility.value[5] = settings.visibility.plot.interval95
-
-    comparisonVisibility.value[0] = settings.visibility.comparison.data
-    comparisonVisibility.value[1] = settings.visibility.comparison.median
-    comparisonVisibility.value[2] = settings.visibility.comparison.interval50
-    comparisonVisibility.value[3] = settings.visibility.comparison.interval75
-    comparisonVisibility.value[4] = settings.visibility.comparison.interval90
-    comparisonVisibility.value[5] = settings.visibility.comparison.interval95
+	const savedSettings = await settingslib.get()
+	syncFromSettings( savedSettings )
 })
 
 </script>

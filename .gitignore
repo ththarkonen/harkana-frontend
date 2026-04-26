@@ -2,6 +2,7 @@
 node_modules
 /dist
 
+/example/
 
 # local env files
 .env.local
@@ -44,3 +45,6 @@ amplifytools.xcconfig
 .secret-*
 **.sample
 #amplify-do-not-edit-end
+
+# local workflow notes
+FRONTEND_VERSIONING_GUIDE.txt
