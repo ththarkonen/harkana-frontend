@@ -1,31 +1,24 @@
 <template>
-    <div class="flex flex-col gap-2 rounded-lg
-                border-2 border-brand bg-black/5 p-4 shadow-sm">
-        <!-- Label -->
-        <h4 class=" font-semibold text-black">
+    <div class="space-y-2">
+        <div class="text-xs font-semibold uppercase tracking-wide text-black/70">
             {{ description }}
-        </h4>
+        </div>
 
-        <!-- Picker Row -->
         <div class="flex items-center gap-3">
-            <!-- Native color input -->
             <input
                 type="color"
                 v-model="color"
-                class="h-10 w-10 cursor-pointer rounded-md border border-gray-300 bg-transparent p-0"
+                class="h-9 w-9 shrink-0 cursor-pointer rounded-md border border-black/15 bg-transparent p-0"
             />
 
-            <!-- Hex display -->
             <input
                 type="text"
                 v-model="color"
-                class="flex-1 rounded-md border border-gray-300 bg-gray-50 px-3 py-2 text-sm font-mono text-gray-800
-                       focus:outline-none focus:ring-2 focus:ring-brand"
+                class="flex-1 border-0 border-b border-black/35 bg-transparent px-0 py-1 text-sm font-mono text-slate-900 focus:border-brand focus:outline-none focus-visible:border-brand"
             />
 
-            <!-- Preview swatch -->
             <div
-                class="h-10 w-10 rounded-md border border-gray-300"
+                class="h-9 w-9 shrink-0 rounded-md border border-black/10"
                 :style="{ backgroundColor: color }"
             />
         </div>

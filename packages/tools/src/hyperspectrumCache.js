@@ -1,4 +1,5 @@
 import results from "./results.js"
+import hyperspectra from "./api/hyperspectra.ts"
 
 const DEFAULT_MEMORY_BUDGET_BYTES = 600 * 1024 * 1024
 const DEFAULT_TTL_MS = 7 * 24 * 60 * 60 * 1000
@@ -33,14 +34,60 @@ var getMip = async function( project, options = {} ){
     return await getOrLoad( project, "mip", { ...options, priority })
 }
 
+var getArtifact = async function( project, mode, options = {} ){
+
+    const normalizedMode = typeof mode === "string" ? mode.trim() : ""
+    if( normalizedMode.length === 0 ){
+        throw new Error( "Artifact mode must be a non-empty string." )
+    }
+
+    const priority = options.priority === "low" ? "low" : "high"
+    return await getOrLoad( project, normalizedMode, { ...options, priority })
+}
+
 var getMipHsv = async function( project, options = {} ){
     const priority = options.priority === "low" ? "low" : "high"
     return await getOrLoad( project, "mip_hsv", { ...options, priority })
 }
 
+var getUmap = async function( project, options = {} ){
+
+    const priority = options.priority === "low" ? "low" : "high"
+
+    const [ redChannel, greenChannel, blueChannel ] = await Promise.all([
+        getOrLoad( project, "umap/r", { ...options, priority }),
+        getOrLoad( project, "umap/g", { ...options, priority }),
+        getOrLoad( project, "umap/b", { ...options, priority })
+    ])
+
+    return {
+        r: redChannel,
+        g: greenChannel,
+        b: blueChannel
+    }
+}
+
 var getXyz = async function( project, options = {} ){
     const priority = options.priority === "low" ? "low" : "high"
     return await getOrLoad( project, "xyz", { ...options, priority })
+}
+
+var setXyz = async function( project, xyz, options = {} ){
+
+    const state = ensureProjectState( project, options )
+    const mode = "xyz"
+    const key = cacheKey( state.projectID, mode )
+
+    setMemoryValue( state, key, xyz )
+
+    try{
+        await writePersistentValue( key, state.projectID, mode, xyz, state.ttlMs )
+        state.stats.persistentWrites += 1
+    } catch( error ){
+        state.stats.persistentErrors += 1
+    }
+
+    return xyz
 }
 
 var getRois = async function( project, options = {} ){
@@ -78,25 +125,67 @@ var getLayer = async function( project, layerIndex, options = {} ){
     return await getOrLoad( project, mode, { ...options, priority })
 }
 
+var peekArtifact = function( project, mode, options = {} ){
+
+    const normalizedMode = typeof mode === "string" ? mode.trim() : ""
+    if( normalizedMode.length === 0 ){
+        return null
+    }
+
+    const state = ensureProjectState( project, options )
+    const key = cacheKey( state.projectID, normalizedMode )
+    const memoryEntry = state.memory.get( key )
+    return memoryEntry ? memoryEntry.value : null
+}
+
+var peekLayer = function( project, layerIndex, options = {} ){
+
+    const normalizedLayer = normalizeLayerIndex( layerIndex )
+    return peekArtifact( project, "layers/" + normalizedLayer, options )
+}
+
 var getPcaScore = async function( project, componentIndex, options = {} ){
 
-    const normalizedComponent = normalizePcaIndex( componentIndex )
-    const mode = pcaModeFromIndex( normalizedComponent )
-    const priority = options.priority === "low" ? "low" : "high"
+    return await getDecompositionScore( project, "pca", componentIndex, options )
+}
 
-    return await getOrLoad( project, mode, { ...options, priority })
+var getRpcaScore = async function( project, componentIndex, options = {} ){
+    return await getDecompositionScore( project, "rpca", componentIndex, options )
 }
 
 var getLoadings = async function( project, options = {} ){
 
-    const priority = options.priority === "low" ? "low" : "high"
-    return await getOrLoad( project, "pca/loadings", { ...options, priority })
+    return await getDecompositionLoadings( project, "pca", options )
+}
+
+var getRpcaLoadings = async function( project, options = {} ){
+    return await getDecompositionLoadings( project, "rpca", options )
+}
+
+var getPcaMip = async function( project, options = {} ){
+
+    return await getDecompositionMip( project, "pca", options )
+}
+
+var getRpcaMip = async function( project, options = {} ){
+    return await getDecompositionMip( project, "rpca", options )
 }
 
 var setActiveLayer = function( project, layerIndex, options = {} ){
 
     const state = ensureProjectState( project, options )
-    state.activeLayer = normalizeLayerIndex( layerIndex )
+    state.activeLayer = clampLayerIndexToMaximum( normalizeLayerIndex( layerIndex ), state.maxLayerIndex )
+
+    pruneLowQueue( state )
+    updatePins( state )
+    enforceMemoryBudget( state )
+    pumpLowQueue( state )
+}
+
+var setInitialLayerWindow = function( project, layerIndex, options = {} ){
+
+    const state = ensureProjectState( project, options )
+    state.initialLayer = clampLayerIndexToMaximum( normalizeLayerIndex( layerIndex ), state.maxLayerIndex )
 
     pruneLowQueue( state )
     updatePins( state )
@@ -106,33 +195,26 @@ var setActiveLayer = function( project, layerIndex, options = {} ){
 
 var setActivePca = function( project, componentIndex, options = {} ){
 
-    const state = ensureProjectState( project, options )
-    state.activePca = normalizePcaIndex( componentIndex )
+    setActiveDecomposition( project, "pca", componentIndex, options )
+}
 
-    pruneLowQueue( state )
-    updatePins( state )
-    enforceMemoryBudget( state )
-    pumpLowQueue( state )
+var setActiveRpca = function( project, componentIndex, options = {} ){
+    setActiveDecomposition( project, "rpca", componentIndex, options )
 }
 
 var prefetchWindow = async function( project, centerIndex, radius = null, options = {} ){
 
     const state = ensureProjectState( project, options )
-    const center = normalizeLayerIndex( centerIndex )
+    const center = clampLayerIndexToMaximum( normalizeLayerIndex( centerIndex ), state.maxLayerIndex )
     const prefetchRadius = normalizePositiveInteger( radius ) ?? state.prefetchRadius
 
     setActiveLayer( project, center, options )
 
-    for( var distance = 1; distance <= prefetchRadius; distance++ ){
+    const windowBounds = resolveLayerWindowBounds( center, prefetchRadius, state.maxLayerIndex )
 
-        const left = center - distance
-        const right = center + distance
-
-        if( left >= 0 ){
-            void getLayer( project, left, { ...options, priority: "low" }).catch(() => null)
-        }
-
-        void getLayer( project, right, { ...options, priority: "low" }).catch(() => null)
+    for( let layerIndex = windowBounds.start; layerIndex <= windowBounds.end; layerIndex++ ){
+        if( layerIndex === center ) continue
+        void getLayer( project, layerIndex, { ...options, priority: "low" }).catch(() => null)
     }
 }
 
@@ -176,6 +258,68 @@ var prefetchPcaScores = async function( project, options = {} ){
     }
 }
 
+async function getDecompositionScore( project, family, componentIndex, options = {} ){
+
+    const normalizedComponent = normalizePcaIndex( componentIndex )
+    const mode = decompositionScoreModeFromIndex( family, normalizedComponent )
+    const priority = options.priority === "low" ? "low" : "high"
+
+    return await getOrLoad( project, mode, { ...options, priority })
+}
+
+async function getDecompositionLoadings( project, family, options = {} ){
+
+    const normalizedFamily = normalizeDecompositionFamily( family )
+    const priority = options.priority === "low" ? "low" : "high"
+
+    return await getOrLoad( project, normalizedFamily + "/loadings", { ...options, priority })
+}
+
+async function getDecompositionMip( project, family, options = {} ){
+
+    const normalizedFamily = normalizeDecompositionFamily( family )
+    const normalizedComponentCount = normalizePcaIndex( options.componentCount ?? options.count ?? DEFAULT_PCA_MAX_COMPONENT )
+    const state = ensureProjectState( project, options )
+
+    if( normalizedFamily === "pca" ){
+        state.activePcaMip = normalizedComponentCount
+        if( Number.isInteger( state.initialPcaMip ) === false ){
+            state.initialPcaMip = normalizedComponentCount
+        }
+    } else {
+        state.activeRpcaMip = normalizedComponentCount
+        if( Number.isInteger( state.initialRpcaMip ) === false ){
+            state.initialRpcaMip = normalizedComponentCount
+        }
+    }
+
+    updatePins( state )
+    enforceMemoryBudget( state )
+
+    const mode = decompositionMipModeFromCount( normalizedFamily, normalizedComponentCount )
+    const priority = options.priority === "low" ? "low" : "high"
+
+    return await getOrLoad( project, mode, { ...options, priority })
+}
+
+function setActiveDecomposition( project, family, componentIndex, options = {} ){
+
+    const normalizedFamily = normalizeDecompositionFamily( family )
+    const state = ensureProjectState( project, options )
+    const normalizedComponent = normalizePcaIndex( componentIndex )
+
+    if( normalizedFamily === "pca" ){
+        state.activePca = normalizedComponent
+    } else {
+        state.activeRpca = normalizedComponent
+    }
+
+    pruneLowQueue( state )
+    updatePins( state )
+    enforceMemoryBudget( state )
+    pumpLowQueue( state )
+}
+
 var clearProjectCache = async function( project ){
 
     const projectID = readProjectID( project )
@@ -192,6 +336,56 @@ var clearProjectCache = async function( project ){
     }
 
     await deletePersistentProjectEntries( projectID )
+}
+
+var clearProjectModePrefixes = async function( project, prefixes = [] ){
+
+    const normalizedPrefixes = normalizeModePrefixes( prefixes )
+    if( normalizedPrefixes.length === 0 ) return
+
+    const projectID = readProjectID( project )
+    const state = projectCaches.get( projectID )
+
+    if( state ){
+
+        const removedQueuedKeys = new Set()
+
+        state.lowQueue = state.lowQueue.filter(( task ) => {
+
+            const shouldRemove = matchesModePrefixes( task?.mode, normalizedPrefixes )
+            if( shouldRemove ){
+                removedQueuedKeys.add( task.key )
+            }
+
+            return !shouldRemove
+        })
+
+        for( const [ key, inflightEntry ] of state.inFlight.entries() ){
+
+            const mode = modeFromCacheKey( projectID, key )
+            if( matchesModePrefixes( mode, normalizedPrefixes ) === false ){
+                continue
+            }
+
+            if( inflightEntry?.status === "queued" ||
+                inflightEntry?.status === "running" ||
+                removedQueuedKeys.has( key ) ){
+                inflightEntry.deferred.resolve( null )
+                state.inFlight.delete( key )
+            }
+        }
+
+        for( const key of [ ...state.memory.keys() ] ){
+            const mode = modeFromCacheKey( projectID, key )
+            if( matchesModePrefixes( mode, normalizedPrefixes ) === false ){
+                continue
+            }
+
+            removeMemoryEntry( state, key )
+        }
+    }
+
+    await deletePersistentProjectEntriesByModePrefixes( projectID, normalizedPrefixes )
 }
 
 var clearAllHyperspectrumCache = async function(){
@@ -218,6 +412,9 @@ var getCacheStats = function( project ){
             queuedPrefetch: 0,
             activeLayer: 0,
             activePca: 1,
+            activePcaMip: DEFAULT_PCA_MAX_COMPONENT,
+            activeRpca: 1,
+            activeRpcaMip: DEFAULT_PCA_MAX_COMPONENT,
             budgetBytes: DEFAULT_MEMORY_BUDGET_BYTES,
             ttlMs: DEFAULT_TTL_MS,
             stats: defaultStats()
@@ -232,6 +429,9 @@ var getCacheStats = function( project ){
         queuedPrefetch: state.lowQueue.length,
         activeLayer: state.activeLayer,
         activePca: state.activePca,
+        activePcaMip: state.activePcaMip,
+        activeRpca: state.activeRpca,
+        activeRpcaMip: state.activeRpcaMip,
         budgetBytes: state.budgetBytes,
         ttlMs: state.ttlMs,
         stats: { ...state.stats }
@@ -370,28 +570,39 @@ function executeRequest( state, project, mode, key, inflightEntry, fromLowQueue 
     void (async () => {
 
         try{
-            const value = await loadFromNetwork( project, mode )
+            const value = await loadFromNetwork( project, mode, inflightEntry.priority )
+
+            if( state.inFlight.get( key ) !== inflightEntry ){
+                return
+            }
 
             state.stats.networkHits += 1
 
             setMemoryValue( state, key, value )
 
-            void writePersistentValue( key, state.projectID, mode, value, state.ttlMs )
-                .then(() => {
-                    state.stats.persistentWrites += 1
-                })
-                .catch(() => {
-                    state.stats.persistentErrors += 1
-                })
+            if( shouldPersistLoadedValue( inflightEntry.priority, mode ) ){
+                void writePersistentValue( key, state.projectID, mode, value, state.ttlMs )
+                    .then(() => {
+                        state.stats.persistentWrites += 1
+                    })
+                    .catch(() => {
+                        state.stats.persistentErrors += 1
+                    })
+            }
 
             inflightEntry.deferred.resolve( value )
 
         } catch( error ){
+            if( state.inFlight.get( key ) !== inflightEntry ){
+                return
+            }
             inflightEntry.deferred.reject( error )
 
         } finally {
 
-            state.inFlight.delete( key )
+            if( state.inFlight.get( key ) === inflightEntry ){
+                state.inFlight.delete( key )
+            }
 
             if( fromLowQueue ){
                 state.runningLow = Math.max( 0, state.runningLow - 1 )
@@ -403,8 +614,8 @@ function executeRequest( state, project, mode, key, inflightEntry, fromLowQueue 
 
 function pruneLowQueue( state ){
 
-    const limit = state.prefetchRadius + 1
     var keptTasks = []
+    const activeLayerWindow = resolveLayerWindowBounds( state.activeLayer, state.prefetchRadius, state.maxLayerIndex )
 
     for( const task of state.lowQueue ){
 
@@ -416,12 +627,14 @@ function pruneLowQueue( state ){
             continue
         }
 
-        if( layerIndex !== null && Math.abs( layerIndex - state.activeLayer ) <= limit ){
+        if( layerIndex !== null &&
+            layerIndex >= activeLayerWindow.start &&
+            layerIndex <= activeLayerWindow.end ){
             keptTasks.push( task )
             continue
         }
 
-        if( pcaIndex !== null && Math.abs( pcaIndex - state.activePca ) <= limit ){
+        if( pcaIndex !== null && Math.abs( pcaIndex - state.activePca ) <= state.prefetchRadius ){
             keptTasks.push( task )
             continue
         }
@@ -483,9 +696,13 @@ function taskScore( state, task ){
     return Number.MAX_SAFE_INTEGER
 }
 
-async function loadFromNetwork( project, mode ){
+async function loadFromNetwork( project, mode, priority = "high" ){
 
-    const loaded = await results.load( project, mode )
+    if( mode === "roi/frontend" ){
+        return await hyperspectra.listRois( project )
+    }
+
+    const loaded = await results.load( project, mode, { priority } )
 
     if( loaded instanceof Error ){
         throw loaded
@@ -501,7 +718,7 @@ async function loadFromNetwork( project, mode ){
 async function refreshMode( state, project, mode ){
 
     const key = cacheKey( state.projectID, mode )
-    const value = await loadFromNetwork( project, mode )
+    const value = await loadFromNetwork( project, mode, "high" )
 
     setMemoryValue( state, key, value )
 
@@ -543,11 +760,20 @@ function createProjectState( projectID ){
         ttlMs: DEFAULT_TTL_MS,
         prefetchRadius: DEFAULT_PREFETCH_RADIUS,
         lowConcurrency: DEFAULT_LOW_CONCURRENCY,
+        maxLayerIndex: null,
         activeLayer: 0,
+        initialLayer: null,
         activePca: 1,
+        activePcaMip: DEFAULT_PCA_MAX_COMPONENT,
+        initialPcaMip: null,
+        activeRpca: 1,
+        activeRpcaMip: DEFAULT_PCA_MAX_COMPONENT,
+        initialRpcaMip: null,
         accessCounter: 0,
         memory: new Map(),
         memoryBytes: 0,
+        pinnedKeys: new Set(),
+        pinsDirty: true,
         inFlight: new Map(),
         lowQueue: [],
         runningLow: 0,
@@ -575,29 +801,79 @@ function applyStateOptions( state, options ){
     if( ttlMs !== null ) state.ttlMs = ttlMs
 
     const radius = normalizePositiveInteger( options.prefetchRadius )
-    if( radius !== null ) state.prefetchRadius = radius
+    if( radius !== null && state.prefetchRadius !== radius ){
+        state.prefetchRadius = radius
+        state.pinsDirty = true
+    }
 
     const lowConcurrency = normalizePositiveInteger( options.lowConcurrency )
     if( lowConcurrency !== null ) state.lowConcurrency = lowConcurrency
+
+    const maxLayerIndex = normalizeOptionalNonNegativeInteger( options.maxLayerIndex )
+    if( maxLayerIndex !== null && state.maxLayerIndex !== maxLayerIndex ){
+        state.maxLayerIndex = maxLayerIndex
+        state.pinsDirty = true
+    }
 }
 
 function updatePins( state ){
 
-    const pinnedKeys = new Set([
-        cacheKey( state.projectID, "mip" ),
-        cacheKey( state.projectID, "mip_hsv" ),
-        cacheKey( state.projectID, "xyz" ),
-        cacheKey( state.projectID, "pca/loadings" ),
-        cacheKey( state.projectID, "layers/" + state.activeLayer ),
-        cacheKey( state.projectID, "layers/" + ( state.activeLayer - 1 )),
-        cacheKey( state.projectID, "layers/" + ( state.activeLayer + 1 )),
-        cacheKey( state.projectID, pcaModeFromIndex( state.activePca )),
-        cacheKey( state.projectID, pcaModeFromIndex( Math.max( 1, state.activePca - 1 ))),
-        cacheKey( state.projectID, pcaModeFromIndex( Math.min( DEFAULT_PCA_MAX_COMPONENT, state.activePca + 1 )))
-    ])
+    const pinnedKeys = computePinnedKeys( state )
+    state.pinnedKeys = pinnedKeys
+    state.pinsDirty = false
 
     for( const [ key, entry ] of state.memory.entries() ){
         entry.pinned = pinnedKeys.has( key )
+    }
+}
+
+function computePinnedKeys( state ){
+
+    const pinnedKeys = new Set([
+        cacheKey( state.projectID, "mip" ),
+        cacheKey( state.projectID, "mip_hsv" ),
+        cacheKey( state.projectID, "umap/r" ),
+        cacheKey( state.projectID, "umap/g" ),
+        cacheKey( state.projectID, "umap/b" ),
+        cacheKey( state.projectID, "xyz" ),
+        cacheKey( state.projectID, "pca/loadings" ),
+        cacheKey( state.projectID, "rpca/loadings" ),
+        cacheKey( state.projectID, pcaMipModeFromCount( state.activePcaMip ) ),
+        cacheKey( state.projectID, rpcaMipModeFromCount( state.activeRpcaMip ) )
+    ])
+
+    if( Number.isInteger( state.initialPcaMip ) ){
+        pinnedKeys.add( cacheKey( state.projectID, pcaMipModeFromCount( state.initialPcaMip ) ))
+    }
+
+    if( Number.isInteger( state.initialRpcaMip ) ){
+        pinnedKeys.add( cacheKey( state.projectID, rpcaMipModeFromCount( state.initialRpcaMip ) ))
+    }
+
+    addPinnedLayerWindow( pinnedKeys, state.projectID, state.activeLayer, state.prefetchRadius, state.maxLayerIndex )
+
+    if( Number.isInteger( state.initialLayer ) ){
+        addPinnedLayerWindow( pinnedKeys, state.projectID, state.initialLayer, state.prefetchRadius, state.maxLayerIndex )
+    }
+
+    for( var componentIndex = 1; componentIndex <= DEFAULT_PCA_MAX_COMPONENT; componentIndex++ ){
+        pinnedKeys.add( cacheKey( state.projectID, pcaModeFromIndex( componentIndex ) ))
+        pinnedKeys.add( cacheKey( state.projectID, rpcaModeFromIndex( componentIndex ) ))
+    }
+
+    return pinnedKeys
+}
+
+function addPinnedLayerWindow( pinnedKeys, projectID, centerLayer, radius = 1, maxLayerIndex = null ){
+
+    if( Number.isInteger( centerLayer ) === false || centerLayer < 0 ) return
+    const windowBounds = resolveLayerWindowBounds( centerLayer, radius, maxLayerIndex )
+    const prefixes = [ "layers/", "estimate/layers/" ]
+
+    for( const prefix of prefixes ){
+        for( let layerIndex = windowBounds.start; layerIndex <= windowBounds.end; layerIndex++ ){
+            pinnedKeys.add( cacheKey( projectID, prefix + layerIndex ))
+        }
     }
 }
 
@@ -612,10 +888,19 @@ function setMemoryValue( state, key, value ){
 
     state.accessCounter += 1
 
+    if( state.pinsDirty ){
+        updatePins( state )
+    }
+
+    if( state.pinnedKeys.size === 0 ){
+        state.pinnedKeys = computePinnedKeys( state )
+        state.pinsDirty = false
+    }
+
     state.memory.set( key, {
         value,
         sizeBytes,
-        pinned: false,
+        pinned: state.pinnedKeys.has( key ),
         lastAccess: state.accessCounter
     })
 
@@ -685,6 +970,18 @@ function cacheKey( projectID, mode ){
     return projectID + "::" + mode
 }
 
+function modeFromCacheKey( projectID, key ){
+
+    if( typeof key !== "string" ) return ""
+
+    const prefix = projectID + "::"
+    if( key.startsWith( prefix ) === false ){
+        return ""
+    }
+
+    return key.slice( prefix.length )
+}
+
 function layerIndexFromMode( mode ){
 
     if( typeof mode !== "string" ) return null
@@ -735,11 +1032,49 @@ function normalizePcaIndex( value ){
     return index
 }
 
+function normalizeDecompositionFamily( value ){
+
+    if( value === "rpca" ){
+        return "rpca"
+    }
+
+    return "pca"
+}
+
 function pcaModeFromIndex( componentIndex ){
 
+    return decompositionScoreModeFromIndex( "pca", componentIndex )
+}
+
+function pcaMipModeFromCount( componentCount ){
+
+    return decompositionMipModeFromCount( "pca", componentCount )
+}
+
+function rpcaModeFromIndex( componentIndex ){
+
+    return decompositionScoreModeFromIndex( "rpca", componentIndex )
+}
+
+function rpcaMipModeFromCount( componentCount ){
+
+    return decompositionMipModeFromCount( "rpca", componentCount )
+}
+
+function decompositionScoreModeFromIndex( family, componentIndex ){
+
+    const normalizedFamily = normalizeDecompositionFamily( family )
     const normalized = normalizePcaIndex( componentIndex )
     const suffix = String( normalized ).padStart( 2, "0" )
-    return "pca/scores/pc" + suffix
+    return normalizedFamily + "/scores/pc" + suffix
+}
+
+function decompositionMipModeFromCount( family, componentCount ){
+
+    const normalizedFamily = normalizeDecompositionFamily( family )
+    const normalized = normalizePcaIndex( componentCount )
+    const suffix = String( normalized ).padStart( 2, "0" )
+    return normalizedFamily + "/pca_mip/pc" + suffix
 }
 
 function normalizePositiveInteger( value ){
@@ -749,6 +1084,88 @@ function normalizePositiveInteger( value ){
     if( number <= 0 ) return null
 
     return number
+}
+
+function normalizeOptionalNonNegativeInteger( value ){
+
+    const number = Number( value )
+    if( Number.isInteger( number ) === false ) return null
+    if( number < 0 ) return null
+
+    return number
+}
+
+function clampLayerIndexToMaximum( layerIndex, maxLayerIndex ){
+
+    const maximum = normalizeOptionalNonNegativeInteger( maxLayerIndex )
+    if( maximum === null ){
+        return layerIndex
+    }
+
+    return Math.max( 0, Math.min( maximum, layerIndex ))
+}
+
+function resolveLayerWindowBounds( centerLayer, radius = 1, maxLayerIndex = null ){
+
+    const center = Math.max( 0, normalizeLayerIndex( centerLayer ))
+    const safeRadius = normalizePositiveInteger( radius ) ?? 1
+    const maximum = normalizeOptionalNonNegativeInteger( maxLayerIndex )
+
+    let start = Math.max( 0, center - safeRadius )
+    let end = center + safeRadius
+
+    if( maximum === null ){
+        return { start, end }
+    }
+
+    start = Math.min( start, maximum )
+    end = Math.min( end, maximum )
+
+    const targetCount = Math.min( maximum + 1, ( safeRadius * 2 ) + 1 )
+
+    while(( end - start + 1 ) < targetCount ){
+        if( start > 0 ){
+            start -= 1
+            continue
+        }
+
+        if( end < maximum ){
+            end += 1
+            continue
+        }
+
+        break
+    }
+
+    return { start, end }
+}
+
+function normalizeModePrefixes( prefixes ){
+
+    if( Array.isArray( prefixes ) === false ){
+        return []
+    }
+
+    const normalized = prefixes
+        .map(( value ) => typeof value === "string" ? value.trim() : "" )
+        .filter(( value ) => value.length > 0 )
+
+    return [ ...new Set( normalized ) ]
+}
+
+function matchesModePrefixes( mode, prefixes ){
+
+    if( typeof mode !== "string" || mode.length === 0 ){
+        return false
+    }
+
+    for( const prefix of prefixes ){
+        if( mode.startsWith( prefix ) ){
+            return true
+        }
+    }
+
+    return false
 }
 
 function readProjectID( project ){
@@ -784,16 +1201,27 @@ function estimateRecursive( value, visited ){
 
     if( Array.isArray( value ) ){
 
-        if( value.length > 0 && Array.isArray( value[0] ) ){
-            var total2D = 16
-            for( const row of value ){
-                if( Array.isArray( row ) ){
-                    total2D += row.length * 8
-                } else {
-                    total2D += estimateRecursive( row, visited )
-                }
+        if( looksLikeNumericMatrix( value ) ){
+            return estimateNumericMatrixBytes( value )
+        }
+
+        if( looksLikeNumericVector( value ) ){
+            return 16 + ( value.length * 8 )
+        }
+
+        if( value.length > 32 ){
+            const sampleCount = Math.min( value.length, 8 )
+            const step = Math.max( 1, Math.floor( value.length / sampleCount ))
+            let sampledSize = 0
+            let sampledItems = 0
+
+            for( let index = 0; index < value.length && sampledItems < sampleCount; index += step ){
+                sampledSize += estimateRecursive( value[ index ], visited )
+                sampledItems += 1
             }
-            return total2D
+
+            const averageSize = sampledItems > 0 ? sampledSize / sampledItems : 16
+            return 16 + Math.round( averageSize * value.length )
         }
 
         var totalArray = 16
@@ -812,6 +1240,98 @@ function estimateRecursive( value, visited ){
     }
 
     return totalObject
+}
+
+function shouldPersistLoadedValue( priority, mode ){
+
+    if( priority === "high" ){
+        return true
+    }
+
+    return mode === "xyz" || mode === "roi/frontend"
+}
+
+function looksLikeNumericVector( value ){
+
+    if( Array.isArray( value ) === false || value.length === 0 ){
+        return false
+    }
+
+    const sampleCount = Math.min( value.length, 8 )
+    const step = Math.max( 1, Math.floor( value.length / sampleCount ))
+
+    for( let index = 0, sampled = 0; index < value.length && sampled < sampleCount; index += step, sampled += 1 ){
+        const entry = value[ index ]
+        if( Array.isArray( entry ) ){
+            return false
+        }
+        if( entry !== null && Number.isFinite( Number( entry )) === false ){
+            return false
+        }
+    }
+
+    return true
+}
+
+function looksLikeNumericMatrix( value ){
+
+    if( Array.isArray( value ) === false || value.length === 0 ){
+        return false
+    }
+
+    const sampleCount = Math.min( value.length, 8 )
+    const step = Math.max( 1, Math.floor( value.length / sampleCount ))
+
+    for( let index = 0, sampled = 0; index < value.length && sampled < sampleCount; index += step, sampled += 1 ){
+        const row = value[ index ]
+        if( Array.isArray( row ) === false ){
+            return false
+        }
+
+        if( row.length === 0 ){
+            continue
+        }
+
+        const columnSampleCount = Math.min( row.length, 8 )
+        const columnStep = Math.max( 1, Math.floor( row.length / columnSampleCount ))
+
+        for( let columnIndex = 0, sampledColumns = 0; columnIndex < row.length && sampledColumns < columnSampleCount; columnIndex += columnStep, sampledColumns += 1 ){
+            const entry = row[ columnIndex ]
+            if( entry !== null && Number.isFinite( Number( entry )) === false ){
+                return false
+            }
+        }
+    }
+
+    return true
+}
+
+function estimateNumericMatrixBytes( matrix ){
+
+    const height = matrix.length
+    if( height === 0 ){
+        return 16
+    }
+
+    const sampleCount = Math.min( height, 8 )
+    const step = Math.max( 1, Math.floor( height / sampleCount ))
+    let sampledWidthTotal = 0
+    let sampledRows = 0
+
+    for( let index = 0; index < height && sampledRows < sampleCount; index += step ){
+        const row = matrix[ index ]
+        if( Array.isArray( row ) === false ){
+            continue
+        }
+        sampledWidthTotal += row.length
+        sampledRows += 1
+    }
+
+    const averageWidth = sampledRows > 0
+        ? ( sampledWidthTotal / sampledRows )
+        : 0
+
+    return 16 + ( height * 16 ) + Math.round( height * averageWidth * 8 )
 }
 
 function createDeferred(){
@@ -993,6 +1513,55 @@ async function deletePersistentProjectEntries( projectID ){
     })
 }
 
+async function deletePersistentProjectEntriesByModePrefixes( projectID, prefixes ){
+
+    const db = await ensureDatabase()
+    if( !db ) return
+
+    await new Promise(( resolve, reject ) => {
+
+        const transaction = db.transaction( STORE_NAME, "readwrite" )
+        const store = transaction.objectStore( STORE_NAME )
+
+        if( store.indexNames.contains( "projectID" ) === false ){
+            transaction.oncomplete = () => resolve( null )
+            transaction.onerror = () => reject( transaction.error )
+            transaction.onabort = () => reject( transaction.error )
+            return
+        }
+
+        const index = store.index( "projectID" )
+        const request = typeof IDBKeyRange === "undefined"
+            ? index.openCursor()
+            : index.openCursor( IDBKeyRange.only( projectID ))
+
+        request.onsuccess = () => {
+
+            const cursor = request.result
+            if( !cursor ) return
+
+            const value = cursor.value
+            if( value?.projectID !== projectID ){
+                cursor.continue()
+                return
+            }
+
+            const mode = typeof value?.mode === "string" ? value.mode : ""
+            if( matchesModePrefixes( mode, prefixes ) ){
+                store.delete( cursor.primaryKey )
+            }
+
+            cursor.continue()
+        }
+
+        request.onerror = () => reject( request.error )
+
+        transaction.oncomplete = () => resolve( null )
+        transaction.onerror = () => reject( transaction.error )
+        transaction.onabort = () => reject( transaction.error )
+    })
+}
+
 async function clearPersistentStore(){
 
     const db = await ensureDatabase()
@@ -1030,7 +1599,15 @@ function normalizeRoiPayload( payload ){
 function normalizeRoiEntry( roi ){
 
     if( roi === null || typeof roi !== "object" ) return null
-    if( roi.shapeType !== "pixel-list" ) return null
+
+    const normalizedShapeType = String( roi.shapeType ?? "" ).trim().toLowerCase()
+    if(
+        normalizedShapeType.length > 0 &&
+        normalizedShapeType !== "pixel-list" &&
+        normalizedShapeType !== "bounding-box"
+    ){
+        return null
+    }
 
     const roiId = String( roi.roiId ?? "" ).trim()
     if( roiId.length === 0 ) return null
@@ -1039,30 +1616,142 @@ function normalizeRoiEntry( roi ){
     if( boundingBox === null ) return null
 
     const meanSpectrum = normalizeNumericSeries( roi.meanSpectrum )
-    if( meanSpectrum === null ) return null
+    const spectrumLength = resolveSpectrumLength( roi.spectrumLength, meanSpectrum )
+    const confidenceLevels = normalizeConfidenceLevelsPayload(
+        roi.confidenceLevels ??
+        roi?.source?.confidence?.levels ??
+        roi?.confidence?.levels
+    )
 
-    const lowerBound = normalizeOptionalNumericSeries( roi.lowerBound, meanSpectrum.length )
-    const upperBound = normalizeOptionalNumericSeries( roi.upperBound, meanSpectrum.length )
+    const estimate = normalizeRoiEstimatePayload( roi.estimate )
+    const expectedLength = spectrumLength > 0
+        ? spectrumLength
+        : ( estimate?.spectrumLength ?? 0 )
+
+    const confidenceLower = normalizeOptionalRoiBoundsPayload( roi?.confidence?.lowerBound, expectedLength )
+    const confidenceUpper = normalizeOptionalRoiBoundsPayload( roi?.confidence?.upperBound, expectedLength )
+
+    const lowerBound = normalizeOptionalRoiBoundsPayload( roi.lowerBound, expectedLength ) ?? confidenceLower
+    const upperBound = normalizeOptionalRoiBoundsPayload( roi.upperBound, expectedLength ) ?? confidenceUpper
     const hasBounds = lowerBound !== null && upperBound !== null
+    const source = roi.source !== null && typeof roi.source === "object"
+        ? normalizeRoiSource( roi.source, expectedLength )
+        : null
 
     return {
         roiId,
         name: String( roi.name ?? "" ).trim() || "Untitled ROI",
         description: String( roi.description ?? "" ),
         createdAt: typeof roi.createdAt === "string" ? roi.createdAt : "",
-        shapeType: "pixel-list",
+        createdBy: typeof roi.createdBy === "string" ? roi.createdBy : "",
+        shapeType: "bounding-box",
         pixelCount: Number.isInteger( Number( roi.pixelCount )) ? Number( roi.pixelCount ) : ( boundingBox.width * boundingBox.height ),
         boundingBox,
         meanSpectrum,
-        spectrumLength: meanSpectrum.length,
-        lowerPercentage: Number.isFinite( Number( roi.lowerPercentage )) ? Number( roi.lowerPercentage ) : null,
+        spectrumLength,
         lowerBound: hasBounds ? lowerBound : null,
-        upperPercentage: Number.isFinite( Number( roi.upperPercentage )) ? Number( roi.upperPercentage ) : null,
         upperBound: hasBounds ? upperBound : null,
         xy: roi.xy !== null && typeof roi.xy === "object" ? roi.xy : null,
         normalization: roi.normalization !== null && typeof roi.normalization === "object" ? roi.normalization : null,
-        source: roi.source !== null && typeof roi.source === "object" ? roi.source : null
+        source,
+        confidence: hasBounds
+            ? {
+                lowerBound,
+                upperBound
+            }
+            : null,
+        confidenceLevels,
+        estimate
     }
+}
+
+function normalizeRoiEstimatePayload( estimate ){
+
+    if( estimate === null || typeof estimate !== "object" ){
+        return null
+    }
+
+    const meanSpectrum = normalizeNumericSeries( estimate.meanSpectrum ?? estimate.spectrum ?? estimate.values )
+    const spectrumLength = resolveSpectrumLength( estimate.spectrumLength, meanSpectrum )
+    const confidenceLevels = normalizeConfidenceLevelsPayload(
+        estimate.confidenceLevels ?? estimate?.source?.confidence?.levels ?? estimate?.confidence?.levels
+    )
+    const confidenceLower = normalizeOptionalRoiBoundsPayload( estimate?.confidence?.lowerBound, spectrumLength )
+    const confidenceUpper = normalizeOptionalRoiBoundsPayload( estimate?.confidence?.upperBound, spectrumLength )
+    const lowerBound = normalizeOptionalRoiBoundsPayload( estimate.lowerBound, spectrumLength ) ?? confidenceLower
+    const upperBound = normalizeOptionalRoiBoundsPayload( estimate.upperBound, spectrumLength ) ?? confidenceUpper
+
+    return {
+        meanSpectrum,
+        spectrumLength,
+        xy: estimate.xy !== null && typeof estimate.xy === "object" ? estimate.xy : null,
+        normalization: estimate.normalization !== null && typeof estimate.normalization === "object"
+            ? estimate.normalization
+            : null,
+        source: estimate.source !== null && typeof estimate.source === "object"
+            ? normalizeRoiSource( estimate.source, spectrumLength )
+            : null,
+        confidence: lowerBound !== null && upperBound !== null
+            ? {
+                lowerBound,
+                upperBound
+            }
+            : null,
+        confidenceLevels,
+        lowerBound,
+        upperBound
+    }
+}
+
+function resolveSpectrumLength( explicitLength, series ){
+
+    const normalizedLength = Number.parseInt( explicitLength, 10 )
+    if( Number.isInteger( normalizedLength ) && normalizedLength > 0 ){
+        return normalizedLength
+    }
+
+    if( Array.isArray( series ) ){
+        return series.length
+    }
+
+    return 0
+}
+
+function normalizeConfidenceLevelsPayload( confidenceLevels ){
+
+    if( Array.isArray( confidenceLevels ) === false ){
+        return []
+    }
+
+    const normalized = confidenceLevels
+        .map(( value ) => Number.parseInt( String( value ), 10 ))
+        .filter(( value ) => Number.isInteger( value ) && value > 0 && value <= 100 )
+        .map(( value ) => String( value ))
+
+    return [ ...new Set( normalized ) ]
+}
+
+function normalizeRoiSource( source, expectedLength ){
+
+    if( source === null || typeof source !== "object" ){
+        return null
+    }
+
+    const normalized = { ...source }
+
+    if( source?.confidence !== null && typeof source?.confidence === "object" ){
+        const confidenceLower = normalizeOptionalRoiBoundsPayload( source.confidence.lowerBound, expectedLength )
+        const confidenceUpper = normalizeOptionalRoiBoundsPayload( source.confidence.upperBound, expectedLength )
+
+        normalized.confidence = {
+            ...source.confidence,
+            lowerBound: confidenceLower,
+            upperBound: confidenceUpper,
+            levels: normalizeConfidenceLevelsPayload( source?.confidence?.levels )
+        }
+    }
+
+    return normalized
 }
 
 function normalizeRoiBoundingBox( boundingBox ){
@@ -1124,29 +1813,72 @@ function normalizeNumericSeries( values ){
 
 function normalizeOptionalNumericSeries( values, expectedLength ){
 
-    if( Array.isArray( values ) === false || values.length !== expectedLength ){
+    if( Array.isArray( values ) === false ){
+        return null
+    }
+
+    if( Number.isInteger( expectedLength ) && expectedLength > 0 && values.length !== expectedLength ){
         return null
     }
 
     return normalizeNumericSeries( values )
 }
 
+function normalizeOptionalRoiBoundsPayload( values, expectedLength ){
+
+    if( Array.isArray( values ) ){
+        return normalizeOptionalNumericSeries( values, expectedLength )
+    }
+
+    if( values === null || typeof values !== "object" ){
+        return null
+    }
+
+    var normalized = {}
+    var hasAnyLevel = false
+
+    for( const [ key, payload ] of Object.entries( values ) ){
+        const numericKey = Number.parseInt( String( key ), 10 )
+        if( Number.isInteger( numericKey ) === false ) continue
+
+        const normalizedSeries = normalizeOptionalNumericSeries( payload, expectedLength )
+        if( normalizedSeries === null ) continue
+
+        normalized[String( numericKey )] = normalizedSeries
+        hasAnyLevel = true
+    }
+
+    return hasAnyLevel ? normalized : null
+}
+
 export default {
     initProjectCache,
+    getArtifact,
+    peekArtifact,
     getMip,
     getMipHsv,
+    getUmap,
     getXyz,
+    setXyz,
     getRois,
     refreshRois,
     getLayer,
+    peekLayer,
     getPcaScore,
+    getRpcaScore,
     getLoadings,
+    getRpcaLoadings,
+    getPcaMip,
+    getRpcaMip,
     setActiveLayer,
+    setInitialLayerWindow,
     setActivePca,
+    setActiveRpca,
     prefetchWindow,
     prefetchPcaWindow,
     prefetchPcaScores,
     clearProjectCache,
+    clearProjectModePrefixes,
     clearAllHyperspectrumCache,
     getCacheStats
 }

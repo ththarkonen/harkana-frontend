@@ -1,14 +1,13 @@
 <template>
-<div class="flex items-center justify-between
-            gap-3 px-2 py-1 text-sm text-white">
-    <span class="flex-1 truncate">
+<div :class = "rowClasses">
+    <span class = "min-w-0 flex-1 text-black">
         <slot></slot>
     </span>
-    <span class="flex items-center justify-center w-5 h-5 shrink-0">
+    <span class = "flex h-5 w-5 shrink-0 items-center justify-center">
 
-        <div v-show = "showProgress"><Spinner class="w-5 h-5 text-brand"></Spinner></div>
-        <div v-show = "showSuccess"><i class = "w-4 h-4 fa fa-check"></i></div>
-        <div v-show = "showError"><i class = "w-4 h-4 fa fa-exclamation-triangle"></i></div>
+        <div v-show = "showProgress"><Spinner class = "h-5 w-5 text-brand"></Spinner></div>
+        <div v-show = "showSuccess"><i class = "fa fa-check text-brand"></i></div>
+        <div v-show = "showError"><i class = "fa fa-exclamation-triangle text-red-500"></i></div>
     </span>
 </div>
 </template>
@@ -24,6 +23,14 @@ const showProgress = computed(() => props.state === "progress")
 const showSuccess = computed(() => props.state === "success")
 const showError = computed(() => props.state === "error")
 
-</script>
+const rowClasses = computed(() => {
+    const baseClass = "flex items-center justify-between gap-3 rounded-lg border bg-white p-4 text-sm"
+    if( showError.value ){
+        return baseClass + " border-red-500/70"
+    }
 
+    return baseClass + " border-brand"
+})
+
+</script>
 

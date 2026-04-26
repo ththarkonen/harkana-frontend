@@ -1,16 +1,16 @@
 <template>
-<div class = "bg-black/5 rounded-lg p-2 border-2 border-brand">
-    <label>
-        <h4 class="m-0 mb-2 text-gray-800 font-semibold">{{ description }}</h4>
+<div class = "space-y-2">
+    <label class = "block">
+        <div class = "mb-1 text-xs font-semibold uppercase tracking-wide text-black/70">{{ description }}</div>
         <input
             type="text"
-            class="w-full px-3 py-2 text-base border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-brand"
+            class="w-full border-0 border-b border-black/35 bg-transparent px-0 py-1 text-sm font-medium text-slate-900 focus:border-brand focus:outline-none focus-visible:border-brand"
             v-model="input"
             :placeholder="placeholder"
         />
     </label>
-    <div 
-        class="mt-2 p-2 rounded min-h-[1.5rem] text-lg"
+    <div
+        class="min-h-[1.5rem] text-base text-black/80"
         v-html="renderedLatex"
     ></div>
 </div>

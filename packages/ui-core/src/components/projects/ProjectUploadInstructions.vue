@@ -4,7 +4,7 @@
 				 text-center text-lg leading-relaxed text-white
 				 shadow-[0_8px_20px_rgba(0,0,0,0.5)]">
 
-        Upload your datasets using the <strong>Upload Data</strong> button in the sidebar.<br>
+        Upload your datasets using the <strong>Upload data</strong> button in the sidebar.<br>
 
 		You can download an example dataset by clicking this
 		<a :href = "exampleDatasetPath"
@@ -22,7 +22,12 @@
 		</a> page.
         <br><br>
 
-        <span v-if = "isHyperspectrum">
+		<span v-if = "isHyperspectrum">
+			Hyperspectral uploads support the existing file-based workflow together with OME-Zarr datasets and OME-TIFF files.
+			<br><br>
+		</span>
+
+		<span v-if = "isHyperspectrum">
 			After a successful upload, a project entry is created and shown here.
 			Initially, the project appears under <strong>Processing</strong>; ongoing processing
 			can be monitored by selecting <strong>Processing</strong> in the sidebar.
@@ -51,9 +56,11 @@
 <script setup>
 
 const dataType = import.meta.env.VITE_DATA_TYPE
-const isHyperspectrum = dataType === "hypercars"
+const isHyperspectrum = dataType === "hypercars" || dataType === "hyperraman"
 
-const exampleDatasetPath = "/examples/data/example_data.txt"
+const exampleDatasetPath = isHyperspectrum
+	? "/examples/data/example_data.tif"
+	: "/examples/data/example_data.txt"
 const dataFormatsPath = isHyperspectrum
 	? "/formats?section=OIR"
 	: "/formats?section=Plain+text"

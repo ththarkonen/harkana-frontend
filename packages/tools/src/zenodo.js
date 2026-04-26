@@ -1,111 +1,128 @@
-import { Amplify, Storage} from 'aws-amplify'
-import awsconfig from '@/aws-exports.js'
-import axios from 'axios';
-import utils from "./utils.js"
+import { apiFetch, buildQueryString } from "./api/http.ts"
 
-Amplify.configure( awsconfig )
-const Auth = Amplify.Auth;
+const SUPPORTED_DATA_TYPES = new Set([ "cars", "raman", "hypercars", "hyperraman" ])
 
-var apiParameters = async function( project ){
+var normalizeDataType = function( dataType = "" ){
 
-    const jwt = ( await Auth.currentSession() ).getIdToken().getJwtToken();
+    const fallback = String( import.meta.env.VITE_DATA_TYPE ?? "" ).trim().toLowerCase()
+    const resolved = String( dataType ?? "" ).trim().toLowerCase()
+    const normalized = resolved.length > 0 ? resolved : fallback
 
-    var parameters =  {};
-    parameters = {};
-    parameters.jwt = jwt;
-    parameters.projectID = project.id;
-    parameters.dataType = import.meta.env.VITE_DATA_TYPE
+    if( SUPPORTED_DATA_TYPES.has( normalized ) ){
+        return normalized
+    }
 
-    return { params: parameters}
+    if( SUPPORTED_DATA_TYPES.has( fallback ) ){
+        return fallback
+    }
+
+    return "raman"
 }
 
-var draft = async function( project ){
+var normalizeKeywords = function( keywords ){
 
-    const parameters = await apiParameters( project );
-    const api = import.meta.env.VITE_BASE_URL + "/zenodo/draft";
+    if( Array.isArray( keywords ) === false ){
+        return []
+    }
 
-    const response = await axios.get( api, parameters);
-    const isError = response.data.hasOwnProperty("Error");
+    var normalized = []
+    for( const keyword of keywords ){
+        const value = String( keyword ?? "" ).trim()
+        if( value.length === 0 ) continue
+        normalized.push( value )
+    }
 
-    if( isError ) throw new Error( response.data.Error );
-    return response;
+    return [ ...new Set( normalized ) ]
 }
 
-var upload = async function( project, draftID, fileName){
+var ensureOwnerProject = function( project ){
 
-    var parameters = await apiParameters( project );
+    if( project?.shared === true ){
+        throw new Error( "Zenodo export is only available for owned projects." )
+    }
 
-    parameters.params.id = draftID;
-    parameters.params.fileName = fileName;
+    const projectID = String( project?.id ?? "" ).trim()
+    if( projectID.length === 0 ){
+        throw new Error( "Missing projectID for Zenodo export." )
+    }
 
-    const api = import.meta.env.VITE_BASE_URL + "/zenodo/upload";
-
-    var response = null;
-    var isError = false;
-
-    for( var ii = 1; ii <= 10; ii++ ){
-
-        try{
-        response = await axios.get( api, parameters);
-        isError = response.data.hasOwnProperty("Error");
-        console.log( isError, response )
-        } catch (error) {
-            console.log( error )
-        }
-        if( isError ){
-            console.log( "upload failed, retrying" )
-            console.log( response.data.Error )
-            await utils.wait( 1000 * ii );
-            continue;
-        };
-
-        break;
-    };
-
-    if( isError ) throw new Error( response.data.Error );
-    return response;
+    return projectID
 }
 
-var remove = async function( project, draftID){
+var saveSettings = async function( payload = {} ){
 
-    var parameters = await apiParameters( project );
+    const body = {
+        token: String( payload?.token ?? "" ),
+        title: String( payload?.title ?? "" ),
+        description: String( payload?.description ?? "" ),
+        keywords: normalizeKeywords( payload?.keywords )
+    }
 
-    parameters.params.id = draftID;
-
-    const api = import.meta.env.VITE_BASE_URL + "/zenodo/delete";
-
-    const response = await axios.get( api, parameters);
-    const isError = response.data.hasOwnProperty("Error");
-
-    if( isError ) throw new Error( response.data.Error );
-    return response;
+    const api = import.meta.env.VITE_BASE_URL + "/zenodo/settings"
+    return await apiFetch( api, {
+        method: "PUT",
+        body: JSON.stringify( body )
+    })
 }
 
-var checkDraft = async function( project, draftID){
-    
-    var parameters = await apiParameters( project );
-    parameters.params.id = draftID;
+var checkSettings = async function(){
 
-    const api = import.meta.env.VITE_BASE_URL + "/zenodo/check/draft";
-    
-    const response = await axios.get( api, parameters);
-    const isError = response.data.hasOwnProperty("Error");
-    
-    if( isError ) throw new Error( response.data.Error );
-    return response;
+    const api = import.meta.env.VITE_BASE_URL + "/zenodo/settings/check"
+    return await apiFetch( api )
 }
 
-var checkToken = async function( project ){
-    
-    var parameters = await apiParameters( project );
+var startExport = async function( project, dataType = "" ){
 
-    const api = import.meta.env.VITE_BASE_URL + "/zenodo/check/token";
-    
-    const response = await axios.get( api, parameters);
-    const isError = response.data.hasOwnProperty("Error");
-    
-    if( isError ) throw new Error( response.data.Error );
-    return response;
+    const projectID = ensureOwnerProject( project )
+
+    var parameters = {}
+    parameters.projectID = projectID
+    parameters.dataType = normalizeDataType( dataType )
+
+    const api = import.meta.env.VITE_BASE_URL + "/zenodo/export"
+    const url = api + "?" + buildQueryString( parameters )
+
+    return await apiFetch( url, {
+        method: "POST"
+    })
 }
 
-export default { draft, upload, remove, checkDraft, checkToken}
+var status = async function( jobId ){
+
+    const normalizedJobId = String( jobId ?? "" ).trim()
+    if( normalizedJobId.length === 0 ){
+        throw new Error( "Missing Zenodo export job id." )
+    }
+
+    var parameters = {}
+    parameters.jobId = normalizedJobId
+
+    const api = import.meta.env.VITE_BASE_URL + "/zenodo/export/status"
+    const url = api + "?" + buildQueryString( parameters )
+
+    return await apiFetch( url )
+}
+
+var depositionStatus = async function( jobId ){
+
+    const normalizedJobId = String( jobId ?? "" ).trim()
+    if( normalizedJobId.length === 0 ){
+        throw new Error( "Missing Zenodo export job id." )
+    }
+
+    var parameters = {}
+    parameters.jobId = normalizedJobId
+
+    const api = import.meta.env.VITE_BASE_URL + "/zenodo/export/deposition-status"
+    const url = api + "?" + buildQueryString( parameters )
+
+    return await apiFetch( url )
+}
+
+export default {
+    saveSettings,
+    checkSettings,
+    startExport,
+    status,
+    depositionStatus
+}

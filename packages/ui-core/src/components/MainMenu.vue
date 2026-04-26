@@ -17,6 +17,7 @@
 		<NavigationBar>
 			<template v-slot:left-items>
 				<button @click = "sidebarOpen = true" class = "md:hidden px-3 py-2 rounded bg-slate-100">☰</button>
+				<MenuDropdown></MenuDropdown>
 			</template>
 			<template v-slot:right-items>
 				<TokenBalanceDropdown ref = "balanceDropdown"></TokenBalanceDropdown>
@@ -27,23 +28,23 @@
 
 		<!-- Main Content -->
 		<main class="bg-dark-gray rounded-lg shadow-sm p-4 overflow-y-auto">
-			<div class = "w-full text-white font-semibold pb-4">
-				<div v-show = "!showInfo">{{ activeFolder }}</div>
-				<div v-if = "showBatchActions" class = "float-right">
+			<div class = "flex min-h-8 w-full items-center justify-between gap-3 pb-4 text-white font-semibold">
+				<div v-show = "!showInfo" class = "min-w-0">{{ activeFolder }}</div>
+				<div v-if = "showBatchActions" class = "flex items-center gap-1">
 					<button
-						class="h-8 w-8 items-center justify-center rounded-md text-white hover:bg-green-100 hover:text-brand transition-colors"
+						class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-white hover:bg-green-100 hover:text-brand transition-colors"
 						@click="open( projectFoldersModal, selectedProjects)"
 						title = "Add selected projects to folders">
 						<i class="fas fa-folder-tree"></i>
 					</button>
 					<button
-						class="h-8 w-8 items-center justify-center rounded-md text-white hover:bg-green-100 hover:text-brand transition-colors"
+						class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-white hover:bg-green-100 hover:text-brand transition-colors"
 						@click = "projects.download( selectedProjects )"
 						title = "Download selected projects">
 						<i class="fas fa-cloud-download"></i>
 					</button>
 					<button
-						class="h-8 w-8 items-center justify-center rounded-md text-white hover:bg-green-100 hover:text-brand transition-colors"
+						class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-white hover:bg-green-100 hover:text-brand transition-colors"
 						@click="open( deleteModal, selectedProjects)"
 						title = "Delete selected projects">
 						<i class="fas fa-trash"></i>
@@ -55,25 +56,25 @@
 			<ProjectTable v-if = "!showInfo & activeFolder !== 'Processing'" :projects = "filteredProjects" :selectedProjectIDs = "activeIDs" class = "mt-4">
 				<template v-slot:actions="{ project }">
 					<button
-						class="h-8 w-8 items-center justify-center rounded-md text-white hover:bg-green-100 hover:text-brand transition-colors"
+						class="inline-flex h-8 w-8 items-center justify-center rounded-md text-white hover:bg-green-100 hover:text-brand transition-colors"
 						@click="open( projectFoldersModal, [ project ])"
 						title = "Add to folders">
 						<i class="fas fa-folder-tree"></i>
 					</button>
 					<button
-						class="h-8 w-8 items-center justify-center rounded-md text-white hover:bg-green-100 hover:text-brand transition-colors"
+						class="inline-flex h-8 w-8 items-center justify-center rounded-md text-white hover:bg-green-100 hover:text-brand transition-colors"
 						@click="open( metadataModal, [ project ])"
 						title = "Project metadata">
 						<i class="fas fa-database"></i>
 					</button>
 					<button
-						class="h-8 w-8 items-center justify-center rounded-md text-white hover:bg-green-100 hover:text-brand transition-colors"
+						class="inline-flex h-8 w-8 items-center justify-center rounded-md text-white hover:bg-green-100 hover:text-brand transition-colors"
 						@click = "projects.download([ project ])"
 						title = "Download project">
 						<i class="fas fa-cloud-download"></i>
 					</button>
 					<button
-						class="h-8 w-8 items-center justify-center rounded-md text-white hover:bg-green-100 hover:text-brand transition-colors"
+						class="inline-flex h-8 w-8 items-center justify-center rounded-md text-white hover:bg-green-100 hover:text-brand transition-colors"
 						@click="open( deleteModal, [ project ])"
 						title = "Delete project">
 						<i class="fas fa-trash"></i>
@@ -94,8 +95,8 @@
 
 <script setup>
 
-import { ref, computed, nextTick, onMounted} from 'vue'
-import { folders, projects } from "@harkana/tools"
+import { ref, computed, nextTick, onMounted, onBeforeUnmount, watch } from 'vue'
+import { folders, projects, navigation } from "@harkana/tools"
 
 import Sidebar from './sidebar/Sidebar.vue'
 import Logo from "./sidebar/Logo.vue"
@@ -103,6 +104,7 @@ import UploadButton from './sidebar/UploadButton.vue'
 import ProjectFolders from './sidebar/ProjectFolders.vue'
 
 import NavigationBar from './navbar/NavigationBar.vue'
+import MenuDropdown from './navbar/MenuDropdown.vue'
 import TokenBalanceDropdown from './navbar/TokenBalanceDropdown.vue'
 import AccountDropdown from './navbar/AccountDropdown.vue'
 
@@ -189,6 +191,14 @@ const showInfo = computed(() => {
 	return Object.keys( projectList.value ).length === 0 && Object.keys( processingList.value ).length === 0
 })
 
+const hasProcessingProjects = computed(() => {
+	return Object.keys( processingList.value ).length > 0
+})
+
+const PROCESSING_REFRESH_INTERVAL_MS = 2 * 60 * 1000
+const refreshingProcessing = ref(false)
+var processingRefreshTimer = null
+
 const open = async ( modal, projectArray) => {
 
 	activeProject.value = projectArray[0]
@@ -235,6 +245,36 @@ const updateProjectsClearChecks = async () => {
 	await balanceDropdown.value.updateBalance()
 }
 
+const refreshProcessingProjects = async () => {
+
+	if( refreshingProcessing.value ) return
+	refreshingProcessing.value = true
+
+	try{
+		await updateProjects()
+	} catch( error ){
+		console.log( error )
+	} finally {
+		refreshingProcessing.value = false
+	}
+}
+
+const startProcessingRefresh = () => {
+
+	if( processingRefreshTimer !== null ) return
+
+	processingRefreshTimer = setInterval(() => {
+		void refreshProcessingProjects()
+	}, PROCESSING_REFRESH_INTERVAL_MS )
+}
+
+const stopProcessingRefresh = () => {
+
+	if( processingRefreshTimer === null ) return
+	clearInterval( processingRefreshTimer )
+	processingRefreshTimer = null
+}
+
 onMounted( async () => {
 
 	userFolders.value = await folders.get()
@@ -247,7 +287,18 @@ onMounted( async () => {
 	emit("loaded")
 })
 
+watch( hasProcessingProjects, ( hasProcessing ) => {
+
+	if( hasProcessing ){
+		startProcessingRefresh()
+		return
+	}
+
+	stopProcessingRefresh()
+}, { immediate: true })
+
+onBeforeUnmount(() => {
+	stopProcessingRefresh()
+})
+
 </script>
-
-
-
