@@ -75,7 +75,7 @@
                                @change = "updateReuseMatchingDimensions"/>
                         <div class = "min-w-0">
                             <div class = "text-sm font-semibold text-black">
-                                Reuse these axis settings for subsequent folders with matching dimensions
+                                Reuse these axis settings for subsequent datasets with matching dimensions
                             </div>
                             <div class = "mt-1 text-xs text-black/70">
                                 The same mapping is applied automatically only when the inspected dimensions match exactly.
@@ -208,7 +208,7 @@ type InspectResponse = {
 }
 
 const props = defineProps({
-    sourceTypeLabel: { type: String, default: "OME-Zarr" },
+    sourceTypeLabel: { type: String, default: "Source" },
     preparing: { type: Boolean, default: false },
     preparationError: { type: String, default: "" },
     inspectResponse: { type: Object, default: null },
@@ -253,7 +253,7 @@ const response = computed<InspectResponse | null>(() => {
 })
 
 const modalTitle = computed(() => {
-    return String( props.sourceTypeLabel ?? "OME-Zarr" ).trim() + " axis mapping"
+    return String( props.sourceTypeLabel ?? "Source" ).trim() + " axis mapping"
 })
 
 const hasInspectResponse = computed(() => {
@@ -266,14 +266,14 @@ const showReuseCheckbox = computed(() => {
 
 const preparationStatusText = computed(() => {
     if( props.validationState === "progress" && props.uploadState === "success" ){
-        return "Inspecting " + String( props.sourceTypeLabel ?? "OME-Zarr" ).trim() + " axes."
+        return "Inspecting " + String( props.sourceTypeLabel ?? "Source" ).trim() + " axes."
     }
 
     if( props.validationState === "success" ){
-        return String( props.sourceTypeLabel ?? "OME-Zarr" ).trim() + " inspection completed."
+        return String( props.sourceTypeLabel ?? "Source" ).trim() + " inspection completed."
     }
 
-    return "Uploading " + String( props.sourceTypeLabel ?? "OME-Zarr" ).trim() + " source."
+    return "Uploading " + String( props.sourceTypeLabel ?? "Source" ).trim() + " source."
 })
 
 const axes = computed<InspectAxis[]>(() => {

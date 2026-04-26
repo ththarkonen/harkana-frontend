@@ -51,6 +51,20 @@ var createHyperspectrumProjectContext = async function( projectName, rawFileName
 	}
 }
 
+var createSingleSpectrumProjectContext = async function( projectList, projectName, rawFileName ){
+
+	const projectID = utils.generateID( projectList );
+	const normalizedProjectName = sanitizeProjectName( projectName );
+
+	const project = await create.project( projectID, normalizedProjectName, rawFileName );
+	const projectInfo = await create.info( project );
+
+	return {
+		project,
+		projectInfo
+	}
+}
+
 var persistHyperspectrumProject = async function( projectContext, response ){
 
 	projectContext.project.status = response.status
@@ -65,6 +79,106 @@ var persistHyperspectrumProject = async function( projectContext, response ){
 	await setProjects( projectContext.projectList )
 
 	return projectContext.projectList;
+}
+
+var singleSpectrumEstimateItemForProject = function( response, project ){
+
+	const projectID = String( project?.id ?? project?.projectID ?? "" )
+	const items = Array.isArray( response?.items ) ? response.items : []
+	return items.find(( item ) => String( item?.projectID ?? "" ) === projectID ) ?? null
+}
+
+var applySingleSpectrumEstimateState = function( target, response, item ){
+
+	if( target === null || typeof target !== "object" || response === null || typeof response !== "object" ){
+		return target
+	}
+
+	const estimateItem = item ?? singleSpectrumEstimateItemForProject( response, target )
+	const itemStatus = String( estimateItem?.status ?? "" ).trim()
+	const jobStatus = String( response?.status ?? "" ).trim()
+	const errorMessage = String( estimateItem?.errorMessage ?? response?.errorMessage ?? "" ).trim()
+
+	target.estimateJobId = String( response?.jobId ?? target.estimateJobId ?? "" )
+	target.estimateJobStatus = jobStatus
+	target.estimateItemStatus = itemStatus
+	target.estimateJobType = String( response?.jobType ?? "SINGLE_SPECTRUM_ESTIMATE_BATCH" )
+	target.estimateReady = itemStatus === "SUCCEEDED"
+	target.estimateUpdatedAt = String( estimateItem?.updatedAt ?? response?.updatedAt ?? response?.submittedAt ?? "" )
+	target.estimateSubmittedAt = String( estimateItem?.submittedAt ?? response?.submittedAt ?? target.estimateSubmittedAt ?? "" )
+
+	if( errorMessage.length > 0 ){
+		target.estimateErrorMessage = errorMessage
+	} else {
+		delete target.estimateErrorMessage
+	}
+
+	if( typeof estimateItem?.tokenChargeAmount === "number" ){
+		target.estimateTokenChargeAmount = estimateItem.tokenChargeAmount
+	}
+
+	return target
+}
+
+var persistSingleSpectrumProject = async function( projectList, project, projectInfo ){
+
+	projectList[ project.id ] = project
+
+	await setInfo( projectInfo )
+	await setProjects( projectList )
+
+	return projectList
+}
+
+var updateSingleSpectrumEstimateState = async function( project, response ){
+
+	if( project?.shared ){
+		return project
+	}
+
+	var projectList = await getProjects()
+	var storedProject = projectList[ project.id ] ?? project
+	var projectInfo = await getInfo( storedProject )
+
+	if( projectInfo instanceof Error ){
+		projectInfo = await create.info( storedProject )
+	}
+
+	const item = singleSpectrumEstimateItemForProject( response, storedProject )
+	storedProject = applySingleSpectrumEstimateState( storedProject, response, item )
+	projectInfo = applySingleSpectrumEstimateState( projectInfo, response, item )
+
+	projectList[ storedProject.id ] = storedProject
+	await setInfo( projectInfo )
+	await setProjects( projectList )
+
+	return storedProject
+}
+
+var singleSpectrumEstimateJobStatus = async function( jobId ){
+	return await api.estimateJobStatus( jobId )
+}
+
+var attachSingleSpectrumEstimateJob = async function( projectList, projects, response ){
+
+	const projectArray = Array.isArray( projects ) ? projects : []
+
+	for( const project of projectArray ){
+		const item = singleSpectrumEstimateItemForProject( response, project )
+		applySingleSpectrumEstimateState( project, response, item )
+
+		var projectInfo = await getInfo( project )
+		if( projectInfo instanceof Error ){
+			projectInfo = await create.info( project )
+		}
+		applySingleSpectrumEstimateState( projectInfo, response, item )
+
+		projectList[ project.id ] = project
+		await setInfo( projectInfo )
+	}
+
+	await setProjects( projectList )
+	return projectList
 }
 
 var resolveOmeZarrDatasets = function( fileList ){
@@ -178,6 +292,27 @@ var uploadOmeZarrDataset = async function( project, omeZarrDataset, progress ){
 	progress.uploadPercentage( "100.0%" )
 }
 
+var uploadSingleFileHyperspectrumSource = async function( project, dataset, progress ){
+
+	const fileName = String( dataset?.rawFileName ?? "" ).trim()
+	const fileKey = project.id + "/" + fileName
+
+	if( typeof progress?.file === "function" ){
+		progress.file({
+			name: fileName,
+			index: 1,
+			totalFiles: 1
+		})
+	}
+
+	await Storage.put( fileKey, dataset.file, {
+		level: "private",
+		progressCallback: ( state ) => formatPercentage( progress, state )
+	})
+
+	progress.uploadPercentage( "100.0%" )
+}
+
 var prepareHyperspectrumOmeZarrDataset = async function( omeZarrDataset, progress ){
 	const projectContext = await createHyperspectrumProjectContext(
 		omeZarrDataset.projectName,
@@ -218,6 +353,76 @@ var listHyperspectrumOmeZarrDatasets = function( fileList ){
 	return resolveOmeZarrDatasets( fileList )
 }
 
+var resolveOirDatasets = function( fileList ){
+
+	const files = Array.from( fileList ?? [] )
+	if( files.length === 0 ){
+		throw new Error( "No OIR files were selected." )
+	}
+
+	const datasets = files
+		.filter(( file ) => {
+			const fileName = String( file?.name ?? "" ).trim().toLowerCase()
+			return fileName.endsWith( ".oir" )
+		})
+		.map(( file ) => {
+			const fileName = String( file?.name ?? "" ).trim()
+			return {
+				file,
+				projectName: sanitizeProjectName( fileName ),
+				rawFileName: fileName
+			}
+		})
+		.sort(( left, right ) => String( left?.rawFileName ?? "" ).localeCompare( String( right?.rawFileName ?? "" )))
+
+	if( datasets.length === 0 ){
+		throw new Error( "Select one or more OIR files." )
+	}
+
+	return datasets
+}
+
+var prepareHyperspectrumOirDataset = async function( oirDataset, progress ){
+
+	const projectContext = await createHyperspectrumProjectContext(
+		oirDataset.projectName,
+		oirDataset.rawFileName
+	)
+
+	try {
+		await uploadSingleFileHyperspectrumSource( projectContext.project, oirDataset, progress )
+		progress.upload("success");
+	} catch (error) {
+		progress.upload("error");
+		await remove( projectContext.project );
+		return error
+	}
+
+	const inputS3Uri = buildPrivateS3Uri( projectContext.project, oirDataset.rawFileName )
+
+	try {
+		const inspectResponse = await hyperspectra.inspectSource( projectContext.project, {
+			inputS3Uri
+		})
+		progress.validate("success");
+
+		return {
+			...projectContext,
+			inputS3Uri,
+			inspectResponse,
+			rawFileName: oirDataset.rawFileName
+		}
+	} catch (error) {
+		progress.validate("error");
+		await remove( projectContext.project );
+		return error
+	}
+}
+
+var listHyperspectrumOirDatasets = function( fileList ){
+	return resolveOirDatasets( fileList )
+}
+
 var resolveOmeTiffDatasets = function( fileList ){
 
 	const files = Array.from( fileList ?? [] )
@@ -248,24 +453,7 @@ var resolveOmeTiffDatasets = function( fileList ){
 }
 
 var uploadOmeTiffDataset = async function( project, omeTiffDataset, progress ){
-
-	const fileName = String( omeTiffDataset?.rawFileName ?? "" ).trim()
-	const fileKey = project.id + "/" + fileName
-
-	if( typeof progress?.file === "function" ){
-		progress.file({
-			name: fileName,
-			index: 1,
-			totalFiles: 1
-		})
-	}
-
-	await Storage.put( fileKey, omeTiffDataset.file, {
-		level: "private",
-		progressCallback: ( state ) => formatPercentage( progress, state )
-	})
-
-	progress.uploadPercentage( "100.0%" )
+	await uploadSingleFileHyperspectrumSource( project, omeTiffDataset, progress )
 }
 
 var prepareHyperspectrumOmeTiffDataset = async function( omeTiffDataset, progress ){
@@ -332,6 +520,29 @@ var launchHyperspectrumOmeZarrAnalysis = async function( preparedProject, tokenG
 	}
 }
 
+var launchHyperspectrumOirAnalysis = async function( preparedProject, tokenGroupID, analysisRequest ){
+
+	try {
+		const response = await hyperspectra.launchOirAnalysis(
+			preparedProject.project,
+			tokenGroupID,
+			{
+				...analysisRequest,
+				inputS3Uri: String(
+					analysisRequest?.inputS3Uri
+					?? preparedProject?.inspectResponse?.source?.s3Uri
+					?? preparedProject?.inputS3Uri
+					?? ""
+				).trim()
+			}
+		)
+
+		return await persistHyperspectrumProject( preparedProject, response )
+	} catch (error) {
+		return error
+	}
+}
+
 var launchHyperspectrumOmeTiffAnalysis = async function( preparedProject, tokenGroupID, analysisRequest ){
 
 	try {
@@ -355,23 +566,18 @@ var launchHyperspectrumOmeTiffAnalysis = async function( preparedProject, tokenG
 	}
 }
 
-var upload = async function( file, tokenGroupID, progress){
+var singleSpectrumDataType = function(){
+	return import.meta.env.VITE_DATA_TYPE === "raman" ? "raman" : "cars"
+}
 
-	const accessSettings = { level: "private",
-							 progressCallback: (state) => formatPercentage( progress, state)
-	};
+var prepareSingleSpectrumProject = async function( file, projectList, accessSettings, progress ){
 
-	var projectList = await getProjects();
-
-	const projectID = utils.generateID( projectList );
 	const [ projectName, extension] = utils.parseProjectName( file );
-
 	const rawFileName = "raw_" + projectName + "." + extension;
-
-	const project = await create.project( projectID, projectName, rawFileName);
-	const projectInfo = await create.info( project );
-	
-	const metadataKey = project.id + "/" + "metadata.json"; 
+	const projectContext = await createSingleSpectrumProjectContext( projectList, projectName, rawFileName );
+	const project = projectContext.project
+	const projectInfo = projectContext.projectInfo
+	const metadataKey = project.id + "/" + "metadata.json";
 	const rawDataFileKey = project.id + "/" + rawFileName;
 
 	try {
@@ -380,8 +586,8 @@ var upload = async function( file, tokenGroupID, progress){
 	} catch (error) {
 		progress.upload("error");
 		await remove( project );
-		return error
-	};
+		throw error
+	}
 
 	try {
 		await api.validate( project );
@@ -390,16 +596,7 @@ var upload = async function( file, tokenGroupID, progress){
 	} catch (error) {
 		progress.validate("error");
 		await remove( project );
-		return error
-	}
-
-	try {
-		await api.estimate( project, tokenGroupID);
-		progress.estimate("success");
-	} catch (error) {
-		progress.estimate("error");
-		await remove( project );
-		return error
+		throw error
 	}
 
 	try {
@@ -407,21 +604,91 @@ var upload = async function( file, tokenGroupID, progress){
 		await Storage.put( metadataKey, settings.defaultMetadata, accessSettings);
 	} catch (error) {
 		await remove( project );
-		return error
+		throw error
+	}
+
+	await persistSingleSpectrumProject( projectList, project, projectInfo )
+	if( typeof progress?.project === "function" ){
+		progress.project( project )
+	}
+	return project
+}
+
+var upload = async function( file, tokenGroupID, progress){
+
+	const accessSettings = { level: "private",
+							 progressCallback: (state) => formatPercentage( progress, state)
 	};
+
+	var projectList = await getProjects();
+	var project = null
 
 	try {
-		projectList[ project.id ] = project;
-
-		await setInfo( projectInfo )
-		await setProjects( projectList );
-
+		project = await prepareSingleSpectrumProject( file, projectList, accessSettings, progress )
 	} catch (error) {
-		await remove( project );
 		return error
-	};
+	}
 
-	return projectList;
+	try {
+		progress.estimate("progress");
+		const response = await api.estimate( project, tokenGroupID);
+		progress.estimate("success");
+		return await attachSingleSpectrumEstimateJob( projectList, [ project ], response )
+	} catch (error) {
+		progress.estimate("error");
+		return error
+	}
+}
+
+var uploadBatch = async function( files, tokenGroupID, progress ){
+
+	const fileArray = Array.from( files ?? [] )
+	if( fileArray.length === 0 ){
+		return new Error( "No files were selected." )
+	}
+
+	if( fileArray.length === 1 ){
+		return await upload( fileArray[0], tokenGroupID, progress )
+	}
+
+	const accessSettings = { level: "private",
+							 progressCallback: (state) => formatPercentage( progress, state)
+	};
+	const projectList = await getProjects();
+	const projects = []
+
+	for( var ii = 0; ii < fileArray.length; ii++ ){
+		const file = fileArray[ii]
+
+		if( typeof progress?.file === "function" ){
+			progress.file({
+				name: file.name,
+				index: ii + 1,
+				totalFiles: fileArray.length
+			})
+		}
+
+		progress.upload("progress")
+		progress.validate("progress")
+		progress.estimate("idle")
+
+		try {
+			const project = await prepareSingleSpectrumProject( file, projectList, accessSettings, progress )
+			projects.push( project )
+		} catch (error) {
+			return error
+		}
+	}
+
+	try {
+		progress.estimate("progress")
+		const response = await api.estimateBatch( projects, singleSpectrumDataType(), tokenGroupID )
+		progress.estimate("success")
+		return await attachSingleSpectrumEstimateJob( projectList, projects, response )
+	} catch (error) {
+		progress.estimate("error")
+		return error
+	}
 }
 
 var hyperspectrum = async function( file, tokenGroupID, progress){
@@ -679,7 +946,11 @@ import { setFolders, getFolders} from "./projects/helpers.js"
 
 export default {
 	upload,
+	uploadBatch,
 	hyperspectrum,
+	listHyperspectrumOirDatasets,
+	prepareHyperspectrumOirDataset,
+	launchHyperspectrumOirAnalysis,
 	listHyperspectrumOmeZarrDatasets,
 	prepareHyperspectrumOmeZarrDataset,
 	launchHyperspectrumOmeZarrAnalysis,
@@ -694,8 +965,10 @@ export default {
 	rename,
 	copy,
 	download,
-    updateFolders,
+	updateFolders,
     updateLastModified,
+	singleSpectrumEstimateJobStatus,
+	updateSingleSpectrumEstimateState,
 	setInfo,
 	getInfo
 }

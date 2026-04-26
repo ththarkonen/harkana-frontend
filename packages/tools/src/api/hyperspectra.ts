@@ -39,31 +39,67 @@ type InspectLayerAxisOption = {
     size: number
 }
 
+type InspectSource = {
+    format: "oir" | "ome-zarr" | "ome-tiff"
+    kind: "s3-object" | "s3-prefix"
+    s3Uri: string
+    bucket: string
+    key: string
+    name: string
+    extension: string
+}
+
+type InspectDimensions = {
+    axisOrder: string
+    shape: number[]
+    shapeByAxis: Record<string, number>
+    axes: InspectAxis[]
+    analysisRoles: {
+        required: string[]
+        optional: string[]
+    }
+    layerAxisOptions: InspectLayerAxisOption[]
+    recommendedLayerAxis: string | null
+}
+
+type OirInspectResponse = {
+    version: "hyperspectrum-source-inspect-v1"
+    projectID: string
+    dataType: "hypercars" | "hyperraman"
+    source: InspectSource & {
+        format: "oir"
+        kind: "s3-object"
+    }
+    dimensions: InspectDimensions
+    metadata: {
+        sourceAxisOrder: string | null
+        sourceShape: number[]
+        normalizedAxisOrder: "TCZYX"
+        dtype: string
+        estimatedNbytes: number
+        sceneCount: number
+        currentScene: string | null
+        channelLabels: string[]
+        physicalSizeX: number | null
+        physicalSizeY: number | null
+        physicalSizeZ: number | null
+        physicalSizeXUnit: string | null
+        physicalSizeYUnit: string | null
+        physicalSizeZUnit: string | null
+    }
+    warnings: string[]
+}
+
 type OmeZarrInspectResponse = {
     version: "hyperspectrum-source-inspect-v1"
     projectID: string
     dataType: "hypercars" | "hyperraman"
-    source: {
+    source: InspectSource & {
         format: "ome-zarr"
         kind: "s3-prefix"
-        s3Uri: string
-        bucket: string
-        key: string
-        name: string
         extension: "zarr"
     }
-    dimensions: {
-        axisOrder: string
-        shape: number[]
-        shapeByAxis: Record<string, number>
-        axes: InspectAxis[]
-        analysisRoles: {
-            required: string[]
-            optional: string[]
-        }
-        layerAxisOptions: InspectLayerAxisOption[]
-        recommendedLayerAxis: string | null
-    }
+    dimensions: InspectDimensions
     metadata: {
         omeZarrVersion: string | null
         zarrFormat: number | null
@@ -79,27 +115,12 @@ type OmeTiffInspectResponse = {
     version: "hyperspectrum-source-inspect-v1"
     projectID: string
     dataType: "hypercars" | "hyperraman"
-    source: {
+    source: InspectSource & {
         format: "ome-tiff"
         kind: "s3-object"
-        s3Uri: string
-        bucket: string
-        key: string
-        name: string
         extension: "tif" | "tiff"
     }
-    dimensions: {
-        axisOrder: string
-        shape: number[]
-        shapeByAxis: Record<string, number>
-        axes: InspectAxis[]
-        analysisRoles: {
-            required: string[]
-            optional: string[]
-        }
-        layerAxisOptions: InspectLayerAxisOption[]
-        recommendedLayerAxis: string | null
-    }
+    dimensions: InspectDimensions
     metadata: {
         omeSchema: string | null
         dimensionOrder: string
@@ -117,7 +138,7 @@ type OmeTiffInspectResponse = {
     warnings: string[]
 }
 
-type HyperspectrumSourceInspectResponse = OmeZarrInspectResponse | OmeTiffInspectResponse
+type HyperspectrumSourceInspectResponse = OirInspectResponse | OmeZarrInspectResponse | OmeTiffInspectResponse
 
 type HyperspectrumSourceAnalysisRequest = {
     projectID: string
@@ -360,7 +381,7 @@ var launchSourceAnalysis = async (
         : null
 
     if( axisMapping === null ){
-        throw new Error( "OME-Zarr analysis axisMapping is required." )
+        throw new Error( "Hyperspectrum source analysis axisMapping is required." )
     }
 
     const parameters: Record<string, string> = {
@@ -444,6 +465,21 @@ var launchOmeTiffAnalysis = async (
         payload,
         dataType,
         "/hyperspectrum/ome-tiff/analysis"
+    )
+}
+
+var launchOirAnalysis = async (
+    project: any,
+    groupID: string = "",
+    payload: Partial<HyperspectrumSourceAnalysisRequest> = {},
+    dataType: string = ""
+) => {
+    return await launchSourceAnalysis(
+        project,
+        groupID,
+        payload,
+        dataType,
+        "/hyperspectrum/oir/analysis"
     )
 }
 
@@ -860,6 +896,7 @@ export default {
     parse,
     estimate,
     inspectSource,
+    launchOirAnalysis,
     launchOmeZarrAnalysis,
     launchOmeTiffAnalysis,
     spectrum,

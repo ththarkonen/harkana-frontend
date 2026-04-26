@@ -11,10 +11,10 @@
                     <span>Upload data</span>
                 </template>
 
-                <BaseDropdownItem :disabled = "isUploadLocked" @select = "openStandardPicker">
+                <BaseDropdownItem :disabled = "isUploadLocked" @select = "openOirPicker">
                     Upload OIR
                 </BaseDropdownItem>
-                <BaseDropdownItem :disabled = "isUploadLocked" @select = "openStandardPicker">
+                <BaseDropdownItem :disabled = "isUploadLocked" @select = "openLegacyTiffPicker">
                     Upload TIFF
                 </BaseDropdownItem>
                 <BaseDropdownItem :disabled = "isUploadLocked" @select = "openOmeZarrPicker">
@@ -41,8 +41,18 @@
                type = "file"
                hidden
                multiple
+               accept = ".tif,.tiff"
                :disabled = "isUploadLocked"
                @change = "handleStandardUpload"
+               @click = "resetInputValue"/>
+
+        <input ref = "oirInput"
+               type = "file"
+               hidden
+               multiple
+               accept = ".oir"
+               :disabled = "isUploadLocked"
+               @change = "handleOirUpload"
                @click = "resetInputValue"/>
 
         <input ref = "omeZarrInput"
@@ -52,7 +62,7 @@
                webkitdirectory
                directory
                :disabled = "isUploadLocked"
-               @change = "handleOmeZarrUpload"
+               @change = "handleInspectableOmeZarrUpload"
                @click = "resetInputValue"/>
 
         <input ref = "omeTiffInput"
@@ -61,7 +71,7 @@
                multiple
                accept = ".ome.tif,.ome.tiff,.tif,.tiff"
                :disabled = "isUploadLocked"
-               @change = "handleOmeTiffUpload"
+               @change = "handleInspectableOmeTiffUpload"
                @click = "resetInputValue"/>
 
         <Modal ref = "progressModal"
@@ -90,7 +100,7 @@
                     <div v-if = "isSpectrumUpload" class = "space-y-3">
                         <ProgressRow :state = "uploadState">Uploading to database. {{ uploadPercentage }}</ProgressRow>
                         <ProgressRow :state = "validationState">Validating input file.</ProgressRow>
-                        <ProgressRow :state = "estimateState">Estimating Raman spectrum.</ProgressRow>
+                        <ProgressRow :state = "estimateState">Starting estimate job.</ProgressRow>
                     </div>
                     <div v-else class = "space-y-3">
                         <ProgressRow :state = "uploadState">Uploading to database. {{ uploadPercentage }}</ProgressRow>
@@ -119,26 +129,26 @@
             </template>
         </Modal>
 
-        <HyperspectrumOmeZarrModal
-            ref = "omeZarrModal"
+        <HyperspectrumSourceModal
+            ref = "sourceAnalysisModal"
             :sourceTypeLabel = "inspectedSourceTypeLabel"
-            :preparing = "omeZarrPreparing"
-            :preparationError = "omeZarrPreparationError"
-            :inspectResponse = "omeZarrInspectResponse"
-            :submitting = "omeZarrSubmitting"
-            :submissionError = "omeZarrSubmissionError"
+            :preparing = "sourcePreparing"
+            :preparationError = "sourcePreparationError"
+            :inspectResponse = "sourceInspectResponse"
+            :submitting = "sourceSubmitting"
+            :submissionError = "sourceSubmissionError"
             :activeFileName = "activeFile?.name || ''"
             :currentIteration = "currentIteration"
             :nFiles = "nFiles"
-            :datasetIteration = "omeZarrDatasetIteration"
-            :datasetCount = "omeZarrDatasetCount"
-            :reuseMatchingDimensions = "omeZarrReuseMatchingDimensions"
+            :datasetIteration = "sourceDatasetIteration"
+            :datasetCount = "sourceDatasetCount"
+            :reuseMatchingDimensions = "sourceReuseMatchingDimensions"
             :uploadPercentage = "uploadPercentage"
             :uploadState = "uploadState"
             :validationState = "validationState"
-            @submit = "submitOmeZarrAnalysis"
-            @update:reuseMatchingDimensions = "updateOmeZarrReuseMatchingDimensions"
-            @cancel = "cancelOmeZarrAnalysis"/>
+            @submit = "submitSourceAnalysis"
+            @update:reuseMatchingDimensions = "updateSourceReuseMatchingDimensions"
+            @cancel = "cancelSourceAnalysis"/>
     </div>
 </template>
 
@@ -149,7 +159,7 @@ import { projects as projectlib, settings as settingslib, utils } from "@harkana
 
 import Modal from "../modals/Modal.vue"
 import ProgressRow from "../modals/ProgressRow.vue"
-import HyperspectrumOmeZarrModal from "../modals/HyperspectrumOmeZarrModal.vue"
+import HyperspectrumSourceModal from "../modals/HyperspectrumOmeZarrModal.vue"
 import BaseDropdown from "../navbar/BaseDropdown.vue"
 import BaseDropdownItem from "../navbar/BaseDropdownItem.vue"
 
@@ -159,8 +169,9 @@ const isHyperspectrum = dataType === "hypercars" || dataType === "hyperraman"
 const emit = defineEmits([ "updateProjects" ])
 
 const progressModal = ref<any>( null )
-const omeZarrModal = ref<any>( null )
+const sourceAnalysisModal = ref<any>( null )
 const standardFileInput = ref<HTMLInputElement | null>( null )
+const oirInput = ref<HTMLInputElement | null>( null )
 const omeZarrInput = ref<HTMLInputElement | null>( null )
 const omeTiffInput = ref<HTMLInputElement | null>( null )
 
@@ -177,18 +188,18 @@ const activeFile = ref<{ name: string } | null>( null )
 const currentIteration = ref( 0 )
 const nFiles = ref( 0 )
 
-const inspectedSourceType = ref<"ome-zarr" | "ome-tiff">( "ome-zarr" )
-const omeZarrPreparedProject = ref<any>( null )
-const omeZarrGroupID = ref( "" )
-const omeZarrDatasetQueue = ref<any[]>( [] )
-const omeZarrDatasetIndex = ref( 0 )
-const omeZarrPreparing = ref( false )
-const omeZarrPreparationError = ref( "" )
-const omeZarrInspectResponse = ref<any>( null )
-const omeZarrReuseMatchingDimensions = ref( false )
-const omeZarrReusableSelections = ref<Record<string, { axisMapping: Record<string, string>, fixedIndices?: Record<string, number> }>>( {} )
-const omeZarrSubmitting = ref( false )
-const omeZarrSubmissionError = ref( "" )
+const inspectedSourceType = ref<"oir" | "ome-zarr" | "ome-tiff">( "ome-zarr" )
+const sourcePreparedProject = ref<any>( null )
+const sourceAnalysisGroupID = ref( "" )
+const sourceDatasetQueue = ref<any[]>( [] )
+const sourceDatasetIndex = ref( 0 )
+const sourcePreparing = ref( false )
+const sourcePreparationError = ref( "" )
+const sourceInspectResponse = ref<any>( null )
+const sourceReuseMatchingDimensions = ref( false )
+const sourceReusableSelections = ref<Record<string, { axisMapping: Record<string, string>, fixedIndices?: Record<string, number> }>>( {} )
+const sourceSubmitting = ref( false )
+const sourceSubmissionError = ref( "" )
 const uploadLock = ref( false )
 
 const isSpectrumUpload = computed(() => {
@@ -207,16 +218,22 @@ const isUploadLocked = computed(() => {
     return uploadLock.value === true
 })
 
+const sourceTypeLabels: Record<string, string> = {
+    oir: "OIR",
+    "ome-zarr": "OME-Zarr",
+    "ome-tiff": "OME-TIFF"
+}
+
 const inspectedSourceTypeLabel = computed(() => {
-    return inspectedSourceType.value === "ome-tiff" ? "OME-TIFF" : "OME-Zarr"
+    return sourceTypeLabels[ inspectedSourceType.value ] ?? "Source"
 })
 
-const omeZarrDatasetCount = computed(() => {
-    return Math.max( 1, omeZarrDatasetQueue.value.length || 0 )
+const sourceDatasetCount = computed(() => {
+    return Math.max( 1, sourceDatasetQueue.value.length || 0 )
 })
 
-const omeZarrDatasetIteration = computed(() => {
-    return Math.min( omeZarrDatasetCount.value, omeZarrDatasetIndex.value + 1 )
+const sourceDatasetIteration = computed(() => {
+    return Math.min( sourceDatasetCount.value, sourceDatasetIndex.value + 1 )
 })
 
 const uploadTriggerClass = computed(() => {
@@ -254,18 +271,18 @@ const resetProgressModalState = () => {
     resetProgress()
 }
 
-const resetOmeZarrModalState = () => {
+const resetSourceAnalysisState = () => {
     inspectedSourceType.value = "ome-zarr"
-    omeZarrPreparedProject.value = null
-    omeZarrDatasetQueue.value = []
-    omeZarrDatasetIndex.value = 0
-    omeZarrPreparing.value = false
-    omeZarrPreparationError.value = ""
-    omeZarrInspectResponse.value = null
-    omeZarrReuseMatchingDimensions.value = false
-    omeZarrReusableSelections.value = {}
-    omeZarrSubmitting.value = false
-    omeZarrSubmissionError.value = ""
+    sourcePreparedProject.value = null
+    sourceDatasetQueue.value = []
+    sourceDatasetIndex.value = 0
+    sourcePreparing.value = false
+    sourcePreparationError.value = ""
+    sourceInspectResponse.value = null
+    sourceReuseMatchingDimensions.value = false
+    sourceReusableSelections.value = {}
+    sourceSubmitting.value = false
+    sourceSubmissionError.value = ""
 }
 
 const resetInputValue = ( event: Event ) => {
@@ -281,6 +298,18 @@ const openStandardPicker = () => {
     }
 
     standardFileInput.value?.click()
+}
+
+const openLegacyTiffPicker = () => {
+    openStandardPicker()
+}
+
+const openOirPicker = () => {
+    if( isUploadLocked.value ){
+        return
+    }
+
+    oirInput.value?.click()
 }
 
 const openOmeZarrPicker = () => {
@@ -364,6 +393,7 @@ const uploadProgressCallbacks = () => {
         validate: ( state: string ) => ( validationState.value = state ),
         upload: ( state: string ) => ( uploadState.value = state ),
         estimate: ( state: string ) => ( estimateState.value = state ),
+        project: () => emit( "updateProjects" ),
         file: ( state: { name?: string, index?: number, totalFiles?: number } ) => {
             activeFile.value = { name: String( state?.name ?? "No file selected" ) }
             currentIteration.value = Math.max( 1, Number.parseInt( String( state?.index ?? 1 ), 10 ) || 1 )
@@ -372,153 +402,174 @@ const uploadProgressCallbacks = () => {
     }
 }
 
-const updateOmeZarrReuseMatchingDimensions = ( nextValue: boolean ) => {
-    omeZarrReuseMatchingDimensions.value = nextValue === true
+const updateSourceReuseMatchingDimensions = ( nextValue: boolean ) => {
+    sourceReuseMatchingDimensions.value = nextValue === true
 
-    if( omeZarrReuseMatchingDimensions.value === false ){
-        omeZarrReusableSelections.value = {}
+    if( sourceReuseMatchingDimensions.value === false ){
+        sourceReusableSelections.value = {}
     }
 }
 
-const finishOmeZarrBatch = () => {
+const finishSourceAnalysisBatch = () => {
     resetProgressModalState()
-    resetOmeZarrModalState()
-    omeZarrModal.value?.close()
+    resetSourceAnalysisState()
+    sourceAnalysisModal.value?.close()
     uploadLock.value = false
     emit( "updateProjects" )
 }
 
-const prepareNextOmeZarrDataset = async () => {
-    const dataset = omeZarrDatasetQueue.value[ omeZarrDatasetIndex.value ]
+const prepareNextSourceDataset = async () => {
+    const dataset = sourceDatasetQueue.value[ sourceDatasetIndex.value ]
 
     if( dataset === undefined ){
-        finishOmeZarrBatch()
+        finishSourceAnalysisBatch()
         return
     }
 
     resetProgressModalState()
-    omeZarrPreparedProject.value = null
-    omeZarrPreparationError.value = ""
-    omeZarrInspectResponse.value = null
-    omeZarrSubmissionError.value = ""
-    omeZarrPreparing.value = true
+    sourcePreparedProject.value = null
+    sourcePreparationError.value = ""
+    sourceInspectResponse.value = null
+    sourceSubmissionError.value = ""
+    sourcePreparing.value = true
     uploadState.value = "progress"
     validationState.value = "progress"
     nFiles.value = Array.isArray( dataset?.files ) ? dataset.files.length : 1
     currentIteration.value = nFiles.value > 0 ? 1 : 0
 
     try {
-        const preparedProject = inspectedSourceType.value === "ome-tiff"
-            ? await projectlib.prepareHyperspectrumOmeTiffDataset( dataset, uploadProgressCallbacks() )
-            : await projectlib.prepareHyperspectrumOmeZarrDataset( dataset, uploadProgressCallbacks() )
+        let preparedProject: any
+
+        if( inspectedSourceType.value === "oir" ){
+            preparedProject = await projectlib.prepareHyperspectrumOirDataset( dataset, uploadProgressCallbacks() )
+        } else if( inspectedSourceType.value === "ome-tiff" ){
+            preparedProject = await projectlib.prepareHyperspectrumOmeTiffDataset( dataset, uploadProgressCallbacks() )
+        } else {
+            preparedProject = await projectlib.prepareHyperspectrumOmeZarrDataset( dataset, uploadProgressCallbacks() )
+        }
+
         if( preparedProject instanceof Error ){
             throw preparedProject
         }
 
-        omeZarrPreparedProject.value = preparedProject
-        omeZarrInspectResponse.value = preparedProject.inspectResponse
-        omeZarrPreparing.value = false
+        sourcePreparedProject.value = preparedProject
+        sourceInspectResponse.value = preparedProject.inspectResponse
+        sourcePreparing.value = false
 
         const dimensionsSignature = buildInspectDimensionsSignature( preparedProject.inspectResponse )
         if(
-            omeZarrReuseMatchingDimensions.value === true &&
-            typeof omeZarrReusableSelections.value[ dimensionsSignature ] === "object"
+            sourceReuseMatchingDimensions.value === true &&
+            typeof sourceReusableSelections.value[ dimensionsSignature ] === "object"
         ){
-            await submitCurrentOmeZarrAnalysis( cloneAnalysisPayload( omeZarrReusableSelections.value[ dimensionsSignature ] ))
+            await submitCurrentSourceAnalysis( cloneAnalysisPayload( sourceReusableSelections.value[ dimensionsSignature ] ))
         }
     } catch (error: any) {
-        omeZarrPreparing.value = false
-        omeZarrPreparationError.value = error?.message || String( error )
+        sourcePreparing.value = false
+        sourcePreparationError.value = error?.message || String( error )
     }
 }
 
-const submitCurrentOmeZarrAnalysis = async (
+const submitCurrentSourceAnalysis = async (
     payload: { axisMapping: Record<string, string>, fixedIndices?: Record<string, number> }
 ) => {
 
-    if( omeZarrPreparedProject.value === null ){
-        omeZarrSubmissionError.value = "No prepared " + inspectedSourceTypeLabel.value + " source is available."
+    if( sourcePreparedProject.value === null ){
+        sourceSubmissionError.value = "No prepared " + inspectedSourceTypeLabel.value + " source is available."
         return
     }
 
-    omeZarrSubmitting.value = true
-    omeZarrSubmissionError.value = ""
+    sourceSubmitting.value = true
+    sourceSubmissionError.value = ""
 
     try {
-        const result = inspectedSourceType.value === "ome-tiff"
-            ? await projectlib.launchHyperspectrumOmeTiffAnalysis(
-                omeZarrPreparedProject.value,
-                omeZarrGroupID.value,
+        let result: any
+
+        if( inspectedSourceType.value === "oir" ){
+            result = await projectlib.launchHyperspectrumOirAnalysis(
+                sourcePreparedProject.value,
+                sourceAnalysisGroupID.value,
                 payload
             )
-            : await projectlib.launchHyperspectrumOmeZarrAnalysis(
-                omeZarrPreparedProject.value,
-                omeZarrGroupID.value,
+        } else if( inspectedSourceType.value === "ome-tiff" ){
+            result = await projectlib.launchHyperspectrumOmeTiffAnalysis(
+                sourcePreparedProject.value,
+                sourceAnalysisGroupID.value,
                 payload
             )
+        } else {
+            result = await projectlib.launchHyperspectrumOmeZarrAnalysis(
+                sourcePreparedProject.value,
+                sourceAnalysisGroupID.value,
+                payload
+            )
+        }
 
         if( result instanceof Error ){
             throw result
         }
 
-        if( omeZarrReuseMatchingDimensions.value === true && omeZarrInspectResponse.value !== null ){
-            const dimensionsSignature = buildInspectDimensionsSignature( omeZarrInspectResponse.value )
-            omeZarrReusableSelections.value = {
-                ...omeZarrReusableSelections.value,
+        if( sourceReuseMatchingDimensions.value === true && sourceInspectResponse.value !== null ){
+            const dimensionsSignature = buildInspectDimensionsSignature( sourceInspectResponse.value )
+            sourceReusableSelections.value = {
+                ...sourceReusableSelections.value,
                 [ dimensionsSignature ]: cloneAnalysisPayload( payload )
             }
         } else {
-            omeZarrReusableSelections.value = {}
+            sourceReusableSelections.value = {}
         }
 
-        omeZarrPreparedProject.value = null
-        omeZarrInspectResponse.value = null
-        omeZarrSubmissionError.value = ""
-        omeZarrSubmitting.value = false
-        omeZarrDatasetIndex.value += 1
+        sourcePreparedProject.value = null
+        sourceInspectResponse.value = null
+        sourceSubmissionError.value = ""
+        sourceSubmitting.value = false
+        sourceDatasetIndex.value += 1
 
-        if( omeZarrDatasetIndex.value >= omeZarrDatasetQueue.value.length ){
-            finishOmeZarrBatch()
+        if( sourceDatasetIndex.value >= sourceDatasetQueue.value.length ){
+            finishSourceAnalysisBatch()
             return
         }
 
-        await prepareNextOmeZarrDataset()
+        await prepareNextSourceDataset()
         return
     } catch (error: any) {
-        omeZarrSubmissionError.value = error?.message || String( error )
+        sourceSubmissionError.value = error?.message || String( error )
     } finally {
-        if( omeZarrPreparedProject.value !== null ){
-            omeZarrSubmitting.value = false
+        if( sourcePreparedProject.value !== null ){
+            sourceSubmitting.value = false
         }
     }
 }
 
-const startInspectableUploadBatch = async (
-    sourceType: "ome-zarr" | "ome-tiff",
+const startInspectableSourceUploadBatch = async (
+    sourceType: "oir" | "ome-zarr" | "ome-tiff",
     files: FileList
 ) => {
 
     uploadLock.value = true
     resetProgressModalState()
-    resetOmeZarrModalState()
+    resetSourceAnalysisState()
     inspectedSourceType.value = sourceType
-    await omeZarrModal.value?.open()
+    await sourceAnalysisModal.value?.open()
 
     try {
-        omeZarrDatasetQueue.value = sourceType === "ome-tiff"
-            ? projectlib.listHyperspectrumOmeTiffDatasets( files )
-            : projectlib.listHyperspectrumOmeZarrDatasets( files )
-        omeZarrDatasetIndex.value = 0
+        if( sourceType === "oir" ){
+            sourceDatasetQueue.value = projectlib.listHyperspectrumOirDatasets( files )
+        } else if( sourceType === "ome-tiff" ){
+            sourceDatasetQueue.value = projectlib.listHyperspectrumOmeTiffDatasets( files )
+        } else {
+            sourceDatasetQueue.value = projectlib.listHyperspectrumOmeZarrDatasets( files )
+        }
+        sourceDatasetIndex.value = 0
         currentIteration.value = 0
         nFiles.value = 0
         activeFile.value = null
 
         const billingSettings = await settingslib.getBilling()
-        omeZarrGroupID.value = typeof billingSettings?.groupID === "string" ? billingSettings.groupID : ""
+        sourceAnalysisGroupID.value = typeof billingSettings?.groupID === "string" ? billingSettings.groupID : ""
 
-        await prepareNextOmeZarrDataset()
+        await prepareNextSourceDataset()
     } catch (error: any) {
-        omeZarrPreparationError.value = error?.message || String( error )
+        sourcePreparationError.value = error?.message || String( error )
     }
 }
 
@@ -545,33 +596,42 @@ const handleStandardUpload = async ( event: Event ) => {
     try {
         const billingSettings = await settingslib.getBilling()
 
-        for( var ii = 0; ii < nFiles.value; ii++ ){
-
-            closeDisabled.value = true
-            resetProgress()
-
-            const file = files[ii]
-            activeFile.value = { name: file.name }
-            currentIteration.value = ii + 1
-
-            validationState.value = "progress"
+        if( isSpectrumUpload.value ){
             uploadState.value = "progress"
-            estimateState.value = "progress"
+            validationState.value = "progress"
+            estimateState.value = "idle"
 
-            const progress = uploadProgressCallbacks()
+            const result = await projectlib.uploadBatch( files, billingSettings.groupID, uploadProgressCallbacks() )
+            if( result instanceof Error ){
+                throw result
+            }
+        } else {
+            for( var ii = 0; ii < nFiles.value; ii++ ){
 
-            try {
-                const result = isHyperspectrum
-                    ? await projectlib.hyperspectrum( file, billingSettings.groupID, progress )
-                    : await projectlib.upload( file, billingSettings.groupID, progress )
+                closeDisabled.value = true
+                resetProgress()
 
-                if( result instanceof Error ){
-                    throw result
+                const file = files[ii]
+                activeFile.value = { name: file.name }
+                currentIteration.value = ii + 1
+
+                validationState.value = "progress"
+                uploadState.value = "progress"
+                estimateState.value = "progress"
+
+                const progress = uploadProgressCallbacks()
+
+                try {
+                    const result = await projectlib.hyperspectrum( file, billingSettings.groupID, progress )
+
+                    if( result instanceof Error ){
+                        throw result
+                    }
+                } catch (error: any) {
+                    setProgressError( error )
+                    hasError = true
+                    break
                 }
-            } catch (error: any) {
-                setProgressError( error )
-                hasError = true
-                break
             }
         }
     } catch (error: any) {
@@ -589,7 +649,7 @@ const handleStandardUpload = async ( event: Event ) => {
     }
 }
 
-const handleOmeZarrUpload = async ( event: Event ) => {
+const handleOirUpload = async ( event: Event ) => {
 
     if( isUploadLocked.value ){
         return
@@ -598,10 +658,10 @@ const handleOmeZarrUpload = async ( event: Event ) => {
     const files = ( event.target as HTMLInputElement ).files
     if( !files || !files.length ) return
 
-    await startInspectableUploadBatch( "ome-zarr", files )
+    await startInspectableSourceUploadBatch( "oir", files )
 }
 
-const handleOmeTiffUpload = async ( event: Event ) => {
+const handleInspectableOmeZarrUpload = async ( event: Event ) => {
 
     if( isUploadLocked.value ){
         return
@@ -610,27 +670,39 @@ const handleOmeTiffUpload = async ( event: Event ) => {
     const files = ( event.target as HTMLInputElement ).files
     if( !files || !files.length ) return
 
-    await startInspectableUploadBatch( "ome-tiff", files )
+    await startInspectableSourceUploadBatch( "ome-zarr", files )
 }
 
-const submitOmeZarrAnalysis = async ( payload: { axisMapping: Record<string, string>, fixedIndices?: Record<string, number> } ) => {
-    await submitCurrentOmeZarrAnalysis( payload )
+const handleInspectableOmeTiffUpload = async ( event: Event ) => {
+
+    if( isUploadLocked.value ){
+        return
+    }
+
+    const files = ( event.target as HTMLInputElement ).files
+    if( !files || !files.length ) return
+
+    await startInspectableSourceUploadBatch( "ome-tiff", files )
 }
 
-const cancelOmeZarrAnalysis = async () => {
+const submitSourceAnalysis = async ( payload: { axisMapping: Record<string, string>, fixedIndices?: Record<string, number> } ) => {
+    await submitCurrentSourceAnalysis( payload )
+}
 
-    omeZarrSubmissionError.value = ""
+const cancelSourceAnalysis = async () => {
 
-    if( omeZarrPreparedProject.value !== null ){
+    sourceSubmissionError.value = ""
+
+    if( sourcePreparedProject.value !== null ){
         try {
-            await projectlib.remove( omeZarrPreparedProject.value.project )
+            await projectlib.remove( sourcePreparedProject.value.project )
         } catch (error) {
             console.log( error )
         }
     }
 
     resetProgressModalState()
-    resetOmeZarrModalState()
+    resetSourceAnalysisState()
     uploadLock.value = false
 }
 </script>

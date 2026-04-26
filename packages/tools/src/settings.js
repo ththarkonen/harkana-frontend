@@ -42,6 +42,8 @@ var get = async function(){
 var getDefaultSettings = async function() {
 
     const isHyperspectrum = import.meta.env.VITE_DATA_TYPE === "hypercars"
+    const defaultSpectrumColor = "#1f77b4"
+    const defaultComparisonSpectrumColor = "#d62728"
 
     return {
         layout: {
@@ -58,7 +60,7 @@ var getDefaultSettings = async function() {
             showUnits: true
         },
         gridlines: {
-            spectra: false,
+            spectra: true,
             hyperspectra: false
         },
         legends: {
@@ -77,15 +79,15 @@ var getDefaultSettings = async function() {
             }
         },
         colors: {
-            data: "#1f77b4",
-            median: "#333333",
-            area: "#333333",
+            data: defaultSpectrumColor,
+            median: defaultSpectrumColor,
+            area: defaultSpectrumColor,
             opacity: 0.15
         },
         comparisonColors: {
-            data: "#d62728",
-            median: "#d62728",
-            area: "#d62728",
+            data: defaultComparisonSpectrumColor,
+            median: defaultComparisonSpectrumColor,
+            area: defaultComparisonSpectrumColor,
             opacity: 0.15
         },
         colormaps: {
