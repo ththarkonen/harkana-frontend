@@ -1,9 +1,14 @@
 <template>
-<Modal ref = "modal" :title = "'Axis values and units'" :showClose = "!saving">
+<Modal ref = "modal" :title = "'Raw axis values and units'" :showClose = "!saving">
 	<template #main>
 		<p class = "text-white mb-4">
-			Configure axis values and units used in hyperspectral visualizations.
+			Configure raw axis values and units used in hyperspectral visualizations.
 		</p>
+		<div v-if = "spectralCalibrationActive"
+			 class = "mb-4 rounded border border-amber-500/70 bg-amber-500/10 px-3 py-2 text-sm text-amber-100">
+			The spectral calibration profile <span class = "font-semibold">{{ spectralCalibrationProfileName }}</span>
+			is applied on top of these raw Z values. Saving here does not overwrite the selected calibration profile.
+		</div>
 
 		<div class = "space-y-4">
 			<div v-for = "axisKey in axisKeys"
@@ -87,7 +92,7 @@
 		<button @click = "emitSave"
 				:disabled = "!canSave"
 				class = "w-full mt-4 mb-4 bg-brand hover:bg-brand-dark text-white font-semibold py-2 px-4 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-			{{ saving ? "Saving..." : "Save axis values" }}
+			{{ saving ? "Saving..." : "Save raw axis values" }}
 		</button>
 	</template>
 </Modal>
@@ -100,7 +105,9 @@ import { computed, reactive, ref } from "vue"
 import Modal from "./Modal.vue"
 
 const props = defineProps({
-	saving: { type: Boolean, default: false }
+	saving: { type: Boolean, default: false },
+	spectralCalibrationActive: { type: Boolean, default: false },
+	spectralCalibrationProfileName: { type: String, default: "Selected calibration" }
 })
 
 const emit = defineEmits([ "save" ])

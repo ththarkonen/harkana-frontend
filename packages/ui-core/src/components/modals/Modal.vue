@@ -14,7 +14,7 @@
 
         <!-- Modal -->
         <div ref = "dialog"
-            class = "relative w-full max-w-2xl border-2 border-brand
+            class = "relative border-2 border-brand
                     rounded-lg bg-dark-gray shadow-xl max-h-[90vh]
                     flex flex-col"
             :class = "panelClass"
@@ -71,7 +71,7 @@ const props = defineProps({
     },
     panelClass: {
         type: String,
-        default: ""
+        default: "w-full max-w-2xl"
     }
 })
 

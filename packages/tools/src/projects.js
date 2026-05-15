@@ -427,7 +427,7 @@ var resolveOmeTiffDatasets = function( fileList ){
 
 	const files = Array.from( fileList ?? [] )
 	if( files.length === 0 ){
-		throw new Error( "No OME-TIFF files were selected." )
+		throw new Error( "No TIFF files were selected." )
 	}
 
 	const datasets = files
@@ -446,7 +446,7 @@ var resolveOmeTiffDatasets = function( fileList ){
 		.sort(( left, right ) => String( left?.rawFileName ?? "" ).localeCompare( String( right?.rawFileName ?? "" )))
 
 	if( datasets.length === 0 ){
-		throw new Error( "Select one or more OME-TIFF files." )
+		throw new Error( "Select one or more TIFF or OME-TIFF files." )
 	}
 
 	return datasets
@@ -495,6 +495,14 @@ var prepareHyperspectrumOmeTiffDataset = async function( omeTiffDataset, progres
 
 var listHyperspectrumOmeTiffDatasets = function( fileList ){
 	return resolveOmeTiffDatasets( fileList )
+}
+
+var listHyperspectrumTiffDatasets = function( fileList ){
+	return resolveOmeTiffDatasets( fileList )
+}
+
+var prepareHyperspectrumTiffDataset = async function( tiffDataset, progress ){
+	return await prepareHyperspectrumOmeTiffDataset( tiffDataset, progress )
 }
 
 var launchHyperspectrumOmeZarrAnalysis = async function( preparedProject, tokenGroupID, analysisRequest ){
@@ -547,6 +555,29 @@ var launchHyperspectrumOmeTiffAnalysis = async function( preparedProject, tokenG
 
 	try {
 		const response = await hyperspectra.launchOmeTiffAnalysis(
+			preparedProject.project,
+			tokenGroupID,
+			{
+				...analysisRequest,
+				inputS3Uri: String(
+					analysisRequest?.inputS3Uri
+					?? preparedProject?.inspectResponse?.source?.s3Uri
+					?? preparedProject?.inputS3Uri
+					?? ""
+				).trim()
+			}
+		)
+
+		return await persistHyperspectrumProject( preparedProject, response )
+	} catch (error) {
+		return error
+	}
+}
+
+var launchHyperspectrumTiffAnalysis = async function( preparedProject, tokenGroupID, analysisRequest = {} ){
+
+	try {
+		const response = await hyperspectra.launchTiffAnalysis(
 			preparedProject.project,
 			tokenGroupID,
 			{
@@ -954,6 +985,9 @@ export default {
 	listHyperspectrumOmeZarrDatasets,
 	prepareHyperspectrumOmeZarrDataset,
 	launchHyperspectrumOmeZarrAnalysis,
+	listHyperspectrumTiffDatasets,
+	prepareHyperspectrumTiffDataset,
+	launchHyperspectrumTiffAnalysis,
 	listHyperspectrumOmeTiffDatasets,
 	prepareHyperspectrumOmeTiffDataset,
 	launchHyperspectrumOmeTiffAnalysis,

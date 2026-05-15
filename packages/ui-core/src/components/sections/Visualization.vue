@@ -124,7 +124,7 @@
 
 		<div v-show = "activeVisualizationTab === 'colors'" role = "tabpanel" class = "max-w-2xl space-y-8">
 			<p class = "text-sm text-black/70">
-				Set the default colors for measurement, estimate, and uncertainty styling in both standard and comparison views.
+				Set the default colors for measurement, estimate, calibration preview, uncertainty styling, and ordered comparison project colors.
 			</p>
 
 			<div class = "space-y-4">
@@ -132,6 +132,7 @@
 				<div class = "grid gap-5 md:grid-cols-2">
 					<ColorPicker v-model = "colors.data" description = "Measurement data color"></ColorPicker>
 					<ColorPicker v-model = "colors.median" description = "Median estimate color"></ColorPicker>
+					<ColorPicker v-model = "colors.calibration" description = "Calibration preview color"></ColorPicker>
 					<ColorPicker v-model = "colors.area" description = "Uncertainty estimate color"></ColorPicker>
 					<label class = "block">
 						<div class = "mb-1 text-xs font-semibold uppercase tracking-wide text-black/70">Uncertainty estimate opacity</div>
@@ -149,10 +150,15 @@
 
 			<div class = "space-y-4">
 				<div class = "text-xs font-semibold uppercase tracking-wide text-black/70">Comparison plot colors</div>
+				<p class = "text-sm text-black/70">
+					Comparison project colors are applied in order. The first selected comparison uses the first color.
+				</p>
 				<div class = "grid gap-5 md:grid-cols-2">
-					<ColorPicker v-model = "comparisonColors.data" description = "Comparison data color"></ColorPicker>
-					<ColorPicker v-model = "comparisonColors.median" description = "Comparison median estimate color"></ColorPicker>
-					<ColorPicker v-model = "comparisonColors.area" description = "Comparison uncertainty estimate color"></ColorPicker>
+					<ColorPicker v-for = "( color, index ) in comparisonPalette"
+								 :key = "'comparison-palette-' + index"
+								 v-model = "comparisonPalette[index]"
+								 :description = "'Comparison color ' + ( index + 1 )">
+					</ColorPicker>
 					<label class = "block">
 						<div class = "mb-1 text-xs font-semibold uppercase tracking-wide text-black/70">Comparison uncertainty opacity</div>
 						<input v-model.number = "comparisonColors.opacity"
@@ -242,6 +248,19 @@ const visibilityEntries = [
 	{ key: "interval95", label: "Marginal 95% uncertainty estimate" }
 ]
 
+const DEFAULT_COMPARISON_PALETTE = [
+	"#ff7f0e",
+	"#2ca02c",
+	"#d62728",
+	"#9467bd",
+	"#8c564b",
+	"#e377c2",
+	"#7f7f7f",
+	"#bcbd22",
+	"#17becf",
+	"#333333"
+]
+
 const updating = ref( false )
 const activeVisualizationTab = ref( "axis" )
 
@@ -276,16 +295,19 @@ const fontSizes = reactive({
 const colors = reactive({
 	data: "#1f77b4",
 	median: "#1f77b4",
+	calibration: DEFAULT_COMPARISON_PALETTE[ DEFAULT_COMPARISON_PALETTE.length - 1 ],
 	area: "#1f77b4",
 	opacity: 0.15
 })
 
 const comparisonColors = reactive({
-	data: "#d62728",
-	median: "#d62728",
-	area: "#d62728",
+	data: DEFAULT_COMPARISON_PALETTE[0],
+	median: DEFAULT_COMPARISON_PALETTE[0],
+	area: DEFAULT_COMPARISON_PALETTE[0],
 	opacity: 0.15
 })
+
+const comparisonPalette = reactive([ ...DEFAULT_COMPARISON_PALETTE ])
 
 const visibility = reactive({
 	data: true,
@@ -349,6 +371,24 @@ const normalizeLayoutMode = ( value ) => {
 	return "vertical"
 }
 
+const normalizeColor = ( value, fallback ) => {
+	const normalizedColor = String( value ?? "" ).trim()
+	return normalizedColor.length > 0 ? normalizedColor : fallback
+}
+
+const normalizeComparisonPalette = ( palette, fallbackColor ) => {
+	const normalizedPalette = Array.isArray( palette )
+		? palette.map(( color, index ) => normalizeColor( color, DEFAULT_COMPARISON_PALETTE[index % DEFAULT_COMPARISON_PALETTE.length] ))
+		: []
+
+	if( normalizedPalette.length > 0 ){
+		return DEFAULT_COMPARISON_PALETTE.map(( defaultColor, index ) => normalizeColor( normalizedPalette[index], defaultColor ))
+	}
+
+	const leadingColor = normalizeColor( fallbackColor, DEFAULT_COMPARISON_PALETTE[0] )
+	return DEFAULT_COMPARISON_PALETTE.map(( defaultColor, index ) => index === 0 ? leadingColor : defaultColor )
+}
+
 const normalizeReversed = ( value ) => {
 	return String( value ?? "" ).trim().toLowerCase() === "false" ? "false" : "true"
 }
@@ -383,13 +423,27 @@ const syncFromSettings = ( savedSettings ) => {
 
 	colors.data = normalizeText( savedSettings?.colors?.data, "#1f77b4" )
 	colors.median = normalizeText( savedSettings?.colors?.median, colors.data )
+	colors.calibration = normalizeText(
+		savedSettings?.colors?.calibration,
+		DEFAULT_COMPARISON_PALETTE[ DEFAULT_COMPARISON_PALETTE.length - 1 ]
+	)
 	colors.area = normalizeText( savedSettings?.colors?.area, colors.data )
 	colors.opacity = normalizeOpacity( savedSettings?.colors?.opacity, 0.15 )
 
-	comparisonColors.data = normalizeText( savedSettings?.comparisonColors?.data, "#d62728" )
+	comparisonColors.data = normalizeText( savedSettings?.comparisonColors?.data, DEFAULT_COMPARISON_PALETTE[0] )
 	comparisonColors.median = normalizeText( savedSettings?.comparisonColors?.median, comparisonColors.data )
 	comparisonColors.area = normalizeText( savedSettings?.comparisonColors?.area, comparisonColors.data )
 	comparisonColors.opacity = normalizeOpacity( savedSettings?.comparisonColors?.opacity, 0.15 )
+	const normalizedComparisonPalette = normalizeComparisonPalette(
+		savedSettings?.comparisonColors?.palette,
+		comparisonColors.data
+	)
+	for( let index = 0; index < comparisonPalette.length; index++ ){
+		comparisonPalette[index] = normalizedComparisonPalette[index]
+	}
+	comparisonColors.data = normalizedComparisonPalette[0]
+	comparisonColors.median = normalizedComparisonPalette[0]
+	comparisonColors.area = normalizedComparisonPalette[0]
 
 	syncVisibility(
 		visibility,
@@ -463,15 +517,17 @@ const updateSettings = async () => {
 		...( savedSettings.colors ?? {} ),
 		data: colors.data,
 		median: colors.median,
+		calibration: colors.calibration,
 		area: colors.area,
 		opacity: normalizeOpacity( colors.opacity, 0.15 )
 	}
 
 	savedSettings.comparisonColors = {
 		...( savedSettings.comparisonColors ?? {} ),
-		data: comparisonColors.data,
-		median: comparisonColors.median,
-		area: comparisonColors.area,
+		data: normalizeColor( comparisonPalette[0], DEFAULT_COMPARISON_PALETTE[0] ),
+		median: normalizeColor( comparisonPalette[0], DEFAULT_COMPARISON_PALETTE[0] ),
+		area: normalizeColor( comparisonPalette[0], DEFAULT_COMPARISON_PALETTE[0] ),
+		palette: normalizeComparisonPalette( comparisonPalette, comparisonPalette[0] ),
 		opacity: normalizeOpacity( comparisonColors.opacity, 0.15 )
 	}
 

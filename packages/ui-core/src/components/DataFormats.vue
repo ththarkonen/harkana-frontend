@@ -238,11 +238,19 @@
 
                         <li>
                             <strong>calibration.json:</strong>  
-                            Holds the user-defined x-axis calibration in <code class="bg-gray-100 px-1 rounded">"x"</code>.  
+                            Holds the user-defined spectrum calibration model, including optional polynomial terms and point pairs used for the fit.
                             This allows post-processing or visualization tools to re-align the data.
                             <br>
                             Example:
-                            <pre class="bg-gray-900 text-gray-100 rounded p-4 text-sm overflow-x-auto whitespace-pre-wrap">{"x": 0.0}</pre>
+                            <pre class="bg-gray-900 text-gray-100 rounded p-4 text-sm overflow-x-auto whitespace-pre-wrap">{"x": 0.0,
+ "polynomialOrder": 3,
+ "includedOrders": [0, 1, 3],
+ "points": [
+  {"id": "p1", "sourceX": 100.2, "targetX": 100.0},
+  {"id": "p2", "sourceX": 512.1, "targetX": 512.0},
+  {"id": "p3", "sourceX": 1331.5, "targetX": 1331.0},
+  {"id": "p4", "sourceX": 1601.2, "targetX": 1601.0}
+ ]}</pre>
                         </li>
                     </ul>
 

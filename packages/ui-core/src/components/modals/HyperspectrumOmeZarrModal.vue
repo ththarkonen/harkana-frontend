@@ -6,7 +6,7 @@
     <template #main>
         <div class = "space-y-4 pb-4">
             <p class = "text-sm leading-relaxed text-white/90">
-                Upload the {{ sourceTypeLabel }} dataset, inspect the available axes, and map them to the analysis dimensions used by the hyperspectral viewer.
+                {{ modalDescription }}
             </p>
 
             <div v-if = "datasetCount > 1" class = "rounded-lg border border-brand bg-white p-4">
@@ -94,7 +94,7 @@
                     </ul>
                 </div>
 
-                <div class = "grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div v-if = "requiresAxisMapping" class = "grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div v-for = "role in analysisRoles"
                          :key = "role.key"
                          class = "rounded-lg border border-brand bg-white p-4">
@@ -120,7 +120,11 @@
                     </div>
                 </div>
 
-                <div v-if = "fixedAxisInputs.length > 0" class = "space-y-3">
+                <div v-else class = "rounded-lg border border-brand bg-white p-4 text-sm text-black/80">
+                    No axis mapping is required for this TIFF source. Analysis uses the normalized TIFF axes from inspection.
+                </div>
+
+                <div v-if = "requiresAxisMapping && fixedAxisInputs.length > 0" class = "space-y-3">
                     <div class = "text-xs font-semibold uppercase tracking-wide text-white/70">Fixed indices</div>
                     <div class = "grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <div v-for = "axis in fixedAxisInputs"
@@ -197,6 +201,7 @@ type InspectAxis = {
 type InspectResponse = {
     source?: {
         name?: string
+        format?: string
     }
     dimensions?: {
         axisOrder?: string
@@ -252,8 +257,24 @@ const response = computed<InspectResponse | null>(() => {
     return props.inspectResponse as InspectResponse | null
 })
 
+const inspectedSourceFormat = computed(() => {
+    return String( response.value?.source?.format ?? "" ).trim().toLowerCase()
+})
+
+const requiresAxisMapping = computed(() => {
+    return inspectedSourceFormat.value !== "tiff"
+})
+
 const modalTitle = computed(() => {
-    return String( props.sourceTypeLabel ?? "Source" ).trim() + " axis mapping"
+    return String( props.sourceTypeLabel ?? "Source" ).trim() + ( requiresAxisMapping.value ? " axis mapping" : " analysis" )
+})
+
+const modalDescription = computed(() => {
+    if( requiresAxisMapping.value === false ){
+        return "Upload the " + String( props.sourceTypeLabel ?? "Source" ).trim() + " dataset, inspect the available dimensions, review any warnings, and start the analysis."
+    }
+
+    return "Upload the " + String( props.sourceTypeLabel ?? "Source" ).trim() + " dataset, inspect the available axes, and map them to the analysis dimensions used by the hyperspectral viewer."
 })
 
 const hasInspectResponse = computed(() => {
@@ -261,7 +282,7 @@ const hasInspectResponse = computed(() => {
 })
 
 const showReuseCheckbox = computed(() => {
-    return props.datasetCount > 1 && props.datasetIteration < props.datasetCount
+    return requiresAxisMapping.value && props.datasetCount > 1 && props.datasetIteration < props.datasetCount
 })
 
 const preparationStatusText = computed(() => {
@@ -476,6 +497,10 @@ function formatAxisOption( axis: InspectAxis ){
 function validateSelection(){
 
     validationError.value = ""
+
+    if( requiresAxisMapping.value === false ){
+        return {}
+    }
 
     const requiredRoles = [ "x", "y" ]
     for( const role of requiredRoles ){
