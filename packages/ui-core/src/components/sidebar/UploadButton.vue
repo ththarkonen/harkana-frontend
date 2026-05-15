@@ -14,7 +14,7 @@
                 <BaseDropdownItem :disabled = "isUploadLocked" @select = "openOirPicker">
                     Upload OIR
                 </BaseDropdownItem>
-                <BaseDropdownItem :disabled = "isUploadLocked" @select = "openLegacyTiffPicker">
+                <BaseDropdownItem :disabled = "isUploadLocked" @select = "openTiffPicker">
                     Upload TIFF
                 </BaseDropdownItem>
                 <BaseDropdownItem :disabled = "isUploadLocked" @select = "openOmeZarrPicker">
@@ -37,13 +37,13 @@
                    @click = "resetInputValue"/>
         </label>
 
-        <input ref = "standardFileInput"
+        <input ref = "tiffInput"
                type = "file"
                hidden
                multiple
                accept = ".tif,.tiff"
                :disabled = "isUploadLocked"
-               @change = "handleStandardUpload"
+               @change = "handleInspectableTiffUpload"
                @click = "resetInputValue"/>
 
         <input ref = "oirInput"
@@ -170,7 +170,7 @@ const emit = defineEmits([ "updateProjects" ])
 
 const progressModal = ref<any>( null )
 const sourceAnalysisModal = ref<any>( null )
-const standardFileInput = ref<HTMLInputElement | null>( null )
+const tiffInput = ref<HTMLInputElement | null>( null )
 const oirInput = ref<HTMLInputElement | null>( null )
 const omeZarrInput = ref<HTMLInputElement | null>( null )
 const omeTiffInput = ref<HTMLInputElement | null>( null )
@@ -188,7 +188,7 @@ const activeFile = ref<{ name: string } | null>( null )
 const currentIteration = ref( 0 )
 const nFiles = ref( 0 )
 
-const inspectedSourceType = ref<"oir" | "ome-zarr" | "ome-tiff">( "ome-zarr" )
+const inspectedSourceType = ref<"oir" | "ome-zarr" | "ome-tiff" | "tiff">( "ome-zarr" )
 const sourcePreparedProject = ref<any>( null )
 const sourceAnalysisGroupID = ref( "" )
 const sourceDatasetQueue = ref<any[]>( [] )
@@ -221,7 +221,8 @@ const isUploadLocked = computed(() => {
 const sourceTypeLabels: Record<string, string> = {
     oir: "OIR",
     "ome-zarr": "OME-Zarr",
-    "ome-tiff": "OME-TIFF"
+    "ome-tiff": "OME-TIFF",
+    tiff: "TIFF"
 }
 
 const inspectedSourceTypeLabel = computed(() => {
@@ -292,16 +293,12 @@ const resetInputValue = ( event: Event ) => {
     }
 }
 
-const openStandardPicker = () => {
+const openTiffPicker = () => {
     if( isUploadLocked.value ){
         return
     }
 
-    standardFileInput.value?.click()
-}
-
-const openLegacyTiffPicker = () => {
-    openStandardPicker()
+    tiffInput.value?.click()
 }
 
 const openOirPicker = () => {
@@ -365,6 +362,16 @@ const buildInspectDimensionsSignature = ( inspectResponse: any ) => {
             ? null
             : String( dimensions?.recommendedLayerAxis ?? "" )
     })
+}
+
+const normalizeInspectedSourceFormat = ( inspectResponse: any ) => {
+    const format = String( inspectResponse?.source?.format ?? "" ).trim().toLowerCase()
+
+    if( format === "oir" || format === "ome-zarr" || format === "ome-tiff" || format === "tiff" ){
+        return format
+    }
+
+    return ""
 }
 
 const cloneAnalysisPayload = ( payload: { axisMapping: Record<string, string>, fixedIndices?: Record<string, number> } ) => {
@@ -442,8 +449,8 @@ const prepareNextSourceDataset = async () => {
 
         if( inspectedSourceType.value === "oir" ){
             preparedProject = await projectlib.prepareHyperspectrumOirDataset( dataset, uploadProgressCallbacks() )
-        } else if( inspectedSourceType.value === "ome-tiff" ){
-            preparedProject = await projectlib.prepareHyperspectrumOmeTiffDataset( dataset, uploadProgressCallbacks() )
+        } else if( inspectedSourceType.value === "ome-tiff" || inspectedSourceType.value === "tiff" ){
+            preparedProject = await projectlib.prepareHyperspectrumTiffDataset( dataset, uploadProgressCallbacks() )
         } else {
             preparedProject = await projectlib.prepareHyperspectrumOmeZarrDataset( dataset, uploadProgressCallbacks() )
         }
@@ -454,6 +461,10 @@ const prepareNextSourceDataset = async () => {
 
         sourcePreparedProject.value = preparedProject
         sourceInspectResponse.value = preparedProject.inspectResponse
+        const inspectedFormat = normalizeInspectedSourceFormat( preparedProject.inspectResponse )
+        if( inspectedFormat.length > 0 ){
+            inspectedSourceType.value = inspectedFormat as "oir" | "ome-zarr" | "ome-tiff" | "tiff"
+        }
         sourcePreparing.value = false
 
         const dimensionsSignature = buildInspectDimensionsSignature( preparedProject.inspectResponse )
@@ -470,7 +481,7 @@ const prepareNextSourceDataset = async () => {
 }
 
 const submitCurrentSourceAnalysis = async (
-    payload: { axisMapping: Record<string, string>, fixedIndices?: Record<string, number> }
+    payload: { axisMapping?: Record<string, string>, fixedIndices?: Record<string, number>, inputS3Uri?: string } = {}
 ) => {
 
     if( sourcePreparedProject.value === null ){
@@ -486,6 +497,12 @@ const submitCurrentSourceAnalysis = async (
 
         if( inspectedSourceType.value === "oir" ){
             result = await projectlib.launchHyperspectrumOirAnalysis(
+                sourcePreparedProject.value,
+                sourceAnalysisGroupID.value,
+                payload
+            )
+        } else if( inspectedSourceType.value === "tiff" ){
+            result = await projectlib.launchHyperspectrumTiffAnalysis(
                 sourcePreparedProject.value,
                 sourceAnalysisGroupID.value,
                 payload
@@ -508,11 +525,19 @@ const submitCurrentSourceAnalysis = async (
             throw result
         }
 
-        if( sourceReuseMatchingDimensions.value === true && sourceInspectResponse.value !== null ){
+        if(
+            sourceReuseMatchingDimensions.value === true &&
+            sourceInspectResponse.value !== null &&
+            typeof payload?.axisMapping === "object" &&
+            payload.axisMapping !== null
+        ){
             const dimensionsSignature = buildInspectDimensionsSignature( sourceInspectResponse.value )
             sourceReusableSelections.value = {
                 ...sourceReusableSelections.value,
-                [ dimensionsSignature ]: cloneAnalysisPayload( payload )
+                [ dimensionsSignature ]: cloneAnalysisPayload({
+                    axisMapping: payload.axisMapping,
+                    fixedIndices: payload.fixedIndices
+                })
             }
         } else {
             sourceReusableSelections.value = {}
@@ -541,7 +566,7 @@ const submitCurrentSourceAnalysis = async (
 }
 
 const startInspectableSourceUploadBatch = async (
-    sourceType: "oir" | "ome-zarr" | "ome-tiff",
+    sourceType: "oir" | "ome-zarr" | "ome-tiff" | "tiff",
     files: FileList
 ) => {
 
@@ -554,8 +579,8 @@ const startInspectableSourceUploadBatch = async (
     try {
         if( sourceType === "oir" ){
             sourceDatasetQueue.value = projectlib.listHyperspectrumOirDatasets( files )
-        } else if( sourceType === "ome-tiff" ){
-            sourceDatasetQueue.value = projectlib.listHyperspectrumOmeTiffDatasets( files )
+        } else if( sourceType === "ome-tiff" || sourceType === "tiff" ){
+            sourceDatasetQueue.value = projectlib.listHyperspectrumTiffDatasets( files )
         } else {
             sourceDatasetQueue.value = projectlib.listHyperspectrumOmeZarrDatasets( files )
         }
@@ -685,7 +710,19 @@ const handleInspectableOmeTiffUpload = async ( event: Event ) => {
     await startInspectableSourceUploadBatch( "ome-tiff", files )
 }
 
-const submitSourceAnalysis = async ( payload: { axisMapping: Record<string, string>, fixedIndices?: Record<string, number> } ) => {
+const handleInspectableTiffUpload = async ( event: Event ) => {
+
+    if( isUploadLocked.value ){
+        return
+    }
+
+    const files = ( event.target as HTMLInputElement ).files
+    if( !files || !files.length ) return
+
+    await startInspectableSourceUploadBatch( "tiff", files )
+}
+
+const submitSourceAnalysis = async ( payload: { axisMapping?: Record<string, string>, fixedIndices?: Record<string, number> } ) => {
     await submitCurrentSourceAnalysis( payload )
 }
 

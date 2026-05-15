@@ -115,6 +115,27 @@
 										   aria-hidden = "true"></i>
 									</button>
 								</li>
+
+								<li><hr class = "h-0.5 bg-gray border-0"></li>
+								<li class = "px-4 pt-2 pb-1 text-xs uppercase tracking-wide text-white/70">
+									Legend hover emphasis
+								</li>
+								<li>
+									<button @click = "setLegendHoverEmphasisEnabled( true )"
+											class = "flex w-full items-center justify-between gap-3 px-4 py-2 text-left text-sm text-white transition hover:bg-brand hover:text-white">
+										<span>Enabled</span>
+										<i :class = "legendHoverEmphasisEnabled ? 'fas fa-check text-brand' : 'fas fa-check opacity-0'"
+										   aria-hidden = "true"></i>
+									</button>
+								</li>
+								<li>
+									<button @click = "setLegendHoverEmphasisEnabled( false )"
+											class = "flex w-full items-center justify-between gap-3 px-4 py-2 text-left text-sm text-white transition hover:bg-brand hover:text-white">
+										<span>Disabled</span>
+										<i :class = "legendHoverEmphasisEnabled === false ? 'fas fa-check text-brand' : 'fas fa-check opacity-0'"
+										   aria-hidden = "true"></i>
+									</button>
+								</li>
 							</BaseDropdown>
 							</div>
 						</div>
@@ -791,6 +812,76 @@
 
 			</div>
 
+			<div v-if = "spectralCalibrationSidebarOpen"
+				 ref = "spectralCalibrationSidebarSection"
+				 class = "mt-4 p-2 shadow-md shadow-black border-2 border-gray bg-gray-800 rounded-lg"
+				 data-tutorial = "spectral-calibration-sidebar-block">
+				<div class = "flex items-center justify-between gap-1">
+					<div class = "flex min-w-0 items-center gap-1">
+						<span class = "inline-flex h-5 w-5 items-center justify-center text-white" aria-hidden = "true">
+							<i class = "fas fa-ruler text-sm"></i>
+						</span>
+						<h3 class = "text-white font-semibold whitespace-nowrap">Calibration</h3>
+					</div>
+
+					<div class = "flex items-center gap-1">
+						<span v-if = "spectralCalibrationProfilesLoading"
+							  class = "inline-flex h-8 w-8 items-center justify-center">
+							<Spinner class = "h-4 w-4 text-brand"></Spinner>
+						</span>
+						<button type = "button"
+								@click = "spectralCalibrationSidebarOpen = false"
+								class = "inline-flex h-8 w-8 items-center justify-center rounded-md text-white transition-colors hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-brand"
+								title = "Close calibration controls"
+								aria-label = "Close calibration controls">
+							<i class = "fas fa-times" aria-hidden = "true"></i>
+						</button>
+					</div>
+				</div>
+
+				<div v-if = "spectralCalibrationProfilesSupported === false"
+					 class = "mt-2 rounded-md border border-white/10 bg-white/5 px-2 py-2 text-xs leading-snug text-white/70">
+					Spectral calibration profiles are not available in this environment.
+				</div>
+
+				<div v-else-if = "project.shared"
+					 class = "mt-2 space-y-2">
+					<p class = "text-xs leading-snug text-white/70">
+						Shared projects use the calibration profile assigned by the project owner.
+					</p>
+					<div class = "min-w-0 truncate border-b border-white/20 py-1 text-sm font-medium text-white"
+						 :title = "activeSpectralCalibrationProfileLabel">
+						{{ activeSpectralCalibrationProfileLabel }}
+					</div>
+				</div>
+
+				<div v-else class = "mt-2">
+					<CalibrationControls :saving = "spectralCalibrationAssignmentSaving"
+										 :profile-options = "spectralCalibrationProfileOptions"
+										 :selected-profile-id = "spectralCalibrationSelectedProfileID"
+										 :profiles-loading = "spectralCalibrationProfilesLoading"
+										 :can-save-selection = "canAssignSpectralCalibrationProfile"
+										 description = "Selecting a saved spectral calibration previews it immediately. Save assigns the selected profile to this project."
+										 @show-panel = "spectralCalibrationPanelOpen = true"
+										 @update:selected-profile-id = "handleSpectralCalibrationProfileSelection"
+										 @save = "assignSpectralCalibrationProfileToProject">
+					</CalibrationControls>
+				</div>
+
+				<p v-if = "spectralCalibrationSelectionDirty"
+				   class = "mt-2 text-xs leading-snug text-amber-200">
+					Unsaved calibration selection. Save before running Raman inference.
+				</p>
+				<p v-else-if = "spectralCalibrationSelectedProfileID.length > 0"
+				   class = "mt-2 text-xs leading-snug text-white/70">
+					Applied on top of the raw Z axis values.
+				</p>
+				<p v-if = "spectralCalibrationError.length > 0"
+				   class = "mt-2 text-xs leading-snug text-red-300">
+					{{ spectralCalibrationError }}
+				</p>
+			</div>
+
 		</Sidebar>
 
 		<NavigationBar>
@@ -820,7 +911,12 @@
 									  :dimmed = "isProjectMenuItemDimmed('core')"
 									  :disabled = "project.shared"
 									  :tooltip = "ownedProjectActionTooltip('Axis value editing')">
-						Edit axis values
+						Edit raw axis values
+					</BaseDropdownItem>
+
+					<BaseDropdownItem @select = "openSpectralCalibrationSidebar"
+									  :dimmed = "isProjectMenuItemDimmed('core')">
+						Calibration
 					</BaseDropdownItem>
 
 					<BaseDropdownItem @select = "openGpuInferenceModal"
@@ -1029,16 +1125,44 @@
 					@confirm = "deleteSelectedRoi"></RoiDeleteModal>
 	<GpuInferenceModal ref = "gpuInferenceModal"
 					  :project = "project"
-					  :default-group-id = "activeGroupID()"
+					  :default-group-id = "resolvedActiveGroupID"
 					  :initial-job-id = "gpuInferenceJobId"
 					  :initial-status = "gpuInferenceStatus"
+					  :spectral-calibration-profile-name = "spectralCalibrationAssignedProfileID.length > 0 ? activeSpectralCalibrationProfileLabel : ''"
 					  @submitted = "handleGpuInferenceSubmitted"
 					  @status = "handleGpuInferenceStatus"></GpuInferenceModal>
 	<GpuInferenceOutcomeModal ref = "gpuInferenceOutcomeModal"></GpuInferenceOutcomeModal>
 	<DownloadPreparingModal ref = "downloadPreparingModal"></DownloadPreparingModal>
 	<XyzSettingsModal ref = "xyzSettingsModal"
 					  :saving = "savingXyz"
+					  :spectral-calibration-active = "spectralCalibrationSelectedProfileID.length > 0"
+					  :spectral-calibration-profile-name = "activeSpectralCalibrationProfileLabel"
 					  @save = "saveXyzSettings"></XyzSettingsModal>
+	<CalibrationPanel v-model = "spectralCalibrationPanelOpen"
+					  :project = "project"
+					  :anchor-element = "spectralCalibrationSidebarSection"
+					  :points = "spectralCalibrationDraft.points"
+					  :polynomial-order = "spectralCalibrationDraft.polynomialOrder"
+					  :included-orders = "spectralCalibrationDraft.includedOrders"
+					  :max-polynomial-order = "spectralCalibrationMaxOrder"
+					  :focused-point-id = "focusedSpectralCalibrationPointID"
+					  :can-apply = "spectralCalibrationHasSavablePoints"
+					  :can-save-profile = "canSaveSpectralCalibrationProfile"
+					  :saving-profile = "spectralCalibrationProfileSaving"
+					  :save-disabled-reason = "spectralCalibrationProfileSaveDisabledReason"
+					  description-text = "Click spectrum traces or loadings to add points. Preview the current spectral-axis calibration here, save the previewed profile beside it, and assign the selected saved profile from the sidebar."
+					  @update:point-target = "updateSpectralCalibrationPointTarget"
+					  @update:polynomial-order = "updateSpectralCalibrationPolynomialOrder"
+					  @toggle-order = "toggleSpectralCalibrationIncludedOrder"
+					  @apply-calibration = "applySpectralCalibrationPreview"
+					  @save-profile = "openSpectralCalibrationProfileSaveModal"
+					  @remove-point = "removeSpectralCalibrationPoint"
+					  @focus-point = "setFocusedSpectralCalibrationPointID"></CalibrationPanel>
+	<CalibrationProfileSaveModal ref = "spectralCalibrationProfileSaveModal"
+								 :saving = "spectralCalibrationProfileSaving"
+								 :reserved-names = "spectralCalibrationReservedProfileNames"
+								 :base-disabled-reason = "spectralCalibrationProfileSaveDisabledReason"
+								 @save = "saveSpectralCalibrationProfile"></CalibrationProfileSaveModal>
 	<ProjectChatWindow v-model = "projectChatOpen"
 					   :project = "project"></ProjectChatWindow>
 	<ViewerTutorialPrompt :visible = "viewerTutorialPromptVisible"
@@ -1049,9 +1173,9 @@
 						   :title = "activeViewerTutorialStep?.title ?? ''"
 						   :body = "activeViewerTutorialStep?.body ?? ''"
 						   :step-number = "viewerTutorialStepIndex + 1"
-						   :step-count = "viewerTutorialSteps.length"
+						   :step-count = "viewerTutorialStepCount"
 						   :can-go-back = "viewerTutorialStepIndex > 0"
-						   :is-final = "viewerTutorialStepIndex >= viewerTutorialSteps.length - 1"
+						   :is-final = "isFinalViewerTutorialStep"
 						   :preferred-placement = "activeViewerTutorialStep?.placement ?? 'center'"
 						   :target-element = "activeViewerTutorialTargetElement"
 						   :spotlight-enabled = "activeViewerTutorialStep?.kind !== 'centered'"
@@ -1082,7 +1206,7 @@
 
 <script setup>
 
-import { ref, shallowRef, watch, computed, nextTick, onMounted, onBeforeUnmount} from 'vue'
+import { ref, shallowRef, watch, computed, nextTick, onBeforeUnmount} from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { debounce } from 'lodash'
 const route = useRoute()
@@ -1097,9 +1221,17 @@ import {
 	navigation,
 	hyperspectrumCache,
 	hyperspectra,
-	results
+	results,
+	data as datalib
 } from "@harkana/tools"
-import { hyperspectrum } from "@harkana/plot"
+import {
+	applyCalibrationToValues,
+	calibrationMaxPolynomialOrder,
+	calibrationHasValidPoints,
+	hyperspectrum,
+	normalizeCalibrationModel,
+	plot
+} from "@harkana/plot"
 
 import Sidebar from './sidebar/Sidebar.vue'
 import Logo from "./sidebar/Logo.vue"
@@ -1109,6 +1241,7 @@ import AccountDropdown from './navbar/AccountDropdown.vue'
 import BaseDropdown from './navbar/BaseDropdown.vue'
 import BaseDropdownItem from './navbar/BaseDropdownItem.vue'
 import ProjectNameInput from './navbar/ProjectNameInput.vue'
+import CalibrationControls from './sidebar/CalibrationControls.vue'
 
 import MetadataModal from './modals/MetadataModal.vue'
 import ShareModal from './modals/ShareModal.vue'
@@ -1122,11 +1255,41 @@ import DownloadPreparingModal from './modals/DownloadPreparingModal.vue'
 import XyzSettingsModal from './modals/XyzSettingsModal.vue'
 import ProjectChatWindow from './chat/ProjectChatWindow.vue'
 import HeatmapRendererPane from './plot/HeatmapRendererPane.vue'
+import CalibrationPanel from './modals/CalibrationPanel.vue'
+import CalibrationProfileSaveModal from './modals/CalibrationProfileSaveModal.vue'
+import { createHyperspectrumDisplayRegistry } from './plot/hyperspectrum/displayRegistry.js'
 import DualRangeSlider from './general/DualRangeSlider.vue'
 import FloatingLabelSelect from './general/FloatingLabelSelect.vue'
 import Spinner from './general/Spinner.vue'
 import ViewerTutorialPrompt from './tutorial/ViewerTutorialPrompt.vue'
 import ViewerTutorialOverlay from './tutorial/ViewerTutorialOverlay.vue'
+import {
+	normalizeSelectionBoundingBox
+} from '../composables/hyperspectrum/selectionBounds.js'
+import {
+	normalizeSelectionConfidenceLevel,
+	useHyperspectrumSelections
+} from '../composables/hyperspectrum/useSelections.js'
+import { useHyperspectrumRois } from '../composables/hyperspectrum/useRois.js'
+import {
+	normalizeHeatmapInteraction,
+	normalizeHeatmapRendererMode,
+	normalizeHeatmapZoomAspectRatio,
+	useHyperspectrumHeatmapToolbarState
+} from '../composables/hyperspectrum/useHeatmapToolbarState.js'
+import { useHyperspectrumPreloadQueue } from '../composables/hyperspectrum/usePreloadQueue.js'
+import { useGpuInferenceState } from '../composables/hyperspectrum/useGpuInferenceState.js'
+import { useDisplayModeWorkflow } from '../composables/hyperspectrum/useDisplayModeWorkflow.js'
+import { useHyperspectrumRenderPipeline } from '../composables/hyperspectrum/useHyperspectrumRenderPipeline.js'
+import { useProjectViewLifecycle } from '../composables/hyperspectrum/useProjectViewLifecycle.js'
+import { useSpectrumPlotSync } from '../composables/hyperspectrum/useSpectrumPlotSync.js'
+import { useSpectrumPaneState } from '../composables/hyperspectrum/useSpectrumPaneState.js'
+import { useViewerTutorial } from '../composables/hyperspectrum/useViewerTutorial.js'
+import {
+	normalizedLoadPriority,
+	shouldChunkBackgroundLoad,
+	yieldToBrowser
+} from '../composables/hyperspectrum/browserIdle.js'
 
 const metadataModal = ref(null)
 const shareModal = ref(null)
@@ -1139,13 +1302,11 @@ const gpuInferenceModal = ref(null)
 const gpuInferenceOutcomeModal = ref(null)
 const downloadPreparingModal = ref(null)
 const xyzSettingsModal = ref(null)
+const spectralCalibrationProfileSaveModal = ref(null)
 const displayInfoTrigger = ref(null)
 const displayOptionsDropdown = ref(null)
 const projectMenuDropdown = ref(null)
 const displaySelectDropdown = ref(null)
-const topSpectrumPaneLegendVisible = ref(true)
-const hoveredSpectrumLegendKey = ref("")
-const hiddenSpectrumLegendKeys = ref([])
 const showDisplayInfoTooltip = ref(false)
 const displayInfoTooltipStyle = ref({
 	left: "0px",
@@ -1166,6 +1327,29 @@ const mip = shallowRef(null)
 const mipHsv = shallowRef(null)
 const umap = shallowRef(null)
 const xyzAxes = shallowRef(null)
+const spectralCalibrationProfilesSupported = ref(true)
+const spectralCalibrationProfilesLoading = ref(false)
+const spectralCalibrationAssignmentSaving = ref(false)
+const spectralCalibrationProfileSaving = ref(false)
+const spectralCalibrationProfiles = ref([])
+const spectralCalibrationAssignedProfileID = ref("")
+const spectralCalibrationSelectedProfileID = ref("")
+const spectralCalibrationAssignedProfile = shallowRef(null)
+const spectralCalibrationSelectedProfile = shallowRef(null)
+const spectralCalibrationPreview = shallowRef(null)
+const spectralCalibrationPanelOpen = ref(false)
+const spectralCalibrationSidebarSection = ref(null)
+const focusedSpectralCalibrationPointID = ref("")
+const spectralCalibrationPulsePhase = ref(0)
+const spectralCalibrationDraftPointCounter = ref(0)
+const spectralCalibrationError = ref("")
+const spectralCalibrationSidebarOpen = ref(false)
+const spectralCalibrationDraft = ref({
+	x: 0,
+	polynomialOrder: 0,
+	includedOrders: [ 0 ],
+	points: []
+})
 const layer = shallowRef(null)
 const pcaClassification = shallowRef(null)
 const pcaClassificationMip = shallowRef(null)
@@ -1179,12 +1363,16 @@ const deckLayoutContainer = ref(null)
 const deckSpectraPaneContainer = ref(null)
 const deckTopPanelGraph = ref(null)
 const deckBottomPanelGraph = ref(null)
+let spectralCalibrationPlotClickHandler = null
+let spectralCalibrationPlotHoverHandler = null
+let spectralCalibrationPlotUnhoverHandler = null
+let spectralCalibrationGraphClickFallbackHandler = null
+let spectralCalibrationPulseInterval = null
+let lastSpectralCalibrationClickSignature = null
 const graph = ref(null)
 const activePlot = ref("umap")
-const heatmapRendererMode = ref("deckgl")
 const heatmapRendererPayload = shallowRef(null)
 const heatmapRendererPaneState = shallowRef(null)
-const heatmapZoomAspectRatio = ref("square")
 const heatmapRenderBenchmark = ref({
 	renderer: "plotly",
 	viewMode: "",
@@ -1193,12 +1381,8 @@ const heatmapRenderBenchmark = ref({
 })
 const heatmapRenderBenchmarkToken = ref(0)
 const pendingDeckRenderBenchmark = ref(null)
-const lastDeckUpperPanelKey = ref("")
-const lastDeckLowerPanelKey = ref("")
-const lastDeckHeatmapPaneKey = ref("")
 const activeLayerIndex = ref(0)
 const activeLayerRequestID = ref(0)
-const activeLayerPayloadPrewarmRequestID = ref(0)
 const activeMipHsvRequestID = ref(0)
 const activeUmapRequestID = ref(0)
 const activeXyzRequestID = ref(0)
@@ -1221,7 +1405,6 @@ const zBlendPresetStatusMessage = ref("")
 const zBlendPresetLoadedFromBackend = ref(false)
 const zBlendDirty = ref(false)
 const zBlendSaving = ref(false)
-const projectSpectrumGridlinesVisible = ref(null)
 const zBlendMeasurementIntensityMaximumByLayer = ref({})
 const zBlendEstimatedIntensityMaximumByLayer = ref({})
 const pcaRgbRedInput = ref(1)
@@ -1229,10 +1412,28 @@ const pcaRgbGreenInput = ref(2)
 const pcaRgbBlueInput = ref(3)
 const pcaClassificationComponentCount = ref(2)
 const pcaMipComponentCount = ref(2)
-const heatmapInteractionMode = ref("select")
 const confidenceLevelOptions = [ 50, 75, 90, 95 ]
 const CONFIDENCE_NONE_VALUE = "none"
 const estimateConfidenceLevels = [ 50, 75, 90, 95 ]
+const LAYER_CACHE_WINDOW_RADIUS = 10
+const DEFAULT_ROI_SPECTRUM_PALETTE = [
+	"#ff7f0e",
+	"#2ca02c",
+	"#d62728",
+	"#9467bd",
+	"#8c564b",
+	"#e377c2",
+	"#7f7f7f",
+	"#bcbd22",
+	"#17becf",
+	"#333333"
+]
+const cacheOptions = {
+	memoryBudgetBytes: 2 * 1024 * 1024 * 1024,
+	ttlMs: 7 * 24 * 60 * 60 * 1000,
+	prefetchRadius: LAYER_CACHE_WINDOW_RADIUS,
+	lowConcurrency: 4
+}
 const DISPLAY_MODE_OPTIONS = new Set([
 	"mip",
 	"mip_hsv",
@@ -1272,11 +1473,6 @@ const DEFAULT_HYPERSPECTRUM_PRIORITIZATION = {
 	rpca_mip: false,
 	rpca_rgb: false
 }
-const VIEWER_TUTORIAL_STORAGE_KEY = "harkana.viewerTutorial.v1"
-const SPECTRUM_GRIDLINE_CHANGE_EVENT = "harkana:spectrum-gridlines-change"
-const SPECTRUM_LEGEND_CHANGE_EVENT = "harkana:spectrum-chip-legend-change"
-const HEATMAP_INTERACTION_CHANGE_EVENT = "harkana:heatmap-interaction-change"
-const HEATMAP_RESET_VIEW_EVENT = "harkana:heatmap-reset-view"
 const PREPARATION_TARGET_ORDER = [
 	"mip",
 	"mip_hsv",
@@ -1291,61 +1487,6 @@ const PREPARATION_TARGET_ORDER = [
 	"layer_window"
 ]
 
-const createDefaultViewerTutorialState = () => {
-	return {
-		prompted: false,
-		completed: false,
-		skipped: false,
-		lastCompletedAt: ""
-	}
-}
-
-const readViewerTutorialState = () => {
-	if( typeof window === "undefined" || typeof window.localStorage === "undefined" ){
-		return createDefaultViewerTutorialState()
-	}
-
-	try{
-		const raw = window.localStorage.getItem( VIEWER_TUTORIAL_STORAGE_KEY )
-		if( typeof raw !== "string" || raw.length === 0 ){
-			return createDefaultViewerTutorialState()
-		}
-
-		const parsed = JSON.parse( raw )
-		return {
-			prompted: parsed?.prompted === true,
-			completed: parsed?.completed === true,
-			skipped: parsed?.skipped === true,
-			lastCompletedAt: typeof parsed?.lastCompletedAt === "string" ? parsed.lastCompletedAt : ""
-		}
-	} catch( error ){
-		console.log( error )
-		return createDefaultViewerTutorialState()
-	}
-}
-
-const viewerTutorialState = ref( readViewerTutorialState() )
-
-const persistViewerTutorialState = ( nextState ) => {
-	viewerTutorialState.value = {
-		...createDefaultViewerTutorialState(),
-		...viewerTutorialState.value,
-		...nextState
-	}
-
-	if( typeof window === "undefined" || typeof window.localStorage === "undefined" ){
-		return
-	}
-
-	try{
-		window.localStorage.setItem(
-			VIEWER_TUTORIAL_STORAGE_KEY,
-			JSON.stringify( viewerTutorialState.value )
-		)
-	} catch( error ){
-		console.log( error )
-	}
-}
 const PREPARATION_TARGET_LABELS = {
 	mip: "MIP",
 	mip_hsv: "HSV-mapped MIP",
@@ -1385,27 +1526,8 @@ const DISPLAY_MODE_LABELS = {
 	rpca_mip: "RPCA MIP",
 	rpca_rgb: "RPCA RGB"
 }
-const selectedConfidenceLevel = ref(95)
 const roiEstimateUncertaintyLevel = ref(95)
 const billingSettings = ref({ groupID: "" })
-const gpuInferenceJobId = ref("")
-const gpuInferenceStatus = ref("")
-const gpuInferenceEstimateSpectraReady = ref(false)
-const visualizationDataSource = ref("measurement")
-const spectrumDataSource = ref("measurement")
-const primarySpectrumSource = ref("measurement")
-const selectedHeatmapIndices = ref({ xIndices: [], yIndices: [] })
-const selectedHeatmapBoundingBox = ref(null)
-const latestMeasurementSingleSpectrum = shallowRef(null)
-const latestMeasurementMeanSpectrum = shallowRef(null)
-const latestMeasurementSelectedSpectrum = shallowRef(null)
-const latestRamanSingleSpectrum = shallowRef(null)
-const latestRamanMeanSpectrum = shallowRef(null)
-const latestRamanSelectedSpectrum = shallowRef(null)
-const ramanRoiSpectraById = shallowRef({})
-const estimatedRoiList = ref([])
-const estimatedRoiListMode = ref("")
-const estimatedRoiListAttempted = ref(false)
 const estimatedMip = shallowRef(null)
 const estimatedMipHsv = shallowRef(null)
 const estimatedUmap = shallowRef(null)
@@ -1422,11 +1544,6 @@ const estimatedRpcaMip = shallowRef(null)
 const estimatedRpcaLoadings = shallowRef(null)
 const activeEstimatedLayerIndex = ref(-1)
 const activeZBlendMeasurementRequestID = ref(0)
-const currentPreparationTarget = ref(null)
-const queuedPreparationTargets = ref([])
-const completedPreparationTargets = ref([])
-const failedPreparationTargets = ref([])
-const viewerLoadedEmitted = ref(false)
 const activeZBlendEstimatedRequestID = ref(0)
 const activeEstimatedPcaClassificationRequestID = ref(0)
 const activeEstimatedPcaClassificationMipRequestID = ref(0)
@@ -1436,23 +1553,11 @@ const activeEstimatedRpcaClassificationRequestID = ref(0)
 const activeEstimatedRpcaClassificationMipRequestID = ref(0)
 const activeEstimatedRpcaMipRequestID = ref(0)
 const activeEstimatedRpcaLoadingsRequestID = ref(0)
-const activeMeasurementSelectionSpectrumRequestID = ref(0)
-const activeRamanSelectionSpectrumRequestID = ref(0)
-const activeRamanRoiRequestIDs = ref({})
-const rois = ref([])
-const selectedRoiIds = ref([])
-const refreshingRois = ref(false)
-const savingRoi = ref(false)
-const deletingRoi = ref(false)
 const savingXyz = ref(false)
 const showPcaLoadings = ref(false)
 const showSelectedSpectra = ref(true)
+const legendHoverEmphasisEnabled = ref(true)
 const projectChatOpen = ref(false)
-const measurementSelectionSpectrumQuerying = ref(false)
-const ramanSelectionSpectrumQuerying = ref(false)
-const isRoiRefreshDisabled = computed(() => refreshingRois.value)
-
-let heatmapViewportSyncHandler = null
 
 const pcaComponentIndices = Array.from({ length: 10 }, (_, index ) => index + 1)
 const activePcaComponents = ref([ 1, 2 ])
@@ -1470,6 +1575,178 @@ const activeEstimatedPcaMipComponentCount = ref(2)
 const activeEstimatedRpcaClassificationComponentCount = ref(0)
 const activeEstimatedRpcaMipComponentCount = ref(2)
 
+const {
+	heatmapRendererMode,
+	heatmapZoomAspectRatio,
+	heatmapInteractionMode,
+	setHeatmapInteractionMode,
+	setHeatmapZoomAspectRatio,
+	applyHeatmapInteraction,
+	handleHeatmapZoomRange,
+	handleHeatmapResetZoom,
+	syncExternalHeatmapRenderer,
+	removeHeatmapViewportSyncListener,
+	syncHeatmapViewportSyncListener,
+	syncHeatmapModebarGraphListeners,
+	resetHeatmapToolbarState,
+	finalizeHeatmapRender
+} = useHyperspectrumHeatmapToolbarState({
+	graph,
+	hyperspectrum,
+	currentMatrix: () => currentMatrix(),
+	matrixDimensions: ( matrix ) => matrixDimensions( matrix ),
+	handleHeatmapPointSelection: ( selection ) => handleHeatmapPointSelection( selection ),
+	handleHeatmapRegionSelection: ( selection ) => handleHeatmapRegionSelection( selection ),
+	heatmapRendererPayload,
+	heatmapRendererPaneState,
+	heatmapRenderBenchmark,
+	activePlot
+})
+
+const measurementDataType = String( import.meta.env?.VITE_DATA_TYPE ?? "hypercars" ).trim() || "hypercars"
+const HYPERSPECTRAL_CALIBRATION_AXIS_ROLE = "hyperspectral-spectral"
+
+const isMissingCalibrationProfileApiError = ( error ) => {
+	const status = Number( error?.status )
+	return status === 404 || status === 501
+}
+
+const {
+	gpuInferenceJobId,
+	gpuInferenceStatus,
+	gpuInferenceEstimateSpectraReady,
+	hasSuccessfulRamanInference,
+	hasEstimatedRamanSpectraReady,
+	sidebarInferenceStatusText,
+	openGpuInferenceModal: openGpuInferenceModalBase,
+	handleGpuInferenceSubmitted,
+	handleGpuInferenceStatus,
+	restoreGpuInferenceState,
+	stopGpuInferenceStatusPolling,
+	resetGpuInferenceState
+} = useGpuInferenceState({
+	project,
+	billingSettings,
+	activeProjectLoadRequestID,
+	settingslib,
+	projectlib,
+	hyperspectra,
+	gpuInferenceModal,
+	gpuInferenceOutcomeModal,
+	resetEstimatedVisualizationState: async () => {
+		resetEstimatedVisualizationState()
+	},
+	clearEstimatedCacheForProject: async () => {
+		await clearEstimatedCacheForProject()
+	}
+})
+
+const {
+	visualizationDataSource,
+	spectrumDataSource,
+	primarySpectrumSource,
+	selectedConfidenceLevel,
+	selectedHeatmapIndices,
+	selectedHeatmapBoundingBox,
+	latestMeasurementSingleSpectrum,
+	latestMeasurementMeanSpectrum,
+	latestMeasurementSelectedSpectrum,
+	latestRamanSingleSpectrum,
+	latestRamanMeanSpectrum,
+	latestRamanSelectedSpectrum,
+	measurementSelectionSpectrumQuerying,
+	ramanSelectionSpectrumQuerying,
+	spectrumSelectionMode,
+	resolvedPrimarySpectrumSource,
+	resolvedSecondarySpectrumSource,
+	normalizeSpectrumSource,
+	setVisualizationDataSource,
+	setPrimarySpectrumSource,
+	setSelectedConfidenceLevel,
+	isSelectionSpectrumQuerying,
+	cancelSelectionSpectrumQuery,
+	cancelSelectionSpectrumQueryState,
+	dataTypeForSpectrumSource,
+	dataSourceForSpectrumSource,
+	confidenceLevelsForSpectrumSource,
+	handleHeatmapPointSelection,
+	handleHeatmapRegionSelection,
+	clearSpectrumSourceState,
+	resetSelectionState
+} = useHyperspectrumSelections({
+	project,
+	hyperspectra,
+	activeGroupID: () => getActiveGroupID(),
+	hasEstimatedRamanSpectraReady: computed(() => hasEstimatedRamanSpectraReady.value),
+	hasSuccessfulRamanInference: computed(() => hasSuccessfulRamanInference.value),
+	queueSpectraPanelRender: () => queueSpectraPanelRender(),
+	measurementDataType,
+	confidenceLevelOptions,
+	estimateConfidenceLevels
+})
+
+const {
+	rois,
+	selectedRoiIds,
+	refreshingRois,
+	savingRoi,
+	deletingRoi,
+	ramanRoiSpectraById,
+	estimatedRoiList,
+	estimatedRoiListMode,
+	estimatedRoiListAttempted,
+	activeRamanRoiRequestIDs,
+	isRoiRefreshDisabled,
+	selectedRoi,
+	selectedRoiIdSet,
+	selectedRois,
+	showAllRoiOverlays,
+	roiSelectOptions,
+	roiDropdownSummaryLabel,
+	activeDisplayedRois,
+	resolvedRoiSpectrumPalette,
+	roiDisplayStylesById,
+	isSelectedRoiId,
+	clearSelectedRois,
+	toggleSelectedRoiId,
+	loadRoiList,
+	refreshRoisFromBackend,
+	resetEstimatedRoiArtifacts,
+	loadEstimatedRoiList,
+	cachedRamanRoiSpectrumForId,
+	estimatedRoiSpectrumForId,
+	roiSpectrumStyleForId,
+	refreshRamanRoiSpectrum,
+	toggleAllRoiOverlays: applyToggleAllRoiOverlays,
+	saveRoi: persistRoi,
+	deleteSelectedRois,
+	resetRoiState
+} = useHyperspectrumRois({
+	settings,
+	project,
+	cacheOptions,
+	hyperspectrumCache,
+	hyperspectra,
+	activeGroupID: () => getActiveGroupID(),
+	estimateConfidenceLevels,
+	normalizeSelectionBoundingBox,
+	canMutateRois: computed(() => canMutateRois.value),
+	selectedHeatmapBoundingBox,
+	hasEstimatedRamanSpectraReady: computed(() => hasEstimatedRamanSpectraReady.value),
+	spectrumSelectionMode: computed(() => spectrumSelectionMode.value),
+	dataTypeForSpectrumSource,
+	dataSourceForSpectrumSource,
+	confidenceLevelsForSpectrumSource,
+	queueSpectraPanelRender: () => queueSpectraPanelRender(),
+	rerenderHeatmap: async () => {
+		if( graph.value === null || currentMatrix() === null ){
+			return
+		}
+		await renderCurrentMatrix()
+	},
+	defaultRoiSpectrumPalette: DEFAULT_ROI_SPECTRUM_PALETTE
+})
+
 const DEFAULT_PCA_COMPONENT_COLORS = {
 	1: "#0072b2",
 	2: "#e69f00",
@@ -1482,19 +1759,6 @@ const DEFAULT_PCA_COMPONENT_COLORS = {
 	9: "#f781bf",
 	10: "#7f7f7f"
 }
-
-const DEFAULT_ROI_SPECTRUM_PALETTE = [
-	"#ff7f0e",
-	"#2ca02c",
-	"#d62728",
-	"#9467bd",
-	"#8c564b",
-	"#e377c2",
-	"#7f7f7f",
-	"#bcbd22",
-	"#17becf",
-	"#333333"
-]
 
 const pcaLegend = computed(() => {
 	return pcaComponentIndices.map(( componentIndex ) => {
@@ -1513,39 +1777,17 @@ const pcaLegend = computed(() => {
 var resizeObserver = null
 let deckPaneResizeSession = null
 let deckPaneResponsiveResizeQueued = false
-let spectrumGridlineGraphListeners = []
-let spectrumLegendGraphListeners = []
-let heatmapModebarGraphListeners = []
-let queuedSpectraPanelRender = Promise.resolve()
 
 const MIN_DECK_HEATMAP_PANE_WIDTH = 320
 const MIN_DECK_SPECTRA_PANE_WIDTH = 360
 const MIN_DECK_SPECTRUM_PANEL_HEIGHT = 120
 const DECK_HEATMAP_PANE_INSET_PX = 8
 const DECK_SPECTRA_PANE_DIVIDER_HEIGHT_PX = 20
-const LAYER_CACHE_WINDOW_RADIUS = 10
 
 const deckHeatmapPaneWidth = ref(null)
 const deckHeatmapPaneWidthTouched = ref(false)
 const deckTopSpectrumPaneHeight = ref(null)
 const deckTopSpectrumPaneHeightTouched = ref(false)
-const viewerTutorialPromptVisible = ref(false)
-const viewerTutorialVisible = ref(false)
-const viewerTutorialStepIndex = ref(0)
-const viewerTutorialRunToken = ref(0)
-const viewerTutorialOriginalDisplayMode = ref("")
-const viewerTutorialOriginalInteractionMode = ref("")
-const tutorialDisplaySelectOpen = ref(false)
-const tutorialDisplayOptionsOpen = ref(false)
-const tutorialProjectMenuOpen = ref(false)
-const activeViewerTutorialTargetElement = ref(null)
-
-const cacheOptions = {
-	memoryBudgetBytes: 2 * 1024 * 1024 * 1024,
-	ttlMs: 7 * 24 * 60 * 60 * 1000,
-	prefetchRadius: LAYER_CACHE_WINDOW_RADIUS,
-	lowConcurrency: 4
-}
 
 const layerCacheOptions = () => {
 
@@ -1558,12 +1800,6 @@ const layerCacheOptions = () => {
 	return options
 }
 
-const GPU_STATUS_POLL_INTERVAL_MS = 60 * 1000
-const GPU_NON_TERMINAL_STATUSES = new Set([ "SUBMITTED", "STARTED" ])
-const GPU_TERMINAL_STATUSES = new Set([ "SUCCEEDED", "FAILED" ])
-
-let gpuStatusPollTimer = null
-let gpuStatusPollInFlight = false
 let pcaClassificationLoadPromise = null
 let rpcaClassificationLoadPromise = null
 
@@ -1595,139 +1831,6 @@ const canMutateRois = computed(() => {
 const canEditXyz = computed(() => {
 	return hasProjectReference.value && isSharedProject.value === false
 })
-
-const selectedRoi = computed(() => {
-	if( selectedRoiIds.value.length !== 1 ) return null
-
-	const selectedId = String( selectedRoiIds.value[0] ?? "" ).trim()
-	return rois.value.find(( roi ) => String( roi?.roiId ?? "" ).trim() === selectedId ) ?? null
-})
-
-const selectedRoiIdSet = computed(() => {
-	return new Set(
-		( Array.isArray( selectedRoiIds.value ) ? selectedRoiIds.value : [] )
-			.map(( roiId ) => String( roiId ?? "" ).trim() )
-			.filter(( roiId ) => roiId.length > 0 )
-	)
-})
-
-const isSelectedRoiId = ( roiId ) => {
-	const normalizedId = String( roiId ?? "" ).trim()
-	if( normalizedId.length === 0 ) return false
-
-	return selectedRoiIdSet.value.has( normalizedId )
-}
-
-const selectedRois = computed(() => {
-	const selectedIds = selectedRoiIdSet.value
-
-	if( selectedIds.size === 0 ){
-		return []
-	}
-
-	return rois.value.filter(( roi ) => selectedIds.has( String( roi?.roiId ?? "" ).trim() ))
-})
-
-const showAllRoiOverlays = computed(() => {
-	return rois.value.length > 0 && selectedRois.value.length === rois.value.length
-})
-
-const roiSelectOptions = computed(() => {
-	return rois.value.map(( roi ) => ({
-		value: String( roi?.roiId ?? "" ),
-		label: String( roi?.name ?? "Unnamed ROI" )
-	}))
-})
-
-const roiDropdownSummaryLabel = computed(() => {
-	if( selectedRoiIdSet.value.size === 0 ){
-		return "No regions selected"
-	}
-
-	if( selectedRoiIdSet.value.size === 1 ){
-		return selectedRois.value[0]?.name ?? "1 region selected"
-	}
-
-	return `${selectedRoiIdSet.value.size} regions selected`
-})
-
-const activeDisplayedRois = computed(() => {
-	return selectedRois.value
-})
-
-const resolvedRoiSpectrumPalette = computed(() => {
-	const storedPalette = Array.isArray( settings.value?.hyperspectrumColors?.roiPalette )
-		? settings.value.hyperspectrumColors.roiPalette
-		: []
-	const normalizedPalette = storedPalette
-		.map(( entry ) => String( entry ?? "" ).trim() )
-		.filter(( entry ) => entry.length > 0 )
-
-	if( normalizedPalette.length > 0 ){
-		return normalizedPalette
-	}
-
-	const storedPrimaryColor = String( settings.value?.hyperspectrumColors?.roiSpectrum ?? "" ).trim()
-	if( storedPrimaryColor.length > 0 ){
-		return [ storedPrimaryColor, ...DEFAULT_ROI_SPECTRUM_PALETTE.slice( 1 ) ]
-	}
-
-	return DEFAULT_ROI_SPECTRUM_PALETTE
-})
-
-const roiDisplayStylesById = computed(() => {
-	const activeRois = activeDisplayedRois.value
-	var styles = {}
-	const roiBoxColor = settings.value?.hyperspectrumColors?.roiBox ??
-		settings.value?.hyperspectrumColors?.roiOverlay ??
-		"#ffffff"
-	const roiTitleColor = settings.value?.hyperspectrumColors?.roiTitle ??
-		settings.value?.hyperspectrumColors?.roiOverlay ??
-		roiBoxColor
-	const spectrumPalette = resolvedRoiSpectrumPalette.value
-
-	for( let index = 0; index < activeRois.length; index++ ){
-		const roi = activeRois[index] ?? null
-		const roiId = String( roi?.roiId ?? "" ).trim()
-		if( roiId.length === 0 ) continue
-
-		const color = spectrumPalette[ index % spectrumPalette.length ]
-		styles[roiId] = {
-			lineColor: color,
-			intervalColor: color,
-			boxColor: roiBoxColor,
-			titleColor: roiTitleColor
-		}
-	}
-
-	return styles
-})
-
-const clearSelectedRois = () => {
-	selectedRoiIds.value = []
-}
-
-const toggleSelectedRoiId = ( nextValue ) => {
-	const normalizedId = String( nextValue ?? "" ).trim()
-	if( normalizedId.length === 0 ){
-		clearSelectedRois()
-		return
-	}
-
-	if( selectedRoiIdSet.value.has( normalizedId ) ){
-		selectedRoiIds.value = selectedRoiIds.value
-			.map(( roiId ) => String( roiId ?? "" ).trim() )
-			.filter(( roiId ) => roiId.length > 0 && roiId !== normalizedId )
-		return
-	}
-
-	selectedRoiIds.value = [
-		...selectedRoiIds.value
-			.map(( roiId ) => String( roiId ?? "" ).trim() )
-			.filter(( roiId ) => roiId.length > 0 ),
-		normalizedId
-	]
-}
 
 const hasSelectedRegion = computed(() => {
 	return normalizeSelectionBoundingBox( selectedHeatmapBoundingBox.value ) !== null
@@ -1834,118 +1937,70 @@ const layerAxisValueLabel = computed(() => {
 		: formattedValue
 })
 
-const hasSuccessfulRamanInference = computed(() => {
-	return String( gpuInferenceStatus.value ?? "" ).trim().toUpperCase() === "SUCCEEDED"
+const {
+	viewerTutorialPromptVisible,
+	viewerTutorialVisible,
+	viewerTutorialStepIndex,
+	activeViewerTutorialTargetElement,
+	activeViewerTutorialStep,
+	viewerTutorialSteps,
+	isHeatmapTutorialStepActive,
+	isProjectMenuItemDimmed,
+	projectMenuDividerClass,
+	showTutorialRamanSidebarPlaceholder,
+	showRamanInferenceTutorialBlock,
+	displayOptionsMenuClass,
+	projectMenuClass,
+	displaySelectMenuClass,
+	tutorialDisplaySelectOpenBinding,
+	tutorialDisplayOptionsOpenBinding,
+	tutorialProjectMenuOpenBinding,
+	handleTutorialDisplaySelectOpenUpdate,
+	handleTutorialDisplayOptionsOpenUpdate,
+	handleTutorialProjectMenuOpenUpdate,
+	maybeOfferViewerTutorialPrompt,
+	startViewerTutorial,
+	restartViewerTutorial,
+	skipViewerTutorialPrompt,
+	skipActiveViewerTutorial,
+	advanceViewerTutorial,
+	rewindViewerTutorial,
+	resetViewerTutorialState
+} = useViewerTutorial({
+	nextTick,
+	project,
+	activeProjectLoadRequestID,
+	activePlot,
+	heatmapInteractionMode: computed(() => heatmapInteractionMode.value),
+	hasEstimatedRamanSpectraReady: computed(() => hasEstimatedRamanSpectraReady.value),
+	displaySelectDropdown,
+	projectMenuDropdown,
+	setHeatmapInteractionMode: ( mode ) => setHeatmapInteractionMode( mode ),
+	renderCurrentMatrix: () => renderCurrentMatrix(),
+	isKnownDisplayMode: ( value ) => DISPLAY_MODE_OPTIONS.has( value )
 })
 
-const hasEstimatedRamanSpectraReady = computed(() => {
-	return gpuInferenceEstimateSpectraReady.value === true || hasSuccessfulRamanInference.value
-})
-
-const sidebarInferenceStatusText = computed(() => {
-	if( GPU_NON_TERMINAL_STATUSES.has( normalizedGpuInferenceStatus( gpuInferenceStatus.value )) === false ){
-		return ""
+const resolvedViewerTutorialSteps = computed(() => {
+	if( Array.isArray( viewerTutorialSteps?.value ) ){
+		return viewerTutorialSteps.value
 	}
 
-	return hasEstimatedRamanSpectraReady.value
-		? "Image analysis running"
-		: "Raman inference running"
-})
-
-const activeViewerTutorialStepId = computed(() => {
-	return viewerTutorialVisible.value
-		? viewerTutorialSteps.value[ viewerTutorialStepIndex.value ]?.id ?? ""
-		: ""
-})
-
-const isDisplayOptionsTutorialStepActive = computed(() => {
-	return activeViewerTutorialStepId.value === "display-options"
-})
-
-const isHeatmapTutorialStepActive = computed(() => {
-	return activeViewerTutorialStepId.value === "heatmap"
-})
-
-const isProjectMenuTutorialStepActive = computed(() => {
-	return activeViewerTutorialStepId.value === "project-menu" ||
-		activeViewerTutorialStepId.value === "project-sharing-actions"
-})
-
-const activeProjectMenuTutorialSection = computed(() => {
-	if( activeViewerTutorialStepId.value === "project-menu" ){
-		return "core"
+	if( Array.isArray( viewerTutorialSteps ) ){
+		return viewerTutorialSteps
 	}
 
-	if( activeViewerTutorialStepId.value === "project-sharing-actions" ){
-		return "sharing"
-	}
-
-	return ""
+	return []
 })
 
-const isProjectMenuItemDimmed = ( section ) => {
-	const activeSection = activeProjectMenuTutorialSection.value
-	if( activeSection.length === 0 ){
-		return false
-	}
+const viewerTutorialStepCount = computed(() => resolvedViewerTutorialSteps.value.length )
 
-	return String( section ?? "" ) !== activeSection
-}
-
-const projectMenuDividerClass = ( section ) => {
-	return isProjectMenuItemDimmed( section )
-		? "h-0.5 bg-gray border-0 opacity-30"
-		: "h-0.5 bg-gray border-0"
-}
-
-const showTutorialRamanSidebarPlaceholder = computed(() => {
-	return viewerTutorialVisible.value === true &&
-		activeViewerTutorialStepId.value === "raman-inference-sidebar" &&
-		project.value?.shared !== true &&
-		hasEstimatedRamanSpectraReady.value === false
-})
-
-const showRamanInferenceTutorialBlock = computed(() => {
-	return project.value?.shared === true ||
-		hasEstimatedRamanSpectraReady.value === true ||
-		showTutorialRamanSidebarPlaceholder.value === true
+const isFinalViewerTutorialStep = computed(() => {
+	return viewerTutorialStepIndex.value >= ( resolvedViewerTutorialSteps.value.length - 1 )
 })
 
 const heatmapUsesEstimatedRaman = computed(() => {
 	return hasSuccessfulRamanInference.value && visualizationDataSource.value === "raman"
 })
-
-const spectrumSelectionMode = computed(() => {
-	if( hasEstimatedRamanSpectraReady.value === false ){
-		return "measurement"
-	}
-
-	return [ "measurement", "raman", "both" ].includes( spectrumDataSource.value )
-		? spectrumDataSource.value
-		: "measurement"
-})
-
-const resolvedPrimarySpectrumSource = () => {
-
-	if( spectrumSelectionMode.value !== "both" ){
-		return spectrumSelectionMode.value
-	}
-
-	return String( primarySpectrumSource.value ?? "" ).trim().toLowerCase() === "raman"
-		? "raman"
-		: "measurement"
-}
-
-const resolvedSecondarySpectrumSource = () => {
-
-	if( spectrumSelectionMode.value !== "both" ){
-		return null
-	}
-
-	return resolvedPrimarySpectrumSource() === "raman"
-		? "measurement"
-		: "raman"
-}
 
 const spectrumGridlineSourceKeyForSpectrumSource = ( source ) => {
 	return normalizeSpectrumSource( source ) === "raman" ? "estimate" : "measurement"
@@ -1970,100 +2025,6 @@ const bottomSpectrumGridlineSourceKey = () => {
 
 	return spectrumGridlineSourceKeyForSpectrumSource( bottomSource )
 }
-
-const selectionSpectrumQueryingRefForSource = ( source ) => {
-	return normalizeSpectrumSource( source ) === "raman"
-		? ramanSelectionSpectrumQuerying
-		: measurementSelectionSpectrumQuerying
-}
-
-const selectionSpectrumRequestIDRefForSource = ( source ) => {
-	return normalizeSpectrumSource( source ) === "raman"
-		? activeRamanSelectionSpectrumRequestID
-		: activeMeasurementSelectionSpectrumRequestID
-}
-
-const setSelectionSpectrumQuerying = ( source, querying ) => {
-	selectionSpectrumQueryingRefForSource( source ).value = querying === true
-}
-
-const isSelectionSpectrumQuerying = ( source ) => {
-	return selectionSpectrumQueryingRefForSource( source ).value === true
-}
-
-const startSelectionSpectrumQuery = ( source ) => {
-	const requestIDRef = selectionSpectrumRequestIDRefForSource( source )
-	const nextRequestID = requestIDRef.value + 1
-	requestIDRef.value = nextRequestID
-	setSelectionSpectrumQuerying( source, true )
-	return nextRequestID
-}
-
-const isSelectionSpectrumQueryCurrent = ( source, requestID ) => {
-	return selectionSpectrumRequestIDRefForSource( source ).value === requestID
-}
-
-const finishSelectionSpectrumQuery = ( source, requestID ) => {
-	if( isSelectionSpectrumQueryCurrent( source, requestID ) ){
-		setSelectionSpectrumQuerying( source, false )
-	}
-}
-
-const cancelSelectionSpectrumQuery = ( source ) => {
-	const requestIDRef = selectionSpectrumRequestIDRefForSource( source )
-	requestIDRef.value += 1
-	setSelectionSpectrumQuerying( source, false )
-}
-
-const cancelSelectionSpectrumQueriesForInactiveSources = ( sources ) => {
-
-	const activeSources = new Set(
-		( Array.isArray( sources ) ? sources : [] )
-			.map(( source ) => normalizeSpectrumSource( source ))
-	)
-
-	for( const source of [ "measurement", "raman" ] ){
-		if( activeSources.has( source ) === false ){
-			cancelSelectionSpectrumQuery( source )
-		}
-	}
-}
-
-const topSpectrumPaneSelectionSource = computed(() => {
-	if( showSelectedSpectra.value === false ){
-		return null
-	}
-
-	const mode = spectrumSelectionMode.value
-	if( mode === "both" ){
-		return resolvedSecondarySpectrumSource() ?? "measurement"
-	}
-
-	return activeDisplayedRois.value.length === 0 ? null : mode
-})
-
-const bottomSpectrumPaneSelectionSource = computed(() => {
-	if( showSelectedSpectra.value === false ){
-		return null
-	}
-
-	const mode = spectrumSelectionMode.value
-	return mode === "both" ? resolvedPrimarySpectrumSource() : mode
-})
-
-const topSpectrumPaneQuerying = computed(() => {
-	const source = topSpectrumPaneSelectionSource.value
-	return typeof source === "string" && source.length > 0
-		? isSelectionSpectrumQuerying( source )
-		: false
-})
-
-const bottomSpectrumPaneQuerying = computed(() => {
-	const source = bottomSpectrumPaneSelectionSource.value
-	return typeof source === "string" && source.length > 0
-		? isSelectionSpectrumQuerying( source )
-		: false
-})
 
 const loadingsSource = () => {
 
@@ -2142,168 +2103,6 @@ const openProjectMenu = async () => {
 	await router.push({ name: "Main menu" })
 }
 
-const tutorialTargetElement = ( targetKey ) => {
-	if( typeof document === "undefined" ) return null
-	const normalizedKey = String( targetKey ?? "" ).trim()
-	if( normalizedKey.length === 0 ) return null
-	return document.querySelector(`[data-tutorial="${normalizedKey}"]`)
-}
-
-const displayOptionsMenuClass = computed(() => {
-	return isDisplayOptionsTutorialStepActive.value
-		? "fixed z-[10030] pointer-events-none min-w-[18rem] w-max max-w-[50vw] origin-top-left rounded-md bg-dark-gray shadow-lg ring-1 ring-black/30"
-		: "fixed z-[45] min-w-[18rem] w-max max-w-[50vw] origin-top-left rounded-md bg-dark-gray shadow-lg ring-1 ring-black/30"
-})
-
-const projectMenuClass = computed(() => {
-	if( isProjectMenuTutorialStepActive.value ){
-		return "fixed z-[10030] pointer-events-none min-w-[14rem] w-max max-w-[50vw] origin-top-left rounded-md bg-dark-gray shadow-lg ring-1 ring-black/30"
-	}
-
-	return "fixed z-[50] min-w-[14rem] w-max max-w-[50vw] origin-top-left rounded-md bg-dark-gray shadow-lg ring-1 ring-black/30"
-})
-
-const isDisplaySelectTutorialStepActive = computed(() => {
-	return activeViewerTutorialStepId.value === "display-select"
-})
-
-const displaySelectMenuClass = computed(() => {
-	return isDisplaySelectTutorialStepActive.value
-		? "fixed z-[10030] pointer-events-none min-w-[16rem] w-max max-w-[50vw] origin-top-left rounded-md bg-dark-gray shadow-lg ring-1 ring-black/30"
-		: "fixed z-[45] min-w-[16rem] w-max max-w-[50vw] origin-top-left rounded-md bg-dark-gray shadow-lg ring-1 ring-black/30"
-})
-
-const tutorialDisplaySelectOpenBinding = computed(() => {
-	return viewerTutorialVisible.value ? tutorialDisplaySelectOpen.value : undefined
-})
-
-const handleTutorialDisplaySelectOpenUpdate = ( nextOpen ) => {
-	if( isDisplaySelectTutorialStepActive.value && nextOpen !== true ){
-		return
-	}
-	tutorialDisplaySelectOpen.value = nextOpen === true
-}
-
-const tutorialDisplayOptionsOpenBinding = computed(() => {
-	return viewerTutorialVisible.value ? tutorialDisplayOptionsOpen.value : undefined
-})
-
-const handleTutorialDisplayOptionsOpenUpdate = ( nextOpen ) => {
-	if( isDisplayOptionsTutorialStepActive.value && nextOpen !== true ){
-		return
-	}
-	tutorialDisplayOptionsOpen.value = nextOpen === true
-}
-
-const tutorialProjectMenuOpenBinding = computed(() => {
-	return viewerTutorialVisible.value ? tutorialProjectMenuOpen.value : undefined
-})
-
-const handleTutorialProjectMenuOpenUpdate = ( nextOpen ) => {
-	if( isProjectMenuTutorialStepActive.value && nextOpen !== true ){
-		return
-	}
-	tutorialProjectMenuOpen.value = nextOpen === true
-}
-
-const viewerTutorialSteps = computed(() => {
-	return [
-		{
-			id: "viewer-layout",
-			kind: "highlight",
-			title: "Viewer layout",
-			body: "The viewer combines spatial false-color views, spectra panels, and analysis controls in one workspace.",
-			target: "viewer-layout",
-			placement: "center"
-		},
-		{
-			id: "display-select",
-			kind: "menu",
-			title: "Display selector",
-			body: "Use this menu to switch between false-color visualizations. Colormaps for the false-color images can be changed in Visualization settings from the Project menu.",
-			target: "display-select",
-			placement: "right"
-		},
-		{
-			id: "display-options",
-			kind: "menu",
-			title: "Display options",
-			body: "This menu controls spectrum display options, including whether selected spectra and uncertainty are shown.",
-			target: "display-options",
-			placement: "right"
-		},
-		{
-			id: "heatmap",
-			kind: "highlight",
-			title: "Heatmap interaction",
-			body: "Use the toolbar above the image to switch between selecting spectra, square zoom, free zoom, and reset zoom. Clicking or selecting a region updates the spectra panels to show the spectral signals at that pixel or region. Hovering shows pixel indices.",
-			target: "heatmap-pane",
-			placement: "left"
-		},
-		{
-			id: "spectra",
-			kind: "highlight",
-			title: "Spectra panels",
-			body: "These panels update from the current pixel or region selection and are used to visualize the spectral signals.",
-			target: "spectra-panels",
-			placement: "right"
-		},
-		{
-			id: "roi-controls",
-			kind: "highlight",
-			title: "Regions of interest",
-			body: "Save, inspect, refresh, and download regions of interest here so you can revisit the same spatial selections later.",
-			target: "roi-controls",
-			placement: "right"
-		},
-		{
-			id: "project-menu",
-			kind: "menu",
-			title: "Project menu",
-			body: "Use these actions to rename the project, edit axis values, and run Raman spectrum inference.\n\nYou can also rename the project by clicking the current project name, typing a new name, and pressing Enter.\n\nThe platform attempts to parse axis values from available metadata automatically, but you can also enter the spatial and spectral axis values manually here.",
-			target: "project-menu",
-			placement: "bottom"
-		},
-		{
-			id: "raman-inference-sidebar",
-			kind: "highlight",
-			title: "Raman inference controls",
-			body: "After inference is available, this block is where you switch to estimated Raman-based views and related spectra controls. The extra false-color options become available from there.",
-			target: "raman-inference-sidebar-block",
-			placement: "right"
-		},
-		{
-			id: "project-sharing-actions",
-			kind: "menu",
-			title: "Sharing and export",
-			body: "This part of the Project menu is used for sharing, project notes, metadata, downloads, and Zenodo export.\n\nUse Share to collaborate, Notes to keep project context, Metadata to inspect project information, Download to export the project data, and Zenodo export when you want to prepare a publication-oriented archive.",
-			target: "project-menu",
-			placement: "bottom"
-		},
-		{
-			id: "finish",
-			kind: "centered",
-			title: "You are ready to explore",
-			body: "You can reopen this tutorial later from the Project menu.",
-			target: "",
-			placement: "center"
-		}
-	]
-})
-
-const activeViewerTutorialStep = computed(() => {
-	if( viewerTutorialVisible.value === false ){
-		return null
-	}
-
-	return viewerTutorialSteps.value[ viewerTutorialStepIndex.value ] ?? null
-})
-
-const refreshActiveViewerTutorialTargetElement = () => {
-	const targetKey = activeViewerTutorialStep.value?.target ?? ""
-	activeViewerTutorialTargetElement.value = tutorialTargetElement( targetKey )
-}
-
 const openShareModal = () => {
 	if( project.value?.shared ) return
 	shareModal.value?.open()
@@ -2316,200 +2115,6 @@ const ownedProjectActionTooltip = ( actionLabel ) => {
 const openZenodoModal = () => {
 	if( project.value?.shared ) return
 	zenodoModal.value?.open()
-}
-
-const openGpuInferenceModal = async () => {
-	if( project.value?.shared ) return
-
-	try{
-		var savedBilling = await settingslib.getBilling()
-		if( savedBilling && typeof savedBilling === "object" ){
-			billingSettings.value = {
-				groupID: typeof savedBilling.groupID === "string" ? savedBilling.groupID : ""
-			}
-		}
-	} catch( error ){
-		console.log( error )
-	}
-
-	gpuInferenceModal.value?.open()
-}
-
-const persistGpuInferenceState = async () => {
-
-	if( project.value?.shared ) return
-	if( typeof project.value?.id !== "string" || project.value.id.length === 0 ) return
-
-	try{
-		const projectInfo = await projectlib.getInfo( project.value )
-		if( projectInfo === null || typeof projectInfo !== "object" || projectInfo instanceof Error ){
-			return
-		}
-
-		projectInfo.gpuInferenceJobId = String( gpuInferenceJobId.value ?? "" ).trim()
-		projectInfo.gpuInferenceStatus = String( gpuInferenceStatus.value ?? "" ).trim()
-		projectInfo.gpuInferenceEstimateSpectraReady = gpuInferenceEstimateSpectraReady.value === true
-
-		await projectlib.setInfo( projectInfo )
-	} catch( error ){
-		console.log( error )
-	}
-}
-
-const normalizedGpuInferenceStatus = ( value ) => {
-	return String( value ?? "" ).trim().toUpperCase()
-}
-
-const resolveGpuInferenceEstimateSpectraReady = ( payload, normalizedNextStatus ) => {
-
-	if(
-		payload !== null &&
-		typeof payload === "object" &&
-		Object.prototype.hasOwnProperty.call( payload, "estimateSpectraReady" )
-	){
-		return payload.estimateSpectraReady === true
-	}
-
-	if( normalizedNextStatus === "SUCCEEDED" ){
-		return true
-	}
-
-	return gpuInferenceEstimateSpectraReady.value === true
-}
-
-const maybeShowGpuInferenceOutcome = async (
-	previousStatus,
-	nextStatus,
-	previousEstimateSpectraReady,
-	nextEstimateSpectraReady,
-	payload = null
-) => {
-
-	const becameEstimateReady = previousEstimateSpectraReady === false &&
-		nextEstimateSpectraReady === true &&
-		nextStatus !== "SUCCEEDED"
-	if( becameEstimateReady ){
-		await gpuInferenceOutcomeModal.value?.open?.( "ESTIMATE_READY" )
-		return
-	}
-
-	if( GPU_NON_TERMINAL_STATUSES.has( previousStatus ) === false ) return
-	if( GPU_TERMINAL_STATUSES.has( nextStatus ) === false ) return
-
-	await gpuInferenceOutcomeModal.value?.open?.( nextStatus, {
-		errorCode: payload?.errorCode,
-		errorMessage: payload?.errorMessage
-	})
-}
-
-const updateGpuInferenceState = async ( payload, options = {} ) => {
-
-	const normalizedNextStatus = normalizedGpuInferenceStatus(
-		payload !== null && typeof payload === "object"
-			? payload?.status
-			: payload
-	)
-	if( normalizedNextStatus.length === 0 ) return false
-
-	const normalizedPreviousStatus = normalizedGpuInferenceStatus( gpuInferenceStatus.value )
-	const previousEstimateSpectraReady = gpuInferenceEstimateSpectraReady.value === true
-	const nextEstimateSpectraReady = resolveGpuInferenceEstimateSpectraReady( payload, normalizedNextStatus )
-
-	if( normalizedNextStatus === normalizedPreviousStatus &&
-		nextEstimateSpectraReady === previousEstimateSpectraReady ){
-		return false
-	}
-
-	gpuInferenceStatus.value = normalizedNextStatus
-	gpuInferenceEstimateSpectraReady.value = nextEstimateSpectraReady
-	await persistGpuInferenceState()
-
-	if( options.announce === true ){
-		await maybeShowGpuInferenceOutcome(
-			normalizedPreviousStatus,
-			normalizedNextStatus,
-			previousEstimateSpectraReady,
-			nextEstimateSpectraReady,
-			payload
-		)
-	}
-
-	return true
-}
-
-const handleGpuInferenceSubmitted = async ( payload ) => {
-
-	const submittedJobId = String( payload?.jobId ?? "" ).trim()
-	if( submittedJobId.length === 0 ) return
-
-	gpuInferenceJobId.value = submittedJobId
-	gpuInferenceStatus.value = normalizedGpuInferenceStatus( payload?.status ?? "STARTED" )
-	gpuInferenceEstimateSpectraReady.value = false
-	resetEstimatedVisualizationState()
-	await clearEstimatedCacheForProject()
-
-	await persistGpuInferenceState()
-}
-
-const handleGpuInferenceStatus = async ( payload ) => {
-
-	await updateGpuInferenceState( payload, { announce: true })
-}
-
-const shouldPollGpuInferenceStatus = () => {
-
-	if( project.value?.shared ) return false
-
-	const jobId = String( gpuInferenceJobId.value ?? "" ).trim()
-	if( jobId.length === 0 ) return false
-
-	return GPU_NON_TERMINAL_STATUSES.has( normalizedGpuInferenceStatus( gpuInferenceStatus.value ))
-}
-
-const stopGpuInferenceStatusPolling = () => {
-
-	if( gpuStatusPollTimer === null ) return
-
-	clearInterval( gpuStatusPollTimer )
-	gpuStatusPollTimer = null
-}
-
-const refreshGpuInferenceStatusPolling = async () => {
-
-	if( gpuStatusPollInFlight ) return
-	if( shouldPollGpuInferenceStatus() === false ) return
-
-	const activeJobId = String( gpuInferenceJobId.value ?? "" ).trim()
-	if( activeJobId.length === 0 ) return
-
-	gpuStatusPollInFlight = true
-
-	try{
-		const response = await hyperspectra.status( activeJobId )
-		if( String( gpuInferenceJobId.value ?? "" ).trim() !== activeJobId ) return
-
-			await updateGpuInferenceState( response, { announce: true })
-	} catch( error ){
-		console.log( error )
-	} finally {
-		gpuStatusPollInFlight = false
-	}
-}
-
-const syncGpuInferenceStatusPolling = () => {
-
-	if( shouldPollGpuInferenceStatus() === false ){
-		stopGpuInferenceStatusPolling()
-		return
-	}
-
-	if( gpuStatusPollTimer !== null ) return
-
-	void refreshGpuInferenceStatusPolling()
-
-	gpuStatusPollTimer = setInterval( () => {
-		void refreshGpuInferenceStatusPolling()
-	}, GPU_STATUS_POLL_INTERVAL_MS )
 }
 
 const resetEstimatedVisualizationState = () => {
@@ -2544,11 +2149,9 @@ const resetEstimatedVisualizationState = () => {
 	activeEstimatedPcaMipComponentCount.value = 0
 	activeEstimatedRpcaClassificationComponentCount.value = 0
 	activeEstimatedRpcaMipComponentCount.value = 0
-	latestRamanSingleSpectrum.value = null
-	latestRamanMeanSpectrum.value = null
-	latestRamanSelectedSpectrum.value = null
-	resetEstimatedRoiArtifacts()
-}
+		clearSpectrumSourceState( "raman" )
+		resetEstimatedRoiArtifacts()
+	}
 
 const clearEstimatedCacheForProject = async () => {
 
@@ -2697,7 +2300,7 @@ const matrixDimensions = ( matrix ) => {
 	return null
 }
 
-const activeGroupID = () => {
+const getActiveGroupID = () => {
 	if( typeof billingSettings.value?.groupID === "string" ){
 		return billingSettings.value.groupID
 	}
@@ -2705,8 +2308,282 @@ const activeGroupID = () => {
 	return ""
 }
 
+const resolvedActiveGroupID = computed(() => getActiveGroupID())
+
+const normalizeSpectralCalibrationProfileModel = ( profileOrModel = {} ) => {
+	const candidateModel = profileOrModel?.model?.type === "polynomial"
+		? profileOrModel.model
+		: profileOrModel
+
+	return normalizeCalibrationModel( candidateModel ?? { x: 0, polynomialOrder: 0, includedOrders: [ 0 ], points: [] })
+}
+
+const cloneSpectralCalibrationModel = ( value = {} ) => {
+	const normalized = normalizeSpectralCalibrationProfileModel( value )
+	return {
+		x: normalized.x,
+		polynomialOrder: normalized.polynomialOrder,
+		includedOrders: [ ...normalized.includedOrders ],
+		points: normalized.points.map(( point ) => ({ ...point }))
+	}
+}
+
+const buildDefaultSpectralCalibrationModel = () => {
+	return cloneSpectralCalibrationModel({ x: 0, polynomialOrder: 0, includedOrders: [ 0 ], points: [] })
+}
+
+const buildDefaultSpectralCalibrationIncludedOrders = ( polynomialOrder = 0 ) => {
+	const resolvedOrder = Math.max( Math.trunc( Number( polynomialOrder ) ), 0 )
+	return Array.from({ length: resolvedOrder + 1 }, ( _, index ) => index )
+}
+
+const normalizeSpectralCalibrationIncludedOrders = ( includedOrders = [], polynomialOrder = 0 ) => {
+	const resolvedOrder = Math.max( Math.trunc( Number( polynomialOrder ) ), 0 )
+	const fallbackOrders = buildDefaultSpectralCalibrationIncludedOrders( resolvedOrder )
+	if( Array.isArray( includedOrders ) === false ){
+		return fallbackOrders
+	}
+
+	const normalizedOrders = Array.from( new Set(
+		includedOrders
+			.map(( order ) => Math.trunc( Number( order ) ) )
+			.filter(( order ) => Number.isInteger( order ) && order >= 0 && order <= resolvedOrder )
+	)).sort(( left, right ) => left - right )
+
+	if( normalizedOrders.length === 0 ){
+		return fallbackOrders
+	}
+
+	if( normalizedOrders.includes( resolvedOrder ) === false ){
+		normalizedOrders.push( resolvedOrder )
+		normalizedOrders.sort(( left, right ) => left - right )
+	}
+
+	return normalizedOrders
+}
+
+const toSpectralCalibrationDraftPoint = ( point = {}, index = 0 ) => {
+	const fallbackID = `calibration-point-${index + 1}`
+	const id = String( point?.id ?? fallbackID ).trim() || fallbackID
+	const sourceX = Number( point?.sourceX ?? 0 )
+	const numericTargetX = Number( point?.targetX )
+	const resolvedSourceX = Number.isFinite( sourceX ) ? sourceX : 0
+
+	return {
+		id,
+		sourceX: resolvedSourceX,
+		targetInput: Number.isFinite( numericTargetX ) ? String( numericTargetX ) : String( resolvedSourceX )
+	}
+}
+
+const buildSpectralCalibrationDraftFromModel = ( value = {} ) => {
+	const normalized = normalizeSpectralCalibrationProfileModel( value )
+	const points = normalized.points.map(( point, index ) => toSpectralCalibrationDraftPoint( point, index ))
+	spectralCalibrationDraftPointCounter.value = points.length
+
+	return {
+		x: normalized.x,
+		polynomialOrder: normalized.polynomialOrder,
+		includedOrders: [ ...normalized.includedOrders ],
+		points
+	}
+}
+
+const buildSpectralCalibrationModelFromDraft = ( draft = spectralCalibrationDraft.value ) => {
+	const rawPoints = Array.isArray( draft?.points ) ? draft.points : []
+
+	return normalizeCalibrationModel({
+		x: Number( draft?.x ?? 0 ),
+		polynomialOrder: Number( draft?.polynomialOrder ?? 0 ),
+		includedOrders: Array.isArray( draft?.includedOrders ) ? draft.includedOrders : [ 0 ],
+		points: rawPoints.map(( point, index ) => {
+			const numericTargetX = Number( point?.targetInput )
+			return {
+				id: String( point?.id ?? `calibration-point-${index + 1}` ),
+				sourceX: Number( point?.sourceX ?? 0 ),
+				targetX: Number.isFinite( numericTargetX ) ? numericTargetX : null
+			}
+		})
+	})
+}
+
+const serializeSpectralCalibrationModel = ( value ) => {
+	return JSON.stringify( normalizeSpectralCalibrationProfileModel( value ) )
+}
+
+const spectralCalibrationProfileOptions = computed(() => {
+	const options = spectralCalibrationProfiles.value.map(( profile ) => {
+		const profileID = String( profile?.profileID ?? "" ).trim()
+		const friendlyName = String( profile?.friendlyName ?? "" ).trim()
+		const shared = profile?.shared === true
+		const pointCount = Number( profile?.pointCount ?? profile?.points?.length ?? 0 )
+		const pointLabel = pointCount === 1 ? "1 point" : `${pointCount} points`
+		const sharedLabel = shared ? " • shared" : ""
+
+		return {
+			value: profileID,
+			label: friendlyName.length > 0 ? `${friendlyName} • ${pointLabel}${sharedLabel}` : `${profileID} • ${pointLabel}${sharedLabel}`
+		}
+	})
+
+	const selectedProfileID = String( spectralCalibrationSelectedProfileID.value ?? "" ).trim()
+	if( selectedProfileID.length > 0 && options.some(( option ) => option.value === selectedProfileID ) === false ){
+		const fallbackLabel = String(
+			spectralCalibrationSelectedProfile.value?.friendlyName ??
+			spectralCalibrationAssignedProfile.value?.friendlyName ??
+			selectedProfileID
+		).trim() || selectedProfileID
+		options.unshift({
+			value: selectedProfileID,
+			label: fallbackLabel
+		})
+	}
+
+	return options
+})
+
+const spectralCalibrationReservedProfileNames = computed(() => {
+	return spectralCalibrationProfiles.value
+		.filter(( profile ) => profile?.shared !== true )
+		.map(( profile ) => String( profile?.friendlyName ?? "" ).trim() )
+		.filter(( friendlyName ) => friendlyName.length > 0 )
+})
+
+const spectralCalibrationProfileNameExists = ( friendlyName ) => {
+	const candidateName = String( friendlyName ?? "" ).trim()
+	if( candidateName.length === 0 ){
+		return false
+	}
+
+	return spectralCalibrationReservedProfileNames.value.some(( reservedName ) => {
+		return String( reservedName ?? "" ).trim().localeCompare( candidateName, undefined, { sensitivity: "accent" } ) === 0
+	})
+}
+
+const spectralCalibrationDraftModel = computed(() => {
+	return buildSpectralCalibrationModelFromDraft( spectralCalibrationDraft.value )
+})
+
+const spectralCalibrationPreviewIsCurrent = computed(() => {
+	return spectralCalibrationPreview.value !== null &&
+		serializeSpectralCalibrationModel( spectralCalibrationPreview.value ) === serializeSpectralCalibrationModel( spectralCalibrationDraftModel.value )
+})
+
+const spectralCalibrationHasSavablePoints = computed(() => {
+	return calibrationHasValidPoints( spectralCalibrationDraftModel.value )
+})
+
+const spectralCalibrationMaxOrder = computed(() => {
+	return calibrationMaxPolynomialOrder( spectralCalibrationDraftModel.value )
+})
+
+const canSaveSpectralCalibrationProfile = computed(() => {
+	return project.value?.shared !== true &&
+		spectralCalibrationProfilesSupported.value &&
+		spectralCalibrationProfileSaving.value === false &&
+		spectralCalibrationHasSavablePoints.value &&
+		spectralCalibrationPreviewIsCurrent.value
+})
+
+const spectralCalibrationProfileSaveDisabledReason = computed(() => {
+	if( spectralCalibrationProfilesSupported.value === false ){
+		return "Calibration profiles are not available."
+	}
+	if( spectralCalibrationPreviewIsCurrent.value === false ){
+		return "Run the preview before saving the calibration profile."
+	}
+	if( spectralCalibrationHasSavablePoints.value === false ){
+		return "Select enough valid points to fit the calibration."
+	}
+
+	return ""
+})
+
+const activeSpectralCalibrationProfile = computed(() => {
+	const selectedProfileID = String( spectralCalibrationSelectedProfileID.value ?? "" ).trim()
+	if( selectedProfileID.length === 0 ){
+		return null
+	}
+
+	const selectedProfile = spectralCalibrationSelectedProfile.value
+	if( String( selectedProfile?.profileID ?? "" ).trim() === selectedProfileID ){
+		return selectedProfile
+	}
+
+	const assignedProfile = spectralCalibrationAssignedProfile.value
+	if( String( assignedProfile?.profileID ?? "" ).trim() === selectedProfileID ){
+		return assignedProfile
+	}
+
+	return null
+})
+
+const activeSpectralCalibrationProfileLabel = computed(() => {
+	const profile = activeSpectralCalibrationProfile.value
+	const friendlyName = String( profile?.friendlyName ?? "" ).trim()
+	if( friendlyName.length > 0 ){
+		return friendlyName
+	}
+
+	const profileID = String( spectralCalibrationSelectedProfileID.value ?? "" ).trim()
+	return profileID.length > 0 ? profileID : "No calibration"
+})
+
+const spectralCalibrationSelectionDirty = computed(() => {
+	return String( spectralCalibrationSelectedProfileID.value ?? "" ).trim() !==
+		String( spectralCalibrationAssignedProfileID.value ?? "" ).trim()
+})
+
+const canAssignSpectralCalibrationProfile = computed(() => {
+	return project.value?.shared !== true &&
+		spectralCalibrationProfilesSupported.value &&
+		spectralCalibrationAssignmentSaving.value === false &&
+		spectralCalibrationSelectionDirty.value
+})
+
+const activeSpectralCalibrationModel = computed(() => {
+	if( spectralCalibrationPreview.value !== null ){
+		const normalizedPreview = normalizeSpectralCalibrationProfileModel( spectralCalibrationPreview.value )
+		if( calibrationHasValidPoints( normalizedPreview ) ){
+			return normalizedPreview
+		}
+	}
+
+	const profile = activeSpectralCalibrationProfile.value
+	if( profile === null || typeof profile !== "object" ){
+		return null
+	}
+
+	const normalizedModel = normalizeSpectralCalibrationProfileModel( profile )
+	return calibrationHasValidPoints( normalizedModel ) ? normalizedModel : null
+})
+
+const rawSpectralAxisValues = () => {
+	const rawValues = Array.isArray( xyzAxes.value?.z ) ? xyzAxes.value.z : []
+	return rawValues.map(( value, index ) => numericAxisValue( value, index ))
+}
+
+const effectiveSpectralAxisValues = () => {
+	const rawValues = rawSpectralAxisValues()
+	const calibrationModel = activeSpectralCalibrationModel.value
+	if( calibrationModel === null ){
+		return rawValues
+	}
+
+	return applyCalibrationToValues( rawValues, calibrationModel )
+}
+
 const plotAxes = () => {
-	return xyzAxes.value
+	if( xyzAxes.value === null || typeof xyzAxes.value !== "object" ){
+		return xyzAxes.value
+	}
+
+	return {
+		...xyzAxes.value,
+		z: effectiveSpectralAxisValues(),
+		rawZ: rawSpectralAxisValues(),
+		zCalibrationProfileID: String( spectralCalibrationSelectedProfileID.value ?? "" ).trim()
+	}
 }
 
 const resolvedUmapChannelColors = () => {
@@ -3088,50 +2965,6 @@ const isPcaComponentActive = ( componentIndex ) => {
 	return activePcaComponents.value.includes( componentIndex )
 }
 
-const normalizeSelectionBoundingBox = ( boundingBox ) => {
-
-	if( boundingBox === null || typeof boundingBox !== "object" ){
-		return null
-	}
-
-	const minX = Number.parseInt( boundingBox.minX, 10 )
-	const maxX = Number.parseInt( boundingBox.maxX, 10 )
-	const minY = Number.parseInt( boundingBox.minY, 10 )
-	const maxY = Number.parseInt( boundingBox.maxY, 10 )
-
-	if(
-		Number.isInteger( minX ) === false ||
-		Number.isInteger( maxX ) === false ||
-		Number.isInteger( minY ) === false ||
-		Number.isInteger( maxY ) === false
-	){
-		return null
-	}
-
-	if( maxX < minX || maxY < minY ){
-		return null
-	}
-
-	return {
-		minX,
-		maxX,
-		minY,
-		maxY,
-		width: maxX - minX + 1,
-		height: maxY - minY + 1
-	}
-}
-
-const selectionBoundingBoxPixelCount = ( boundingBox ) => {
-
-	const normalizedBoundingBox = normalizeSelectionBoundingBox( boundingBox )
-	if( normalizedBoundingBox === null ){
-		return 0
-	}
-
-	return normalizedBoundingBox.width * normalizedBoundingBox.height
-}
-
 const normalizeOpacity = ( value, fallback = 0.25 ) => {
 
 	const numeric = Number( value )
@@ -3142,21 +2975,9 @@ const normalizeOpacity = ( value, fallback = 0.25 ) => {
 	return Math.max( 0, Math.min( 1, numeric ))
 }
 
-const measurementDataType = String( import.meta.env?.VITE_DATA_TYPE ?? "hypercars" ).trim() || "hypercars"
-
 const normalizeDisplayMode = ( value ) => {
 	const normalized = String( value ?? "" ).trim()
 	return DISPLAY_MODE_OPTIONS.has( normalized ) ? normalized : "umap"
-}
-
-const normalizeHeatmapInteraction = ( value ) => {
-	return String( value ?? "" ).trim().toLowerCase() === "zoom" ? "zoom" : "select"
-}
-
-const normalizeHeatmapRendererMode = () => "deckgl"
-
-const normalizeHeatmapZoomAspectRatio = ( value ) => {
-	return String( value ?? "" ).trim().toLowerCase() === "free" ? "free" : "square"
 }
 
 const normalizeShowHideMode = ( value, fallback = "hide" ) => {
@@ -3168,21 +2989,10 @@ const normalizeShowHideMode = ( value, fallback = "hide" ) => {
 }
 
 const normalizeConfidenceLevel = ( value ) => {
-
-	if( String( value ?? "" ).trim().toLowerCase() === CONFIDENCE_NONE_VALUE ){
-		return CONFIDENCE_NONE_VALUE
-	}
-
-	const numeric = Number.parseInt( value, 10 )
-	if( Number.isInteger( numeric ) === false ){
-		return 95
-	}
-
-	if( confidenceLevelOptions.includes( numeric ) ){
-		return numeric
-	}
-
-	return 95
+	return normalizeSelectionConfidenceLevel( value, {
+		confidenceLevelOptions,
+		noneValue: CONFIDENCE_NONE_VALUE
+	}, 95 )
 }
 
 const normalizeRoiEstimateUncertaintyLevel = ( value ) => {
@@ -3196,20 +3006,6 @@ const normalizeRoiEstimateUncertaintyLevel = ( value ) => {
 	}
 
 	return normalizeConfidenceLevel( value )
-}
-
-const normalizeGridlineVisibility = ( value, fallback = false ) => {
-
-	if( typeof value === "boolean" ){
-		return value
-	}
-
-	if( typeof value === "string" ){
-		if( value === "true" ) return true
-		if( value === "false" ) return false
-	}
-
-	return fallback
 }
 
 const defaultDisplayMode = () => {
@@ -3242,64 +3038,6 @@ const defaultFalseColoringBasis = () => {
 
 const defaultRoiEstimateUncertaintyLevel = () => {
 	return normalizeRoiEstimateUncertaintyLevel( settings.value?.hyperspectrumDefaults?.roiEstimateUncertainty )
-}
-
-const defaultProjectSpectrumGridlinesVisible = () => {
-	const defaultVisible = normalizeGridlineVisibility( settings.value?.gridlines?.hyperspectra, false )
-
-	return {
-		measurement: defaultVisible,
-		estimate: defaultVisible
-	}
-}
-
-const normalizeProjectSpectrumGridlineState = ( value, fallback = null ) => {
-
-	const normalizedFallback = fallback !== null && typeof fallback === "object"
-		? {
-			measurement: normalizeGridlineVisibility( fallback?.measurement ?? fallback?.showGridlines, false ),
-			estimate: normalizeGridlineVisibility( fallback?.estimate ?? fallback?.showGridlines, false )
-		}
-		: defaultProjectSpectrumGridlinesVisible()
-
-	if( value !== null && typeof value === "object" ){
-		const hasSharedVisible = Object.prototype.hasOwnProperty.call( value, "showGridlines" )
-		const sharedVisible = hasSharedVisible
-			? normalizeGridlineVisibility( value.showGridlines, normalizedFallback.measurement )
-			: null
-
-		const normalizedState = {
-			measurement: Object.prototype.hasOwnProperty.call( value, "measurement" )
-				? normalizeGridlineVisibility( value.measurement, normalizedFallback.measurement )
-				: ( sharedVisible ?? normalizedFallback.measurement ),
-			estimate: Object.prototype.hasOwnProperty.call( value, "estimate" )
-				? normalizeGridlineVisibility( value.estimate, normalizedFallback.estimate )
-				: ( sharedVisible ?? normalizedFallback.estimate )
-		}
-
-		const hasUpperPane = Object.prototype.hasOwnProperty.call( value, "upperPane" )
-		const hasLowerPane = Object.prototype.hasOwnProperty.call( value, "lowerPane" )
-		if( hasUpperPane ){
-			normalizedState[ topSpectrumGridlineSourceKey() ] = normalizeGridlineVisibility(
-				value.upperPane,
-				normalizedState[ topSpectrumGridlineSourceKey() ]
-			)
-		}
-		if( hasLowerPane ){
-			normalizedState[ bottomSpectrumGridlineSourceKey() ] = normalizeGridlineVisibility(
-				value.lowerPane,
-				normalizedState[ bottomSpectrumGridlineSourceKey() ]
-			)
-		}
-
-		return normalizedState
-	}
-
-	const normalizedVisible = normalizeGridlineVisibility( value, normalizedFallback.measurement )
-	return {
-		measurement: normalizedVisible,
-		estimate: normalizedVisible
-	}
 }
 
 const normalizeHyperspectrumPrioritization = ( value ) => {
@@ -3367,86 +3105,81 @@ const resolveTrailingPreparationTargets = ( startingDisplayMode ) => {
 	return [ "layer_window" ]
 }
 
-const pendingPreparationTargets = computed(() => {
-
-	const completed = new Set( completedPreparationTargets.value )
-	const failed = new Set( failedPreparationTargets.value )
-	const orderedTargets = []
-
-	if( typeof currentPreparationTarget.value === "string" && currentPreparationTarget.value.length > 0 ){
-		orderedTargets.push( currentPreparationTarget.value )
-	}
-
-	for( const target of queuedPreparationTargets.value ){
-		orderedTargets.push( target )
-	}
-
-	return orderedTargets.filter(( target, index ) => {
-		return completed.has( target ) === false &&
-			failed.has( target ) === false &&
-			orderedTargets.indexOf( target ) === index
-	})
+const {
+	currentPreparationTarget,
+	pendingPreparationTargets,
+	showDisplayInfoIcon,
+	resetPreparationState,
+	markPreparationStarted,
+	markPreparationCompleted,
+	markPreparationFailed,
+	emitLoadedOnce,
+	installProjectBackgroundInteractionListeners,
+	removeBackgroundInteractionListeners,
+	clearProjectBackgroundWork,
+	loadVisualizationTargetData,
+	queueProjectBackgroundHydration,
+	scheduleDisplayPayloadPrewarm,
+	resolveLayerWindowIndices,
+	prefetchMeasurementLayerWindow,
+	prefetchEstimatedLayerWindow,
+	ensureMeasurementLayerWindowReady,
+	ensureEstimatedLayerWindowReady,
+	scheduleLayerPayloadPrewarm,
+	invalidateDisplayPayloadPrewarm,
+	invalidateLayerPayloadPrewarm
+} = useHyperspectrumPreloadQueue({
+	emitLoaded: () => emit("loaded"),
+	nextTick,
+	graph,
+	activePlot,
+	project,
+	activeProjectLoadRequestID,
+	heatmapRendererMode,
+	heatmapUsesEstimatedRaman: computed(() => heatmapUsesEstimatedRaman.value),
+	mip,
+	cacheOptions,
+	layerCacheOptions: () => layerCacheOptions(),
+	layerInput,
+	maxLayerIndex,
+	pcaClassificationComponentCount,
+	pcaMipComponentCount,
+	pcaComponentIndices,
+	activePcaClassificationCount: () => activePcaClassificationCount(),
+	resetActivePcaComponents: ( count ) => resetActivePcaComponents( count ),
+	normalizeLayerInput: ( value ) => normalizeLayerInput( value ),
+	normalizePcaComponentInput: ( value ) => normalizePcaComponentInput( value ),
+	decompositionMipMode: ( mode, count ) => decompositionMipMode( mode, count ),
+	decompositionScoreMode: ( mode, index ) => decompositionScoreMode( mode, index ),
+	loadEstimatedArtifact: ( path, priority ) => loadEstimatedArtifact( path, priority ),
+	loadEstimatedMip: ( priority ) => loadEstimatedMip( priority ),
+	loadEstimatedMipHsv: ( priority ) => loadEstimatedMipHsv( priority ),
+	loadEstimatedUmap: ( priority ) => loadEstimatedUmap( priority ),
+	loadEstimatedLayer: ( index, priority ) => loadEstimatedLayer( index, priority ),
+	loadEstimatedPcaClassificationMip: ( count, priority ) => loadEstimatedPcaClassificationMip( count, priority ),
+	loadEstimatedPcaMip: ( count, priority ) => loadEstimatedPcaMip( count, priority ),
+	loadEstimatedPcaClassification: ( priority ) => loadEstimatedPcaClassification( priority ),
+	loadEstimatedRpcaClassificationMip: ( count, priority ) => loadEstimatedRpcaClassificationMip( count, priority ),
+	loadEstimatedRpcaMip: ( count, priority ) => loadEstimatedRpcaMip( count, priority ),
+	loadEstimatedRpcaClassification: ( priority ) => loadEstimatedRpcaClassification( priority ),
+	loadMipHsv: ( priority ) => loadMipHsv( priority ),
+	loadUmap: ( priority ) => loadUmap( priority ),
+	loadLayer: ( index, priority ) => loadLayer( index, priority ),
+	loadZBlendSource: ( estimated, priority ) => loadZBlendSource( estimated, priority ),
+	loadPcaClassificationMip: ( count, priority ) => loadPcaClassificationMip( count, priority ),
+	loadPcaMip: ( count, priority ) => loadPcaMip( count, priority ),
+	loadPcaClassification: ( priority ) => loadPcaClassification( priority ),
+	loadRpcaClassificationMip: ( count, priority ) => loadRpcaClassificationMip( count, priority ),
+	loadRpcaMip: ( count, priority ) => loadRpcaMip( count, priority ),
+	loadRpcaClassification: ( priority ) => loadRpcaClassification( priority ),
+	resolvePrioritizedPreparationTargets: ( startingDisplayMode ) => resolvePrioritizedPreparationTargets( startingDisplayMode ),
+	resolveDeferredPreparationTargets: ( startingDisplayMode ) => resolveDeferredPreparationTargets( startingDisplayMode ),
+	resolveTrailingPreparationTargets: ( startingDisplayMode ) => resolveTrailingPreparationTargets( startingDisplayMode ),
+	prewarmVisualizationTargetPayload: ( target, loadedData ) => prewarmVisualizationTargetPayload( target, loadedData ),
+	hyperspectrumCache,
+	hyperspectrum,
+	layerHeatmapColorscale: () => layerHeatmapColorscale()
 })
-
-const showDisplayInfoIcon = computed(() => {
-	return pendingPreparationTargets.value.length > 0
-})
-
-const resetPreparationState = () => {
-	currentPreparationTarget.value = null
-	queuedPreparationTargets.value = []
-	completedPreparationTargets.value = []
-	failedPreparationTargets.value = []
-	viewerLoadedEmitted.value = false
-}
-
-const markPreparationStarted = ( target ) => {
-	currentPreparationTarget.value = target
-}
-
-const markPreparationCompleted = ( target ) => {
-
-	if( typeof target !== "string" || target.length === 0 ){
-		return
-	}
-
-	if( completedPreparationTargets.value.includes( target ) === false ){
-		completedPreparationTargets.value = [ ...completedPreparationTargets.value, target ]
-	}
-
-	queuedPreparationTargets.value = queuedPreparationTargets.value.filter(( entry ) => entry !== target )
-
-	if( currentPreparationTarget.value === target ){
-		currentPreparationTarget.value = null
-	}
-}
-
-const markPreparationFailed = ( target ) => {
-
-	if( typeof target !== "string" || target.length === 0 ){
-		return
-	}
-
-	if( failedPreparationTargets.value.includes( target ) === false ){
-		failedPreparationTargets.value = [ ...failedPreparationTargets.value, target ]
-	}
-
-	queuedPreparationTargets.value = queuedPreparationTargets.value.filter(( entry ) => entry !== target )
-
-	if( currentPreparationTarget.value === target ){
-		currentPreparationTarget.value = null
-	}
-}
-
-const emitLoadedOnce = () => {
-
-	if( viewerLoadedEmitted.value ){
-		return
-	}
-
-	viewerLoadedEmitted.value = true
-	emit("loaded")
-}
 
 const updateDisplayInfoTooltipPosition = () => {
 
@@ -3711,124 +3444,6 @@ const deckSpectraPaneGridStyle = computed(() => {
 	}
 })
 
-const deckPanelObjectIDs = new WeakMap()
-let nextDeckPanelObjectID = 1
-
-const deckPanelObjectKey = ( value ) => {
-
-	if( value !== null && typeof value === "object" ){
-		if( deckPanelObjectIDs.has( value ) === false ){
-			deckPanelObjectIDs.set( value, nextDeckPanelObjectID )
-			nextDeckPanelObjectID += 1
-		}
-
-		return "object:" + deckPanelObjectIDs.get( value )
-	}
-
-	return "primitive:" + String( value )
-}
-
-const serializeDeckPanelKeyPart = ( value ) => {
-
-	if( Array.isArray( value ) ){
-		return "[" + value.map(( entry ) => serializeDeckPanelKeyPart( entry )).join( "," ) + "]"
-	}
-
-	if( value !== null && typeof value === "object" ){
-		const keys = Object.keys( value ).sort()
-		return "{" + keys.map(( key ) => key + ":" + serializeDeckPanelKeyPart( value[key] )).join( "," ) + "}"
-	}
-
-	return String( value )
-}
-
-const deckPanelSettingsKey = () => {
-	return JSON.stringify({
-		font: settings.value?.font ?? null,
-		labels: settings.value?.labels ?? null,
-		layout: {
-			heatmapOrigin: settings.value?.layout?.heatmapOrigin ?? null
-		}
-	})
-}
-
-const spectrumPayloadRenderKey = ( payload ) => {
-
-	if( payload === null || payload === undefined ){
-		return "null"
-	}
-
-	if( Array.isArray( payload ) ){
-		return "array:" + deckPanelObjectKey( payload )
-	}
-
-	if( typeof payload !== "object" ){
-		return "primitive:" + String( payload )
-	}
-
-	return [
-		"spectrum=" + deckPanelObjectKey( payload?.spectrum ?? payload?.meanSpectrum ?? null ),
-		"lower=" + deckPanelObjectKey( payload?.lowerBound ?? null ),
-		"upper=" + deckPanelObjectKey( payload?.upperBound ?? null ),
-		"xy=" + deckPanelObjectKey( payload?.xy ?? null ),
-		"length=" + String( payload?.spectrumLength ?? "" )
-	].join( "," )
-}
-
-const spectrumPayloadListRenderKey = ( payloads ) => {
-	if( Array.isArray( payloads ) === false ){
-		return spectrumPayloadRenderKey( payloads ?? null )
-	}
-
-	return payloads.map(( payload ) => spectrumPayloadRenderKey( payload )).join( ";" )
-}
-
-const upperPanelRenderKey = ( options ) => {
-	return [
-		"settings=" + deckPanelSettingsKey(),
-		"source=" + String( options?.topSpectrumGridlineSource ?? "" ),
-		"axes=" + deckPanelObjectKey( options?.axes ?? null ),
-		"roi=" + spectrumPayloadListRenderKey( options?.topLeftSpectrum?.rois ?? options?.topLeftSpectrum?.roi ?? null ),
-		"current=" + spectrumPayloadRenderKey( options?.topLeftSpectrum?.current ?? null ),
-		"showFallback=" + String( options?.topLeftSpectrum?.showFallback === true ),
-		"loadings=" + deckPanelObjectKey( options?.loadings ?? null ),
-		"loadingSeries=" + serializeDeckPanelKeyPart( options?.loadingSeries ?? [] ),
-		"loadingComponents=" + serializeDeckPanelKeyPart( options?.loadingComponents ?? [] )
-	].join( "|" )
-}
-
-const lowerPanelRenderKey = ( options ) => {
-	return [
-		"settings=" + deckPanelSettingsKey(),
-		"source=" + String( options?.bottomSpectrumGridlineSource ?? "" ),
-		"axes=" + deckPanelObjectKey( options?.axes ?? null ),
-		"selected=" + spectrumPayloadRenderKey( options?.selectedSpectrum ?? null ),
-		"roi=" + spectrumPayloadListRenderKey( options?.bottomLeftSpectrum?.rois ?? options?.bottomLeftSpectrum?.roi ?? null ),
-		"current=" + spectrumPayloadRenderKey( options?.bottomLeftSpectrum?.current ?? null )
-	].join( "|" )
-}
-
-const heatmapPaneLayoutKey = ( matrix, axes ) => {
-
-	const dimensions = matrixDimensions( matrix )
-	if( dimensions === null ){
-		return ""
-	}
-
-	return [
-		"settings=" + deckPanelSettingsKey(),
-		"axes=" + deckPanelObjectKey( axes ?? null ),
-		"width=" + String( dimensions.width ),
-		"height=" + String( dimensions.height )
-	].join( "|" )
-}
-
-const resetDeckPanelRenderKeys = () => {
-	lastDeckUpperPanelKey.value = ""
-	lastDeckLowerPanelKey.value = ""
-	lastDeckHeatmapPaneKey.value = ""
-}
-
 const resolvedDefaultVisualizationDataSource = () => {
 	if( hasSuccessfulRamanInference.value === false ){
 		return "measurement"
@@ -3955,41 +3570,78 @@ const withSpectrumLegendName = ( payload, name = "Selection" ) => {
 	}
 }
 
-const normalizeSpectrumSource = ( source ) => {
-	const normalized = String( source ?? "" ).trim().toLowerCase()
-	return normalized === "raman" ? "raman" : "measurement"
-}
+const {
+	topSpectrumPaneLegendVisible,
+	hoveredSpectrumLegendKey,
+	normalizedHiddenSpectrumLegendKeys,
+	topSpectrumPaneQuerying,
+	bottomSpectrumPaneQuerying,
+	topLeftSpectrumOptions,
+	bottomLeftSpectrumOptions,
+	topSpectrumPaneLegendEntries,
+	isSpectrumLegendHidden,
+	toggleSpectrumLegendTraceVisibility
+} = useSpectrumPaneState({
+	nextTick,
+	deckTopPanelGraph,
+	deckBottomPanelGraph,
+	hyperspectrum,
+	resizePlotlyContainer: async ( graphContainer ) => resizePlotlyContainer( graphContainer ),
+	activePlot,
+	showPcaLoadings,
+	showSelectedSpectra,
+	spectrumSelectionMode: computed(() => spectrumSelectionMode.value),
+	resolvedPrimarySpectrumSource: () => resolvedPrimarySpectrumSource(),
+	resolvedSecondarySpectrumSource: () => resolvedSecondarySpectrumSource(),
+	normalizeSpectrumSource: ( source ) => normalizeSpectrumSource( source ),
+	latestMeasurementSelectedSpectrum,
+	latestMeasurementSingleSpectrum,
+	latestMeasurementMeanSpectrum,
+	latestRamanSelectedSpectrum,
+	latestRamanSingleSpectrum,
+	latestRamanMeanSpectrum,
+	withSelectedConfidenceBounds: ( payload ) => withSelectedConfidenceBounds( payload ),
+	withSpectrumLegendName: ( payload, name ) => withSpectrumLegendName( payload, name ),
+	activeDisplayedRois,
+	roiSpectrumStyleForId: ( roiId ) => roiSpectrumStyleForId( roiId ),
+	estimatedRoiSpectrumForId: ( roiId ) => estimatedRoiSpectrumForId( roiId ),
+	cachedRamanRoiSpectrumForId: ( roiId ) => cachedRamanRoiSpectrumForId( roiId ),
+	roiEstimateUncertaintyLevelValue,
+	roiEstimateUncertaintyNumericLevel,
+	confidenceNoneValue: CONFIDENCE_NONE_VALUE,
+	resolveConfidenceBoundSeries: ( boundsPayload, confidenceLevel ) => resolveConfidenceBoundSeries( boundsPayload, confidenceLevel ),
+	queriedSpectrumLegendColor,
+	resolvedRoiSpectrumPalette,
+	activeLoadingLegendEntries,
+	isSelectionSpectrumQuerying: ( source ) => isSelectionSpectrumQuerying( source ),
+	legendHoverEmphasisEnabled
+})
 
-const setVisualizationDataSource = ( source ) => {
-
-	if( hasSuccessfulRamanInference.value === false ){
-		visualizationDataSource.value = "measurement"
-		return
-	}
-
-	visualizationDataSource.value = normalizeSpectrumSource( source )
-}
-
-const setPrimarySpectrumSource = ( source ) => {
-	primarySpectrumSource.value = normalizeSpectrumSource( source )
-}
-
-const setSelectedConfidenceLevel = ( level ) => {
-	selectedConfidenceLevel.value = normalizeConfidenceLevel( level )
-}
+const {
+	projectSpectrumGridlinesVisible,
+	normalizeProjectSpectrumGridlineState,
+	applyProjectSpectrumGridlineState,
+	loadProjectSpectrumGridlinePreset,
+	syncSpectrumPlotGraphListeners,
+	clearSpectrumPlotGraphListeners,
+	cancelSpectrumGridlinePresetSave,
+	resetSpectrumPlotSyncState
+} = useSpectrumPlotSync({
+	settings,
+	project,
+	measurementDataType,
+	hyperspectra,
+	graph,
+	deckTopPanelGraph,
+	deckBottomPanelGraph,
+	topSpectrumPaneLegendVisible,
+	topSpectrumGridlineSourceKey: () => topSpectrumGridlineSourceKey(),
+	bottomSpectrumGridlineSourceKey: () => bottomSpectrumGridlineSourceKey(),
+	activeProjectLoadRequestID
+})
 
 const setRoiEstimateUncertaintyLevel = ( level ) => {
 	roiEstimateUncertaintyLevel.value = normalizeRoiEstimateUncertaintyLevel( level )
-}
-
-const setHeatmapInteractionMode = ( mode ) => {
-	heatmapInteractionMode.value = mode === "zoom" ? "zoom" : "select"
-	hyperspectrum.syncHeatmapModebarState( graph.value, heatmapInteractionMode.value, heatmapZoomAspectRatio.value )
-}
-
-const setHeatmapZoomAspectRatio = ( mode ) => {
-	heatmapZoomAspectRatio.value = normalizeHeatmapZoomAspectRatio( mode )
-	hyperspectrum.syncHeatmapModebarState( graph.value, heatmapInteractionMode.value, heatmapZoomAspectRatio.value )
 }
 
 const setActiveDisplayMode = ( nextValue ) => {
@@ -4003,477 +3655,6 @@ const setActiveDisplayMode = ( nextValue ) => {
 
 	activePlot.value = normalizedValue
 }
-
-const focusTutorialTarget = async ( targetKey ) => {
-	const element = tutorialTargetElement( targetKey )
-	if( element instanceof HTMLElement ){
-		element.scrollIntoView({
-			block: "nearest",
-			inline: "nearest"
-		})
-	}
-	await nextTick()
-}
-
-const openTutorialSelectMenu = async () => {
-	tutorialDisplaySelectOpen.value = false
-	displaySelectDropdown.value?.close?.()
-	await nextTick()
-	await new Promise(( resolve ) => {
-		window.setTimeout( resolve, 24 )
-	})
-	tutorialDisplaySelectOpen.value = true
-	displaySelectDropdown.value?.open?.()
-}
-
-const closeTutorialTransientUi = () => {
-	tutorialDisplaySelectOpen.value = false
-	displaySelectDropdown.value?.close?.()
-	tutorialDisplayOptionsOpen.value = false
-	tutorialProjectMenuOpen.value = false
-	projectMenuDropdown.value?.close?.()
-}
-
-const restoreViewerTutorialUiState = async () => {
-	closeTutorialTransientUi()
-
-	if( viewerTutorialOriginalDisplayMode.value.length > 0 &&
-		DISPLAY_MODE_OPTIONS.has( viewerTutorialOriginalDisplayMode.value ) &&
-		activePlot.value !== viewerTutorialOriginalDisplayMode.value ){
-		activePlot.value = viewerTutorialOriginalDisplayMode.value
-		await nextTick()
-		await renderCurrentMatrix()
-	}
-
-	if( viewerTutorialOriginalInteractionMode.value.length > 0 ){
-		setHeatmapInteractionMode( viewerTutorialOriginalInteractionMode.value )
-	}
-}
-
-const enterViewerTutorialStep = async ( step ) => {
-	if( step === null ){
-		return
-	}
-
-	closeTutorialTransientUi()
-
-	if( step.id === "display-select" ){
-		await focusTutorialTarget( step.target )
-		await openTutorialSelectMenu()
-		return
-	}
-
-	if( step.id === "display-options" ){
-		await focusTutorialTarget( step.target )
-		tutorialDisplayOptionsOpen.value = true
-		return
-	}
-
-	if( step.id === "heatmap" ){
-		setHeatmapInteractionMode( "select" )
-		await focusTutorialTarget( step.target )
-		return
-	}
-
-	if( step.id === "project-menu" || step.id === "project-sharing-actions" ){
-		await focusTutorialTarget( step.target )
-		tutorialProjectMenuOpen.value = false
-		projectMenuDropdown.value?.close?.()
-		await nextTick()
-		await new Promise(( resolve ) => {
-			window.setTimeout( resolve, 24 )
-		})
-		tutorialProjectMenuOpen.value = true
-		projectMenuDropdown.value?.open?.()
-		return
-	}
-
-	await focusTutorialTarget( step.target )
-}
-
-const activateViewerTutorialStep = async ( nextIndex ) => {
-	if( viewerTutorialVisible.value === false ){
-		activeViewerTutorialTargetElement.value = null
-		return
-	}
-
-	const clampedIndex = Math.max( 0, Math.min( viewerTutorialSteps.value.length - 1, nextIndex ))
-	const nextToken = viewerTutorialRunToken.value + 1
-	viewerTutorialRunToken.value = nextToken
-	viewerTutorialStepIndex.value = clampedIndex
-	await nextTick()
-	refreshActiveViewerTutorialTargetElement()
-	if( nextToken !== viewerTutorialRunToken.value ){
-		return
-	}
-
-	await enterViewerTutorialStep( activeViewerTutorialStep.value )
-	await nextTick()
-	refreshActiveViewerTutorialTargetElement()
-}
-
-const maybeOfferViewerTutorialPrompt = ( requestID = null ) => {
-	if( project.value?.id === "" ) return
-	if( viewerTutorialVisible.value || viewerTutorialPromptVisible.value ) return
-	if( viewerTutorialState.value.completed === true ) return
-	if( viewerTutorialState.value.skipped === true ) return
-	if( viewerTutorialState.value.prompted === true ) return
-
-	persistViewerTutorialState({ prompted: true })
-
-	window.setTimeout(() => {
-		if( requestID !== null && requestID !== activeProjectLoadRequestID.value ) return
-		if( project.value?.id === "" ) return
-		viewerTutorialPromptVisible.value = true
-	}, 0 )
-}
-
-const startViewerTutorial = async () => {
-	viewerTutorialPromptVisible.value = false
-	viewerTutorialOriginalDisplayMode.value = activePlot.value
-	viewerTutorialOriginalInteractionMode.value = heatmapInteractionMode.value
-	viewerTutorialVisible.value = true
-	viewerTutorialStepIndex.value = 0
-	await activateViewerTutorialStep( 0 )
-}
-
-const restartViewerTutorial = async () => {
-	viewerTutorialPromptVisible.value = false
-	if( viewerTutorialVisible.value ){
-		await restoreViewerTutorialUiState()
-	}
-
-	viewerTutorialOriginalDisplayMode.value = activePlot.value
-	viewerTutorialOriginalInteractionMode.value = heatmapInteractionMode.value
-	viewerTutorialVisible.value = true
-	viewerTutorialStepIndex.value = 0
-	await activateViewerTutorialStep( 0 )
-}
-
-const skipViewerTutorialPrompt = () => {
-	viewerTutorialPromptVisible.value = false
-	persistViewerTutorialState({ skipped: true })
-}
-
-const skipActiveViewerTutorial = async () => {
-	if( viewerTutorialVisible.value === false ){
-		return
-	}
-
-	viewerTutorialVisible.value = false
-	activeViewerTutorialTargetElement.value = null
-	viewerTutorialRunToken.value += 1
-	await restoreViewerTutorialUiState()
-
-	if( viewerTutorialState.value.completed !== true ){
-		persistViewerTutorialState({ skipped: true })
-	}
-}
-
-const completeViewerTutorial = async () => {
-	viewerTutorialVisible.value = false
-	activeViewerTutorialTargetElement.value = null
-	viewerTutorialRunToken.value += 1
-	await restoreViewerTutorialUiState()
-	persistViewerTutorialState({
-		completed: true,
-		skipped: false,
-		lastCompletedAt: new Date().toISOString()
-	})
-}
-
-const advanceViewerTutorial = async () => {
-	if( viewerTutorialVisible.value === false ){
-		return
-	}
-
-	if( viewerTutorialStepIndex.value >= viewerTutorialSteps.value.length - 1 ){
-		await completeViewerTutorial()
-		return
-	}
-
-	await activateViewerTutorialStep( viewerTutorialStepIndex.value + 1 )
-}
-
-const rewindViewerTutorial = async () => {
-	if( viewerTutorialVisible.value === false ) return
-	if( viewerTutorialStepIndex.value <= 0 ) return
-
-	await activateViewerTutorialStep( viewerTutorialStepIndex.value - 1 )
-}
-
-const selectedSpectrumPayloadBySource = ( source ) => {
-
-	const normalizedSource = normalizeSpectrumSource( source )
-
-	if( normalizedSource === "raman" ){
-		const payload = latestRamanSelectedSpectrum.value ??
-			latestRamanSingleSpectrum.value?.response ??
-			latestRamanMeanSpectrum.value?.response ??
-			null
-		return withSpectrumLegendName( withSelectedConfidenceBounds( payload ), "Selection" )
-	}
-
-	const payload = latestMeasurementSelectedSpectrum.value ??
-		latestMeasurementSingleSpectrum.value?.response ??
-		latestMeasurementMeanSpectrum.value?.response ??
-		null
-	return withSpectrumLegendName( withSelectedConfidenceBounds( payload ), "Selection" )
-}
-
-const cachedRamanRoiSpectrumForId = ( roiId ) => {
-	const normalizedId = String( roiId ?? "" ).trim()
-	if( normalizedId.length === 0 ) return null
-
-	return ramanRoiSpectraById.value?.[ normalizedId ] ?? null
-}
-
-const estimatedRoiSpectrumForId = ( roiId ) => {
-	const normalizedId = String( roiId ?? "" ).trim()
-	if( normalizedId.length === 0 ) return null
-
-	return estimatedRoiList.value.find(( roi ) => roi.roiId === normalizedId ) ?? null
-}
-
-const roiSpectrumStyleForId = ( roiId ) => {
-	const normalizedId = String( roiId ?? "" ).trim()
-	const fallbackColor = resolvedRoiSpectrumPalette.value[0] ?? "#333333"
-	const fallbackBoxColor = settings.value?.hyperspectrumColors?.roiBox ??
-		settings.value?.hyperspectrumColors?.roiOverlay ??
-		"#ffffff"
-	const fallbackTitleColor = settings.value?.hyperspectrumColors?.roiTitle ??
-		settings.value?.hyperspectrumColors?.roiOverlay ??
-		fallbackBoxColor
-	return roiDisplayStylesById.value?.[ normalizedId ] ?? {
-		lineColor: fallbackColor,
-		intervalColor: fallbackColor,
-		boxColor: fallbackBoxColor,
-		titleColor: fallbackTitleColor
-	}
-}
-
-const measurementRoiSpectrumPayloadForEntry = ( roi ) => {
-	const spectrum = Array.isArray( roi?.meanSpectrum ) ? roi.meanSpectrum : null
-	if( spectrum === null ) return null
-
-	const roiId = String( roi?.roiId ?? "" ).trim()
-	const style = roiSpectrumStyleForId( roiId )
-
-	return withSelectedConfidenceBounds({
-		roiId,
-		name: String( roi?.name ?? "" ).trim(),
-		traceGroupKey: `roi-${roiId}`,
-		spectrum,
-		lowerBound: roi?.lowerBound ?? null,
-		upperBound: roi?.upperBound ?? null,
-		lineColor: style.lineColor,
-		intervalColor: style.intervalColor
-	})
-}
-
-const ramanRoiSpectrumPayloadForEntry = ( roi ) => {
-	const roiId = String( roi?.roiId ?? "" ).trim()
-	if( roiId.length === 0 ) return null
-
-	const estimatedRoi = estimatedRoiSpectrumForId( roiId )
-	const payload = estimatedRoi !== null && Array.isArray( estimatedRoi.meanSpectrum )
-		? {
-			spectrum: estimatedRoi.meanSpectrum,
-			lowerBound: estimatedRoi.lowerBound ?? null,
-			upperBound: estimatedRoi.upperBound ?? null
-		}
-		: cachedRamanRoiSpectrumForId( roiId )
-	if( payload === null || payload === undefined ){
-		return null
-	}
-
-	const style = roiSpectrumStyleForId( roiId )
-	const resolvedPayload = {
-		...payload,
-		roiId,
-		name: String( roi?.name ?? "" ).trim(),
-		traceGroupKey: `roi-${roiId}`,
-		lowerBound: payload.lowerBound ?? null,
-		upperBound: payload.upperBound ?? null,
-		lineColor: style.lineColor,
-		intervalColor: style.intervalColor
-	}
-
-	if( roiEstimateUncertaintyLevelValue.value === CONFIDENCE_NONE_VALUE ){
-		return {
-			...resolvedPayload,
-			lowerBound: null,
-			upperBound: null
-		}
-	}
-
-	return {
-		...resolvedPayload,
-		lowerBound: resolveConfidenceBoundSeries( resolvedPayload.lowerBound, roiEstimateUncertaintyNumericLevel.value ),
-		upperBound: resolveConfidenceBoundSeries( resolvedPayload.upperBound, roiEstimateUncertaintyNumericLevel.value )
-	}
-}
-
-const roiSpectrumPayloadsBySource = ( source ) => {
-	const normalizedSource = normalizeSpectrumSource( source )
-	const activeRois = activeDisplayedRois.value
-
-	if( activeRois.length === 0 ){
-		return []
-	}
-
-	return activeRois
-		.map(( roi ) => normalizedSource === "raman"
-			? ramanRoiSpectrumPayloadForEntry( roi )
-			: measurementRoiSpectrumPayloadForEntry( roi ))
-		.filter(( payload ) => payload !== null )
-}
-
-const topLeftSpectrumOptions = () => {
-
-	const mode = spectrumSelectionMode.value
-	const showLoadingsFallback = activePlot.value === "pca" || activePlot.value === "pca_mip" || activePlot.value === "pca_rgb" ||
-		activePlot.value === "rpca" || activePlot.value === "rpca_mip" || activePlot.value === "rpca_rgb"
-		? showPcaLoadings.value
-		: false
-
-	if( activeDisplayedRois.value.length === 0 && showLoadingsFallback ){
-		return {
-			showFallback: true
-		}
-	}
-
-	const topSource = mode === "both"
-		? ( resolvedSecondarySpectrumSource() ?? "measurement" )
-		: mode
-	const current = showSelectedSpectra.value
-		? selectedSpectrumPayloadBySource( topSource )
-		: null
-
-	const roiPayloads = roiSpectrumPayloadsBySource( topSource )
-
-	if( roiPayloads.length === 0 ){
-		if( mode === "both" && current !== null ){
-			return { current }
-		}
-
-		return showLoadingsFallback ? { current, showFallback: true } : {}
-	}
-
-	return {
-		rois: roiPayloads,
-		current: current
-	}
-}
-
-const bottomLeftSpectrumOptions = () => {
-
-	const mode = spectrumSelectionMode.value
-	const lowerSource = mode === "both"
-		? resolvedPrimarySpectrumSource()
-		: mode
-	const current = showSelectedSpectra.value
-		? selectedSpectrumPayloadBySource( lowerSource )
-		: null
-
-	const roiPayloads = roiSpectrumPayloadsBySource( lowerSource )
-
-	if( mode === "both" && roiPayloads.length > 0 ){
-		return {
-			selectedSpectrum: current,
-			bottomLeftSpectrum: {
-				rois: roiPayloads,
-				current
-			}
-		}
-	}
-
-	return {
-		selectedSpectrum: current,
-		bottomLeftSpectrum: null
-	}
-}
-
-const buildSpectrumPaneLegendEntries = ( roiPayloads, currentPayload, fallbackEntries = [] ) => {
-
-	const entries = []
-	const normalizedRoiPayloads = Array.isArray( roiPayloads ) ? roiPayloads : []
-
-	if( currentPayload !== null && currentPayload !== undefined ){
-		entries.push({
-			key: String( currentPayload?.traceGroupKey ?? "selection" ),
-			label: String( currentPayload?.name ?? "Selection" ).trim() || "Selection",
-			color: queriedSpectrumLegendColor.value
-		})
-	}
-
-	for( const payload of normalizedRoiPayloads ){
-		if( payload === null || payload === undefined ) continue
-
-		entries.push({
-			key: String( payload?.traceGroupKey ?? `roi-${String( payload?.roiId ?? payload?.name ?? entries.length )}` ),
-			label: String( payload?.name ?? "Region of interest" ).trim() || "Region of interest",
-			color: String( payload?.lineColor ?? "" ).trim() || ( resolvedRoiSpectrumPalette.value[0] ?? "#333333" )
-		})
-	}
-
-	if( entries.length > 0 ){
-		return entries
-	}
-
-	return ( Array.isArray( fallbackEntries ) ? fallbackEntries : [] )
-		.filter(( entry ) => entry !== null && entry !== undefined )
-		.map(( entry, index ) => ({
-			key: String( entry?.key ?? `fallback-${index}` ),
-			label: String( entry?.label ?? "" ).trim(),
-			color: String( entry?.color ?? "" ).trim()
-		}))
-		.filter(( entry ) => entry.label.length > 0 && entry.color.length > 0 )
-}
-
-const normalizedHiddenSpectrumLegendKeys = computed(() => {
-	return Array.from( new Set(
-		( Array.isArray( hiddenSpectrumLegendKeys.value ) ? hiddenSpectrumLegendKeys.value : [] )
-			.map(( key ) => String( key ?? "" ).trim() )
-			.filter(( key ) => key.length > 0 )
-	))
-})
-
-const isSpectrumLegendHidden = ( legendKey ) => {
-	const normalizedKey = String( legendKey ?? "" ).trim()
-	if( normalizedKey.length === 0 ){
-		return false
-	}
-
-	return normalizedHiddenSpectrumLegendKeys.value.includes( normalizedKey )
-}
-
-const toggleSpectrumLegendTraceVisibility = ( legendKey ) => {
-	const normalizedKey = String( legendKey ?? "" ).trim()
-	if( normalizedKey.length === 0 ){
-		return
-	}
-
-	if( isSpectrumLegendHidden( normalizedKey ) ){
-		hiddenSpectrumLegendKeys.value = normalizedHiddenSpectrumLegendKeys.value
-			.filter(( entry ) => entry !== normalizedKey )
-		return
-	}
-
-	hiddenSpectrumLegendKeys.value = [
-		...normalizedHiddenSpectrumLegendKeys.value,
-		normalizedKey
-	]
-}
-
-const topSpectrumPaneLegendEntries = computed(() => {
-	const options = topLeftSpectrumOptions()
-	return buildSpectrumPaneLegendEntries(
-		options?.rois ?? [],
-		options?.current ?? null,
-		options?.showFallback === true ? activeLoadingLegendEntries.value : []
-	)
-})
 
 const setPcaLoadingsVisibility = async ( shouldShowLoadings ) => {
 
@@ -4513,6 +3694,10 @@ const setSelectedSpectraVisibility = async ( shouldShowSpectra ) => {
 	} catch( error ){
 		console.log( error )
 	}
+}
+
+const setLegendHoverEmphasisEnabled = ( enabled ) => {
+	legendHoverEmphasisEnabled.value = enabled === true
 }
 
 const roiOverlayFromEntry = ( roi ) => {
@@ -4563,7 +3748,9 @@ const currentSelectionOverlay = () => {
 const activeRoiOverlays = () => {
 
 	var overlays = []
-	const highlightedLegendKey = String( hoveredSpectrumLegendKey.value ?? "" ).trim()
+	const highlightedLegendKey = legendHoverEmphasisEnabled.value
+		? String( hoveredSpectrumLegendKey.value ?? "" ).trim()
+		: ""
 	const highlightsOverlay = highlightedLegendKey === "selection" || highlightedLegendKey.startsWith( "roi-" )
 
 	overlays = activeDisplayedRois.value
@@ -4588,369 +3775,71 @@ const activeRoiOverlays = () => {
 	})
 }
 
-const loadRoiList = async ( forceRefresh = false ) => {
+const {
+	resetDeckPanelRenderKeys,
+	queueSpectraPanelRender,
+	renderCurrentMatrix: renderCurrentMatrixBase
+} = useHyperspectrumRenderPipeline({
+	nextTick,
+	graph,
+	deckTopPanelGraph,
+	deckBottomPanelGraph,
+	settings,
+	hyperspectrum,
+	resolveCurrentPlotRenderSpec: ( plotOptions ) => resolveCurrentPlotRenderSpec( plotOptions ),
+	currentMatrix: () => currentMatrix(),
+	bottomLeftSpectrumOptions: () => bottomLeftSpectrumOptions(),
+	topLeftSpectrumOptions: () => topLeftSpectrumOptions(),
+	topSpectrumGridlineSourceKey: () => topSpectrumGridlineSourceKey(),
+	bottomSpectrumGridlineSourceKey: () => bottomSpectrumGridlineSourceKey(),
+	normalizeProjectSpectrumGridlineState: ( value, fallback ) => normalizeProjectSpectrumGridlineState( value, fallback ),
+	projectSpectrumGridlinesVisible,
+	activeRoiOverlays: () => activeRoiOverlays(),
+	plotAxes: () => plotAxes(),
+	heatmapRendererMode,
+	topSpectrumPaneLegendVisible,
+	hoveredSpectrumLegendKey: computed(() => {
+		return legendHoverEmphasisEnabled.value
+			? hoveredSpectrumLegendKey.value
+			: ""
+	}),
+	normalizedHiddenSpectrumLegendKeys,
+	activePlot,
+	heatmapUsesEstimatedRaman,
+	ensureZBlendVisualizationMatrix: ( priority ) => ensureZBlendVisualizationMatrix( priority ),
+	ensureEstimatedVisualizationMatrix: ( priority ) => ensureEstimatedVisualizationMatrix( priority ),
+	ensureActivePlotLoadings: ( priority ) => ensureActivePlotLoadings( priority ),
+	syncSpectrumPlotGraphListeners: () => syncSpectrumPlotGraphListeners(),
+	syncHeatmapModebarGraphListeners: () => syncHeatmapModebarGraphListeners(),
+	syncHeatmapModebarState: ( graphContainer, mode, aspectRatio ) => {
+		hyperspectrum.syncHeatmapModebarState( graphContainer, mode, aspectRatio )
+	},
+	heatmapInteractionMode,
+	heatmapZoomAspectRatio,
+	applyProjectSpectrumGridlineState: async ( state ) => applyProjectSpectrumGridlineState( state ),
+	deckHeatmapPaneWidth,
+	deckHeatmapPaneWidthTouched,
+	deckTopSpectrumPaneHeight,
+	deckTopSpectrumPaneHeightTouched,
+	defaultDeckHeatmapPaneWidth: () => defaultDeckHeatmapPaneWidth(),
+	defaultDeckTopSpectrumPaneHeight: () => defaultDeckTopSpectrumPaneHeight(),
+	matrixDimensions: ( matrix ) => matrixDimensions( matrix ),
+	queueDeckPaneResponsiveResize: () => queueDeckPaneResponsiveResize(),
+	reconcileDeckHeatmapPaneWidthWithPlotlyLayout: ( matrix ) => reconcileDeckHeatmapPaneWidthWithPlotlyLayout( matrix ),
+	finalizeHeatmapRender: async ( startedAt ) => finalizeHeatmapRender( startedAt ),
+	heatmapRenderBenchmarkToken,
+	pendingDeckRenderBenchmark
+})
 
-	const loadedRois = forceRefresh
-		? await hyperspectrumCache.refreshRois( project.value, cacheOptions )
-		: await hyperspectrumCache.getRois( project.value, cacheOptions )
-
-	rois.value = Array.isArray( loadedRois ) ? loadedRois : []
-
-	selectedRoiIds.value = selectedRoiIds.value.filter(( roiId ) => {
-		return rois.value.some(( roi ) => String( roi?.roiId ?? "" ).trim() === String( roiId ?? "" ).trim() )
-	})
-
-	await loadEstimatedRoiList( forceRefresh )
-}
-
-const refreshRoisFromBackend = async () => {
-
-	if( refreshingRois.value ) return
-	const startedAt = Date.now()
-	const spinCycleMs = 800
-	const minimumSpinCycles = 1
-	refreshingRois.value = true
-	await nextTick()
-
-	try{
-		await loadRoiList( true )
-		await refreshRamanRoiSpectrum()
-
-		if( graph.value !== null && currentMatrix() !== null ){
-			await renderCurrentMatrix()
-		}
-	} catch( error ){
-		console.log( error )
-	} finally {
-		const elapsedMs = Date.now() - startedAt
-		const minimumDurationMs = spinCycleMs * minimumSpinCycles
-		const targetDurationMs = Math.max(
-			minimumDurationMs,
-			Math.ceil( elapsedMs / spinCycleMs ) * spinCycleMs
-		)
-		const remainingMs = targetDurationMs - elapsedMs
-		if( remainingMs > 0 ){
-			await new Promise(( resolve ) => {
-				setTimeout( resolve, remainingMs )
-			})
-		}
-		refreshingRois.value = false
-	}
-}
-
-const normalizeRoiNumericSeries = ( values ) => {
-
-	if( Array.isArray( values ) === false || values.length === 0 ){
-		return null
-	}
-
-	var series = []
-	var hasNumericValue = false
-
-	for( const value of values ){
-		const numeric = Number( value )
-		if( Number.isFinite( numeric ) ){
-			series.push( numeric )
-			hasNumericValue = true
-			continue
-		}
-		series.push( null )
+const renderCurrentMatrix = async ( initialize = false ) => {
+	const result = await renderCurrentMatrixBase( initialize )
+	if( spectralCalibrationEditingActive.value ){
+		await nextTick()
+		syncSpectralCalibrationPlotClickListeners()
+		await syncSpectralCalibrationReferenceLines()
 	}
 
-	return hasNumericValue ? series : null
-}
-
-const normalizeRoiBoundsPayload = ( payload ) => {
-
-	if( Array.isArray( payload ) ){
-		return normalizeRoiNumericSeries( payload )
-	}
-
-	if( payload === null || typeof payload !== "object" ){
-		return null
-	}
-
-	var normalized = {}
-	var hasAnyLevel = false
-
-	for( const [ key, value ] of Object.entries( payload )){
-		const numericKey = Number.parseInt( String( key ), 10 )
-		if( Number.isInteger( numericKey ) === false ) continue
-
-		const normalizedSeries = normalizeRoiNumericSeries( value )
-		if( normalizedSeries === null ) continue
-
-		normalized[String( numericKey )] = normalizedSeries
-		hasAnyLevel = true
-	}
-
-	return hasAnyLevel ? normalized : null
-}
-
-const extractEstimateSpectrumFromRoi = ( roi ) => {
-
-	if( roi === null || typeof roi !== "object" ){
-		return null
-	}
-
-	const directSpectrumKeys = [
-		"estimateMeanSpectrum",
-		"estimatedMeanSpectrum",
-		"meanSpectrumEstimate",
-		"meanSpectrumEstimated",
-		"ramanMeanSpectrum"
-	]
-
-	for( const key of directSpectrumKeys ){
-		const series = normalizeRoiNumericSeries( roi?.[key] )
-		if( series === null ) continue
-
-		const lowerBound = normalizeRoiBoundsPayload(
-			roi?.estimateLowerBound ??
-			roi?.estimatedLowerBound ??
-			roi?.lowerBoundEstimate ??
-			roi?.ramanLowerBound ??
-			null
-		)
-		const upperBound = normalizeRoiBoundsPayload(
-			roi?.estimateUpperBound ??
-			roi?.estimatedUpperBound ??
-			roi?.upperBoundEstimate ??
-			roi?.ramanUpperBound ??
-			null
-		)
-
-		return {
-			spectrum: series,
-			lowerBound,
-			upperBound
-		}
-	}
-
-	const nestedCandidates = [
-		roi?.estimate,
-		roi?.estimated,
-		roi?.raman,
-		roi?.inference,
-		roi?.sources?.estimate
-	]
-
-	for( const nested of nestedCandidates ){
-		if( nested === null || typeof nested !== "object" ) continue
-
-		const series = normalizeRoiNumericSeries( nested.meanSpectrum ?? nested.spectrum ?? nested.values )
-		if( series === null ) continue
-
-		return {
-			spectrum: series,
-			lowerBound: normalizeRoiBoundsPayload( nested.lowerBound ),
-			upperBound: normalizeRoiBoundsPayload( nested.upperBound )
-		}
-	}
-
-	return null
-}
-
-const normalizeEstimatedRoiEntry = ( roi, mode = "" ) => {
-
-	if( roi === null || typeof roi !== "object" ){
-		return null
-	}
-
-	const roiId = String( roi.roiId ?? "" ).trim()
-	if( roiId.length === 0 ){
-		return null
-	}
-
-	const normalizedMode = String( mode ?? "" ).trim().toLowerCase()
-	const estimateFromRoi = extractEstimateSpectrumFromRoi( roi )
-	const useEstimateOnly = normalizedMode === "roi/frontend"
-	const fallbackMeanSpectrum = useEstimateOnly
-		? null
-		: normalizeRoiNumericSeries( roi.meanSpectrum )
-	const spectrum = estimateFromRoi?.spectrum ?? fallbackMeanSpectrum
-	const lowerBound = estimateFromRoi?.lowerBound ?? normalizeRoiBoundsPayload( roi.lowerBound )
-	const upperBound = estimateFromRoi?.upperBound ?? normalizeRoiBoundsPayload( roi.upperBound )
-	const boundingBox = normalizeSelectionBoundingBox( roi.boundingBox )
-
-	return {
-		roiId,
-		name: String( roi.name ?? "" ).trim(),
-		description: String( roi.description ?? "" ),
-		meanSpectrum: spectrum,
-		lowerBound,
-		upperBound,
-		boundingBox
-	}
-}
-
-const normalizeEstimatedRoiPayload = ( payload, mode = "" ) => {
-
-	if( Array.isArray( payload?.rois ) === false ){
-		return []
-	}
-
-	var normalized = []
-	for( const roi of payload.rois ){
-		const normalizedRoi = normalizeEstimatedRoiEntry( roi, mode )
-		if( normalizedRoi === null ) continue
-		normalized.push( normalizedRoi )
-	}
-
-	return normalized
-}
-
-const resetEstimatedRoiArtifacts = () => {
-
-	estimatedRoiList.value = []
-	estimatedRoiListMode.value = ""
-	estimatedRoiListAttempted.value = false
-	ramanRoiSpectraById.value = {}
-	activeRamanRoiRequestIDs.value = {}
-}
-
-const syncEstimatedRoiCachesFromRois = () => {
-
-	const payload = { rois: rois.value }
-	const normalized = normalizeEstimatedRoiPayload( payload, "roi/frontend" )
-
-	estimatedRoiList.value = normalized
-	estimatedRoiListMode.value = normalized.length > 0 ? "roi/frontend" : ""
-	estimatedRoiListAttempted.value = true
-}
-
-const loadEstimatedRoiList = async ( forceRefresh = false ) => {
-
-	if( forceRefresh ){
-		estimatedRoiListAttempted.value = false
-	}
-
-	if( estimatedRoiListAttempted.value ){
-		return
-	}
-
-	syncEstimatedRoiCachesFromRois()
-}
-
-const cacheRamanRoiSpectrum = ( roiId, payload ) => {
-	const normalizedId = String( roiId ?? "" ).trim()
-	if( normalizedId.length === 0 ) return
-
-	ramanRoiSpectraById.value = {
-		...ramanRoiSpectraById.value,
-		[ normalizedId ]: payload ?? null
-	}
-}
-
-const nextRamanRoiRequestID = ( roiId ) => {
-	const normalizedId = String( roiId ?? "" ).trim()
-	const nextRequestID = Number( activeRamanRoiRequestIDs.value?.[ normalizedId ] ?? 0 ) + 1
-
-	activeRamanRoiRequestIDs.value = {
-		...activeRamanRoiRequestIDs.value,
-		[ normalizedId ]: nextRequestID
-	}
-
-	return nextRequestID
-}
-
-const isCurrentRamanRoiRequest = ( roiId, requestID ) => {
-	const normalizedId = String( roiId ?? "" ).trim()
-	return Number( activeRamanRoiRequestIDs.value?.[ normalizedId ] ?? 0 ) === requestID
-}
-
-const ensureRamanRoiSpectrumForEntry = async ( roi ) => {
-
-	const roiId = String( roi?.roiId ?? "" ).trim()
-	if( roiId.length === 0 ) return null
-
-	const cachedEstimatedRoi = estimatedRoiSpectrumForId( roiId )
-	if( cachedEstimatedRoi !== null && Array.isArray( cachedEstimatedRoi.meanSpectrum ) ){
-		return {
-			spectrum: cachedEstimatedRoi.meanSpectrum,
-			lowerBound: cachedEstimatedRoi.lowerBound ?? null,
-			upperBound: cachedEstimatedRoi.upperBound ?? null
-		}
-	}
-
-	const cachedPayload = cachedRamanRoiSpectrumForId( roiId )
-	if( cachedPayload !== null ){
-		return cachedPayload
-	}
-
-	const boundingBox = normalizeSelectionBoundingBox( roi?.boundingBox )
-	if( boundingBox === null ){
-		return null
-	}
-
-	const requestID = nextRamanRoiRequestID( roiId )
-
-	try{
-		const response = await hyperspectra.meanSpectrum(
-			project.value,
-			boundingBox,
-			activeGroupID(),
-			false,
-			dataTypeForSpectrumSource( "raman" ),
-			dataSourceForSpectrumSource( "raman" ),
-			confidenceLevelsForSpectrumSource( "raman" )
-		)
-
-		if( isCurrentRamanRoiRequest( roiId, requestID ) === false ) return null
-
-		cacheRamanRoiSpectrum( roiId, response ?? null )
-
-		if( graph.value !== null && currentMatrix() !== null ){
-			await queueSpectraPanelRender()
-		}
-
-		return response ?? null
-	} catch( error ){
-		if( isCurrentRamanRoiRequest( roiId, requestID ) === false ) return null
-		console.log( error )
-		return null
-	}
-}
-
-const refreshRamanRoiSpectrum = async () => {
-
-	const needsRaman = spectrumSelectionMode.value === "raman" || spectrumSelectionMode.value === "both"
-	if( needsRaman === false || hasEstimatedRamanSpectraReady.value === false ){
-		return
-	}
-
-	const activeRois = activeDisplayedRois.value
-	if( activeRois.length === 0 ){
-		return
-	}
-
-	await loadEstimatedRoiList()
-	await Promise.all( activeRois.map(( roi ) => ensureRamanRoiSpectrumForEntry( roi )))
-}
-
-const newestMatchingRoiId = ( name, description ) => {
-
-	const normalizedName = String( name ?? "" ).trim()
-	const normalizedDescription = String( description ?? "" )
-
-	const matches = rois.value.filter(( roi ) => {
-		return roi.name === normalizedName && roi.description === normalizedDescription
-	})
-
-	if( matches.length === 0 ){
-		return ""
-	}
-
-	matches.sort(( left, right ) => {
-		const leftTimestamp = Date.parse( left.createdAt || "" )
-		const rightTimestamp = Date.parse( right.createdAt || "" )
-		const safeLeft = Number.isFinite( leftTimestamp ) ? leftTimestamp : 0
-		const safeRight = Number.isFinite( rightTimestamp ) ? rightTimestamp : 0
-
-		return safeRight - safeLeft
-	})
-
-	return matches[0].roiId
+	return result
 }
 
 const openRoiSaveModal = () => {
@@ -5018,7 +3907,7 @@ const currentXAxisForLength = ( length ) => {
 		return []
 	}
 
-	const zValues = Array.isArray( xyzAxes.value?.z ) ? xyzAxes.value.z : []
+	const zValues = effectiveSpectralAxisValues()
 	var xValues = []
 
 	for( var index = 0; index < targetLength; index++ ){
@@ -5266,244 +4155,6 @@ const zBlendPresetPayload = () => {
 	}
 }
 
-const spectrumGridlinePresetPayload = () => {
-	const normalizedState = normalizeProjectSpectrumGridlineState( projectSpectrumGridlinesVisible.value )
-
-	return {
-		version: "spectrum-gridlines-v1",
-		projectID: String( project.value?.rawid ?? project.value?.id ?? "" ).trim(),
-		dataType: measurementDataType.toLowerCase() === "hyperraman" || measurementDataType.toLowerCase() === "raman"
-			? "hyperraman"
-			: "hypercars",
-		measurement: normalizedState.measurement,
-		estimate: normalizedState.estimate
-	}
-}
-
-const spectrumGridlineSourceKeysForGraph = ( graphContainer ) => {
-
-	if( graphContainer === deckTopPanelGraph.value ){
-		return [ topSpectrumGridlineSourceKey() ]
-	}
-
-	if( graphContainer === deckBottomPanelGraph.value ){
-		return [ bottomSpectrumGridlineSourceKey() ]
-	}
-
-	if( graphContainer === graph.value ){
-		return Array.from( new Set([
-			topSpectrumGridlineSourceKey(),
-			bottomSpectrumGridlineSourceKey()
-		]))
-	}
-
-	return []
-}
-
-const spectrumGridlineVisibilityForGraph = ( state, graphContainer ) => {
-
-	const normalizedState = normalizeProjectSpectrumGridlineState( state )
-	const topVisible = normalizedState[ topSpectrumGridlineSourceKey() ] === true
-	const bottomVisible = normalizedState[ bottomSpectrumGridlineSourceKey() ] === true
-
-	if( graphContainer === deckTopPanelGraph.value ){
-		return topVisible
-	}
-
-	if( graphContainer === deckBottomPanelGraph.value ){
-		return bottomVisible
-	}
-
-	if( graphContainer === graph.value ){
-		return {
-			xaxis: topVisible,
-			yaxis: topVisible,
-			xaxis2: bottomVisible,
-			yaxis2: bottomVisible
-		}
-	}
-
-	return topVisible
-}
-
-const applyProjectSpectrumGridlineState = async ( state ) => {
-
-	const normalizedState = normalizeProjectSpectrumGridlineState(
-		state,
-		defaultProjectSpectrumGridlinesVisible()
-	)
-
-	projectSpectrumGridlinesVisible.value = normalizedState
-	const graphContainers = Array.from( new Set(
-		[ graph.value, deckTopPanelGraph.value, deckBottomPanelGraph.value ]
-			.filter(( graphContainer ) => graphContainer !== null )
-	) )
-
-	for( const graphContainer of graphContainers ){
-		graphContainer.__harkanaSpectrumGridlinesVisible = spectrumGridlineVisibilityForGraph(
-			normalizedState,
-			graphContainer
-		)
-	}
-}
-
-const loadProjectSpectrumGridlinePreset = async ( requestID = null ) => {
-
-	const fallbackState = defaultProjectSpectrumGridlinesVisible()
-	await applyProjectSpectrumGridlineState( fallbackState )
-
-	if( project.value?.id === "" ) return
-
-	try{
-		const response = await hyperspectra.loadSpectrumGridlineSettings( project.value, measurementDataType )
-		if( requestID !== null && requestID !== activeProjectLoadRequestID.value ) return
-		await applyProjectSpectrumGridlineState( response )
-	} catch( error ){
-		if( requestID !== null && requestID !== activeProjectLoadRequestID.value ) return
-		await applyProjectSpectrumGridlineState( fallbackState )
-		console.log( error )
-	}
-}
-
-const saveProjectSpectrumGridlinePreset = async () => {
-
-	if( project.value?.id === "" ){
-		return
-	}
-
-	try{
-		await hyperspectra.saveSpectrumGridlineSettings(
-			project.value,
-			spectrumGridlinePresetPayload(),
-			measurementDataType
-		)
-	} catch( error ){
-		console.log( error )
-	}
-}
-
-const debouncedSaveProjectSpectrumGridlinePreset = debounce( () => {
-	void saveProjectSpectrumGridlinePreset()
-}, 250 )
-
-const handleSpectrumGridlineChange = ( event ) => {
-
-	const sourceKeys = spectrumGridlineSourceKeysForGraph( event?.currentTarget ?? null )
-	if( sourceKeys.length === 0 ){
-		return
-	}
-
-	const nextVisible = normalizeGridlineVisibility( event?.detail?.visible, false )
-	const currentState = normalizeProjectSpectrumGridlineState( projectSpectrumGridlinesVisible.value )
-	const nextState = { ...currentState }
-
-	for( const sourceKey of sourceKeys ){
-		nextState[sourceKey] = nextVisible
-	}
-
-	void applyProjectSpectrumGridlineState( nextState )
-	debouncedSaveProjectSpectrumGridlinePreset()
-}
-
-const clearSpectrumGridlineGraphListeners = () => {
-
-	for( const listenerEntry of spectrumGridlineGraphListeners ){
-		listenerEntry.element.removeEventListener( SPECTRUM_GRIDLINE_CHANGE_EVENT, listenerEntry.handler )
-	}
-
-	spectrumGridlineGraphListeners = []
-}
-
-const syncSpectrumGridlineGraphListeners = () => {
-
-	clearSpectrumGridlineGraphListeners()
-
-	const graphContainers = Array.from( new Set(
-		[ graph.value, deckTopPanelGraph.value, deckBottomPanelGraph.value ]
-			.filter(( graphContainer ) => graphContainer !== null )
-	) )
-
-	for( const graphContainer of graphContainers ){
-		const handler = ( event ) => {
-			handleSpectrumGridlineChange( event )
-		}
-
-		graphContainer.addEventListener( SPECTRUM_GRIDLINE_CHANGE_EVENT, handler )
-		spectrumGridlineGraphListeners.push({
-			element: graphContainer,
-			handler
-		})
-	}
-}
-
-const clearSpectrumLegendGraphListeners = () => {
-
-	for( const listenerEntry of spectrumLegendGraphListeners ){
-		listenerEntry.element.removeEventListener( SPECTRUM_LEGEND_CHANGE_EVENT, listenerEntry.handler )
-	}
-
-	spectrumLegendGraphListeners = []
-}
-
-const syncSpectrumLegendGraphListeners = () => {
-
-	clearSpectrumLegendGraphListeners()
-
-	if( deckTopPanelGraph.value === null ){
-		return
-	}
-
-	const handler = ( event ) => {
-		topSpectrumPaneLegendVisible.value = event?.detail?.visible !== false
-	}
-
-	deckTopPanelGraph.value.addEventListener( SPECTRUM_LEGEND_CHANGE_EVENT, handler )
-	spectrumLegendGraphListeners.push({
-		element: deckTopPanelGraph.value,
-		handler
-	})
-}
-
-const clearHeatmapModebarGraphListeners = () => {
-
-	for( const listenerEntry of heatmapModebarGraphListeners ){
-		listenerEntry.element.removeEventListener( listenerEntry.eventName, listenerEntry.handler )
-	}
-
-	heatmapModebarGraphListeners = []
-}
-
-const syncHeatmapModebarGraphListeners = () => {
-
-	clearHeatmapModebarGraphListeners()
-
-	if( graph.value === null ) return
-
-	const interactionHandler = ( event ) => {
-		if( typeof event?.detail?.zoomAspectRatio === "string" ){
-			setHeatmapZoomAspectRatio( event.detail.zoomAspectRatio )
-		}
-		setHeatmapInteractionMode( event?.detail?.mode )
-	}
-	const resetHandler = () => {
-		void handleHeatmapResetZoom()
-	}
-
-	graph.value.addEventListener( HEATMAP_INTERACTION_CHANGE_EVENT, interactionHandler )
-	graph.value.addEventListener( HEATMAP_RESET_VIEW_EVENT, resetHandler )
-
-	heatmapModebarGraphListeners.push({
-		element: graph.value,
-		eventName: HEATMAP_INTERACTION_CHANGE_EVENT,
-		handler: interactionHandler
-	})
-	heatmapModebarGraphListeners.push({
-		element: graph.value,
-		eventName: HEATMAP_RESET_VIEW_EVENT,
-		handler: resetHandler
-	})
-}
-
 const loadZBlendPreset = async ( requestID = null ) => {
 
 	ensureDefaultZBlendState()
@@ -5534,6 +4185,9 @@ const loadZBlendPreset = async ( requestID = null ) => {
 			status: "defaulted",
 			message: ""
 		})
+		if( Number( error?.status ) === 404 ){
+			return
+		}
 		console.log( error )
 	}
 }
@@ -6083,339 +4737,973 @@ const saveXyzSettings = async ( payload ) => {
 	}
 }
 
-const toggleAllRoiOverlays = () => {
+const applySpectralCalibrationAssignment = ( assignmentProfile = null, options = {} ) => {
+	const profile = assignmentProfile !== null && typeof assignmentProfile === "object" ? assignmentProfile : null
+	const profileID = String( profile?.profileID ?? options?.profileID ?? "" ).trim()
+	const model = profile !== null ? normalizeSpectralCalibrationProfileModel( profile ) : buildDefaultSpectralCalibrationModel()
 
-	if( showAllRoiOverlays.value ){
-		clearSelectedRois()
+	spectralCalibrationAssignedProfileID.value = profileID
+	spectralCalibrationSelectedProfileID.value = profileID
+	spectralCalibrationAssignedProfile.value = profile
+	spectralCalibrationSelectedProfile.value = profile
+	spectralCalibrationPreview.value = null
+	spectralCalibrationDraft.value = buildSpectralCalibrationDraftFromModel( model )
+	focusedSpectralCalibrationPointID.value = ""
+	spectralCalibrationError.value = ""
+}
+
+const buildSpectralCalibrationProfilePayload = ( calibrationModel = spectralCalibrationDraftModel.value, metadata = {} ) => {
+	const normalizedModel = normalizeSpectralCalibrationProfileModel( calibrationModel )
+	const points = Array.isArray( normalizedModel?.points ) ? normalizedModel.points.map(( point ) => ({
+		id: String( point?.id ?? "" ),
+		sourceX: Number( point?.sourceX ?? 0 ),
+		targetX: Number( point?.targetX ?? 0 )
+	})) : []
+	const polynomialOrder = Number( normalizedModel?.polynomialOrder ?? 0 )
+	const includedOrders = Array.isArray( normalizedModel?.includedOrders ) ? normalizedModel.includedOrders : [ 0 ]
+
+	return {
+		version: "calibration-profile-write-v2",
+		profileKind: "axis-calibration",
+		axisRole: HYPERSPECTRAL_CALIBRATION_AXIS_ROLE,
+		sourceProjectID: String( project.value?.id ?? "" ).trim(),
+		dataType: measurementDataType,
+		friendlyName: String( metadata?.friendlyName ?? "" ).trim(),
+		description: String( metadata?.description ?? "" ).trim(),
+		polynomialOrder,
+		includedOrders,
+		points,
+		model: {
+			type: "polynomial",
+			polynomialOrder,
+			includedOrders,
+			points
+		}
+	}
+}
+
+const refreshSpectralCalibrationProfiles = async () => {
+	if( project.value?.shared ){
 		return
 	}
 
-	selectedRoiIds.value = rois.value
-		.map(( roi ) => String( roi?.roiId ?? "" ).trim() )
-		.filter(( roiId ) => roiId.length > 0 )
+	spectralCalibrationProfilesLoading.value = true
+	spectralCalibrationError.value = ""
+
+	try{
+		const ownedResponse = await datalib.listCalibrationProfiles({
+			dataType: measurementDataType,
+			axisRole: HYPERSPECTRAL_CALIBRATION_AXIS_ROLE,
+			scope: "owned"
+		})
+		const ownedProfiles = Array.isArray( ownedResponse?.items ) ? ownedResponse.items : []
+		let sharedProfiles = []
+
+		try{
+			const sharedResponse = await datalib.listCalibrationProfiles({
+				dataType: measurementDataType,
+				axisRole: HYPERSPECTRAL_CALIBRATION_AXIS_ROLE,
+				scope: "shared"
+			})
+			sharedProfiles = Array.isArray( sharedResponse?.items )
+				? sharedResponse.items.map(( profile ) => ({ ...profile, shared: true }))
+				: []
+		} catch( error ){
+			if( isMissingCalibrationProfileApiError( error ) === false ){
+				console.log( error )
+			}
+		}
+
+		const profileByID = new Map()
+		for( const profile of [ ...ownedProfiles, ...sharedProfiles ] ){
+			const profileID = String( profile?.profileID ?? "" ).trim()
+			if( profileID.length > 0 && profileByID.has( profileID ) === false ){
+				profileByID.set( profileID, profile )
+			}
+		}
+
+		spectralCalibrationProfiles.value = Array.from( profileByID.values() )
+		spectralCalibrationProfilesSupported.value = true
+	} catch( error ){
+		if( isMissingCalibrationProfileApiError( error ) ){
+			spectralCalibrationProfilesSupported.value = false
+			spectralCalibrationProfiles.value = []
+			return
+		}
+
+		spectralCalibrationError.value = String( error?.detail ?? error?.message ?? "Failed to load calibration profiles." ).trim()
+		console.log( error )
+	} finally {
+		spectralCalibrationProfilesLoading.value = false
+	}
+}
+
+const loadAssignedSpectralCalibration = async () => {
+	spectralCalibrationError.value = ""
+
+	try{
+		const assignment = await datalib.getProjectCalibration(
+			project.value,
+			measurementDataType,
+			HYPERSPECTRAL_CALIBRATION_AXIS_ROLE
+		)
+		spectralCalibrationProfilesSupported.value = true
+
+		if( assignment?.profile ){
+			applySpectralCalibrationAssignment( assignment.profile, {
+				profileID: assignment.profileID
+			})
+			return true
+		}
+
+		const assignedProfileID = String( assignment?.profileID ?? "" ).trim()
+		if( assignedProfileID.length > 0 ){
+			const profile = await datalib.getCalibrationProfile(
+				assignedProfileID,
+				measurementDataType,
+				HYPERSPECTRAL_CALIBRATION_AXIS_ROLE
+			)
+			applySpectralCalibrationAssignment( profile, {
+				profileID: assignedProfileID
+			})
+			return true
+		}
+
+		applySpectralCalibrationAssignment( null )
+		return true
+	} catch( error ){
+		if( isMissingCalibrationProfileApiError( error ) ){
+			spectralCalibrationProfilesSupported.value = false
+			applySpectralCalibrationAssignment( null )
+			return false
+		}
+
+		spectralCalibrationError.value = String( error?.detail ?? error?.message ?? "Failed to load assigned calibration." ).trim()
+		console.log( error )
+	}
+
+	return false
+}
+
+const loadSpectralCalibrationState = async () => {
+	await loadAssignedSpectralCalibration()
+	if( project.value?.shared !== true && spectralCalibrationProfilesSupported.value ){
+		await refreshSpectralCalibrationProfiles()
+	}
+}
+
+const openSpectralCalibrationSidebar = async () => {
+	spectralCalibrationSidebarOpen.value = true
+	if(
+		project.value?.shared !== true &&
+		spectralCalibrationProfilesSupported.value &&
+		spectralCalibrationProfilesLoading.value === false &&
+		spectralCalibrationProfiles.value.length === 0
+	){
+		await refreshSpectralCalibrationProfiles()
+	}
+
+	await nextTick()
+	syncSpectralCalibrationPlotClickListeners()
+	await syncSpectralCalibrationReferenceLines()
+}
+
+const renderSpectralCalibrationChange = async () => {
+	resetDeckPanelRenderKeys()
+	if( graph.value === null || currentMatrix() === null ){
+		syncSpectralCalibrationPlotClickListeners()
+		await syncSpectralCalibrationReferenceLines()
+		return
+	}
+
+	await renderCurrentMatrix()
+	await nextTick()
+	syncSpectralCalibrationPlotClickListeners()
+	await syncSpectralCalibrationReferenceLines()
+}
+
+const handleSpectralCalibrationProfileSelection = async ( nextProfileID ) => {
+	const normalizedProfileID = String( nextProfileID ?? "" ).trim()
+	spectralCalibrationSelectedProfileID.value = normalizedProfileID
+	spectralCalibrationError.value = ""
+
+	if( normalizedProfileID.length === 0 ){
+		spectralCalibrationSelectedProfile.value = null
+		spectralCalibrationPreview.value = null
+		spectralCalibrationDraft.value = buildSpectralCalibrationDraftFromModel( buildDefaultSpectralCalibrationModel() )
+		focusedSpectralCalibrationPointID.value = ""
+		await renderSpectralCalibrationChange()
+		return
+	}
+
+	const existingProfile = spectralCalibrationSelectedProfile.value
+	if(
+		String( existingProfile?.profileID ?? "" ).trim() === normalizedProfileID &&
+		( existingProfile?.model?.type === "polynomial" || Array.isArray( existingProfile?.points ))
+	){
+		spectralCalibrationPreview.value = null
+		spectralCalibrationDraft.value = buildSpectralCalibrationDraftFromModel( existingProfile )
+		focusedSpectralCalibrationPointID.value = ""
+		await renderSpectralCalibrationChange()
+		return
+	}
+
+	spectralCalibrationProfilesLoading.value = true
+
+	try{
+		const profile = await datalib.getCalibrationProfile(
+			normalizedProfileID,
+			measurementDataType,
+			HYPERSPECTRAL_CALIBRATION_AXIS_ROLE
+		)
+		spectralCalibrationProfilesSupported.value = true
+		spectralCalibrationSelectedProfile.value = profile
+		spectralCalibrationPreview.value = null
+		spectralCalibrationDraft.value = buildSpectralCalibrationDraftFromModel( profile )
+		focusedSpectralCalibrationPointID.value = ""
+		await renderSpectralCalibrationChange()
+	} catch( error ){
+		if( isMissingCalibrationProfileApiError( error ) ){
+			spectralCalibrationProfilesSupported.value = false
+			return
+		}
+
+		spectralCalibrationError.value = String( error?.detail ?? error?.message ?? "Failed to load calibration profile." ).trim()
+		console.log( error )
+	} finally {
+		spectralCalibrationProfilesLoading.value = false
+	}
+}
+
+const assignSpectralCalibrationProfileToProject = async () => {
+	if( project.value?.shared || spectralCalibrationAssignmentSaving.value ){
+		return false
+	}
+
+	spectralCalibrationAssignmentSaving.value = true
+	spectralCalibrationError.value = ""
+
+	try{
+		const selectedProfileID = String( spectralCalibrationSelectedProfileID.value ?? "" ).trim()
+		const assignment = await datalib.setProjectCalibration(
+			project.value,
+			selectedProfileID.length > 0 ? selectedProfileID : null,
+			measurementDataType,
+			HYPERSPECTRAL_CALIBRATION_AXIS_ROLE
+		)
+		const assignedProfileID = String( assignment?.profileID ?? selectedProfileID ).trim()
+		const assignedProfile = assignment?.profile ??
+			( assignedProfileID.length > 0 && String( spectralCalibrationSelectedProfile.value?.profileID ?? "" ).trim() === assignedProfileID
+				? spectralCalibrationSelectedProfile.value
+				: null )
+		applySpectralCalibrationAssignment( assignedProfile, {
+			profileID: assignedProfileID
+		})
+		if( spectralCalibrationProfilesSupported.value ){
+			await refreshSpectralCalibrationProfiles()
+		}
+		await renderSpectralCalibrationChange()
+		return true
+	} catch( error ){
+		if( isMissingCalibrationProfileApiError( error ) ){
+			spectralCalibrationProfilesSupported.value = false
+			return false
+		}
+
+		spectralCalibrationError.value = String( error?.detail ?? error?.message ?? "Failed to save calibration assignment." ).trim()
+		console.log( error )
+		return false
+	} finally {
+		spectralCalibrationAssignmentSaving.value = false
+	}
+}
+
+const applySpectralCalibrationPreview = async () => {
+	if( spectralCalibrationHasSavablePoints.value === false ){
+		return
+	}
+
+	spectralCalibrationPreview.value = cloneSpectralCalibrationModel( spectralCalibrationDraftModel.value )
+	await renderSpectralCalibrationChange()
+}
+
+const openSpectralCalibrationProfileSaveModal = async () => {
+	if( canSaveSpectralCalibrationProfile.value === false ){
+		return
+	}
+
+	const activeName = String( activeSpectralCalibrationProfile.value?.friendlyName ?? "" ).trim()
+	const defaultName = String( activeName || project.value?.name || project.value?.id || "" ).trim() || "Spectral calibration profile"
+	await spectralCalibrationProfileSaveModal.value?.open?.({
+		name: spectralCalibrationProfileNameExists( defaultName ) ? "" : defaultName,
+		description: String( activeSpectralCalibrationProfile.value?.description ?? "" ).trim()
+	})
+}
+
+const saveSpectralCalibrationProfile = async ( metadata = {} ) => {
+	const friendlyName = String( metadata?.friendlyName ?? "" ).trim()
+	const description = String( metadata?.description ?? "" ).trim()
+	if(
+		project.value?.shared ||
+		spectralCalibrationProfileSaving.value ||
+		canSaveSpectralCalibrationProfile.value === false ||
+		friendlyName.length === 0 ||
+		spectralCalibrationProfileNameExists( friendlyName )
+	){
+		return
+	}
+
+	spectralCalibrationProfileSaving.value = true
+	spectralCalibrationError.value = ""
+
+	try{
+		const savedProfile = await datalib.createCalibrationProfile(
+			buildSpectralCalibrationProfilePayload( spectralCalibrationDraftModel.value, { friendlyName, description }),
+			measurementDataType,
+			HYPERSPECTRAL_CALIBRATION_AXIS_ROLE
+		)
+		spectralCalibrationProfilesSupported.value = true
+		spectralCalibrationSelectedProfileID.value = String( savedProfile?.profileID ?? "" ).trim()
+		spectralCalibrationSelectedProfile.value = savedProfile
+		spectralCalibrationPreview.value = null
+		spectralCalibrationDraft.value = buildSpectralCalibrationDraftFromModel( savedProfile )
+		focusedSpectralCalibrationPointID.value = ""
+		spectralCalibrationProfileSaveModal.value?.close?.()
+		await refreshSpectralCalibrationProfiles()
+		await renderSpectralCalibrationChange()
+	} catch( error ){
+		if( isMissingCalibrationProfileApiError( error ) ){
+			spectralCalibrationProfilesSupported.value = false
+		} else {
+			spectralCalibrationError.value = String( error?.detail ?? error?.message ?? "Failed to save calibration profile." ).trim()
+			console.log( error )
+		}
+	} finally {
+		spectralCalibrationProfileSaving.value = false
+	}
+}
+
+const updateSpectralCalibrationPointTarget = ( payload = {} ) => {
+	const pointID = String( payload?.id ?? "" ).trim()
+	if( pointID.length === 0 ){
+		return
+	}
+
+	spectralCalibrationDraft.value = {
+		...spectralCalibrationDraft.value,
+		points: spectralCalibrationDraft.value.points.map(( point ) => {
+			if( point.id !== pointID ){
+				return point
+			}
+
+			return {
+				...point,
+				targetInput: String( payload?.value ?? "" )
+			}
+		})
+	}
+}
+
+const updateSpectralCalibrationPolynomialOrder = ( value ) => {
+	const requestedOrder = Math.trunc( Number( value ) )
+	const nextOrder = Number.isFinite( requestedOrder )
+		? Math.min( Math.max( requestedOrder, 0 ), spectralCalibrationMaxOrder.value )
+		: 0
+	const currentOrder = Math.max( Math.trunc( Number( spectralCalibrationDraft.value.polynomialOrder ) ), 0 )
+	const currentIncludedOrders = Array.isArray( spectralCalibrationDraft.value.includedOrders )
+		? spectralCalibrationDraft.value.includedOrders
+		: [ currentOrder ]
+	const nextIncludedOrderCandidates = currentIncludedOrders.filter(( order ) => Number( order ) <= nextOrder )
+
+	if( nextOrder > currentOrder ){
+		for( let order = currentOrder + 1; order <= nextOrder; order++ ){
+			nextIncludedOrderCandidates.push( order )
+		}
+	}
+
+	spectralCalibrationDraft.value = {
+		...spectralCalibrationDraft.value,
+		polynomialOrder: nextOrder,
+		includedOrders: normalizeSpectralCalibrationIncludedOrders( nextIncludedOrderCandidates, nextOrder )
+	}
+}
+
+const toggleSpectralCalibrationIncludedOrder = ( value ) => {
+	const order = Math.trunc( Number( value ) )
+	if( Number.isInteger( order ) === false ){
+		return
+	}
+
+	const currentOrder = Math.max( Math.trunc( Number( spectralCalibrationDraft.value.polynomialOrder ) ), 0 )
+	if( order < 0 || order > currentOrder || order === currentOrder ){
+		return
+	}
+
+	const currentIncludedOrders = Array.isArray( spectralCalibrationDraft.value.includedOrders )
+		? spectralCalibrationDraft.value.includedOrders
+		: [ currentOrder ]
+	const nextIncludedOrders = currentIncludedOrders.includes( order )
+		? currentIncludedOrders.filter(( includedOrder ) => Number( includedOrder ) !== order )
+		: [ ...currentIncludedOrders, order ]
+
+	spectralCalibrationDraft.value = {
+		...spectralCalibrationDraft.value,
+		includedOrders: normalizeSpectralCalibrationIncludedOrders( nextIncludedOrders, currentOrder )
+	}
+}
+
+const removeSpectralCalibrationPoint = ( pointID ) => {
+	const normalizedPointID = String( pointID ?? "" ).trim()
+	if( normalizedPointID.length === 0 ){
+		return
+	}
+
+	spectralCalibrationDraft.value = {
+		...spectralCalibrationDraft.value,
+		points: spectralCalibrationDraft.value.points.filter(( point ) => point.id !== normalizedPointID )
+	}
+
+	if( focusedSpectralCalibrationPointID.value === normalizedPointID ){
+		focusedSpectralCalibrationPointID.value = ""
+	}
+
+	if( spectralCalibrationDraft.value.polynomialOrder > spectralCalibrationMaxOrder.value ){
+		spectralCalibrationDraft.value = {
+			...spectralCalibrationDraft.value,
+			polynomialOrder: spectralCalibrationMaxOrder.value,
+			includedOrders: normalizeSpectralCalibrationIncludedOrders(
+				spectralCalibrationDraft.value.includedOrders,
+				spectralCalibrationMaxOrder.value
+			)
+		}
+	}
+}
+
+const setFocusedSpectralCalibrationPointID = ( pointID ) => {
+	focusedSpectralCalibrationPointID.value = String( pointID ?? "" ).trim()
+}
+
+const spectralCalibrationEditingActive = computed(() => {
+	return spectralCalibrationSidebarOpen.value &&
+		project.value?.shared !== true &&
+		spectralCalibrationProfilesSupported.value
+})
+
+const spectralCalibrationDisplayValueForSource = ( sourceX ) => {
+	const numericSourceX = Number( sourceX )
+	if( Number.isFinite( numericSourceX ) === false ){
+		return null
+	}
+
+	const calibrationModel = activeSpectralCalibrationModel.value
+	if( calibrationModel === null ){
+		return numericSourceX
+	}
+
+	const calibratedValues = applyCalibrationToValues([ numericSourceX ], calibrationModel )
+	const calibratedValue = Number( calibratedValues?.[0] )
+	return Number.isFinite( calibratedValue ) ? calibratedValue : numericSourceX
+}
+
+const spectralCalibrationReferenceLines = computed(() => {
+	const focusedPointID = String( focusedSpectralCalibrationPointID.value ?? "" ).trim()
+	return spectralCalibrationDraft.value.points
+		.map(( point ) => {
+			const displayX = spectralCalibrationDisplayValueForSource( point.sourceX )
+			if( Number.isFinite( displayX ) === false ){
+				return null
+			}
+
+			const focused = focusedPointID.length > 0 && point.id === focusedPointID
+			const pulse = 0.5 + 0.5 * Math.sin( spectralCalibrationPulsePhase.value )
+
+			return {
+				x: displayX,
+				color: focused ? `rgba(17, 17, 17, ${0.55 + 0.45 * pulse})` : "rgba(17, 17, 17, 0.75)",
+				width: focused ? 1.5 + 1.5 * pulse : 1,
+				dash: focused ? "solid" : "dash"
+			}
+		})
+		.filter(( line ) => line !== null )
+})
+
+const spectralCalibrationHoverSelections = new WeakMap()
+const MAX_SPECTRAL_CALIBRATION_CLICK_DISTANCE_PX = 14
+const SPECTRAL_CALIBRATION_CLICK_DEDUP_WINDOW_MS = 48
+
+const buildSpectralCalibrationClickSignature = ( graphElement, eventLike ) => {
+	const clientX = Number( eventLike?.clientX )
+	const clientY = Number( eventLike?.clientY )
+	const timeStamp = Number( eventLike?.timeStamp )
+	if( Number.isFinite( clientX ) === false || Number.isFinite( clientY ) === false || Number.isFinite( timeStamp ) === false ){
+		return null
+	}
+
+	return {
+		graphElement,
+		clientX,
+		clientY,
+		timeStamp
+	}
+}
+
+const isDuplicateSpectralCalibrationClick = ( signature ) => {
+	if( signature === null || lastSpectralCalibrationClickSignature === null ){
+		return false
+	}
+
+	return signature.graphElement === lastSpectralCalibrationClickSignature.graphElement &&
+		Math.abs( signature.clientX - lastSpectralCalibrationClickSignature.clientX ) <= 1 &&
+		Math.abs( signature.clientY - lastSpectralCalibrationClickSignature.clientY ) <= 1 &&
+		Math.abs( signature.timeStamp - lastSpectralCalibrationClickSignature.timeStamp ) <= SPECTRAL_CALIBRATION_CLICK_DEDUP_WINDOW_MS
+}
+
+const rememberSpectralCalibrationClick = ( signature ) => {
+	lastSpectralCalibrationClickSignature = signature
+}
+
+const spectralCalibrationAxisReferenceToLayoutKey = ( axisReference = "", axisType = "x" ) => {
+	const normalizedAxisReference = String( axisReference ?? "" ).trim().toLowerCase()
+	const normalizedAxisType = axisType === "y" ? "y" : "x"
+	if( normalizedAxisReference.length === 0 || normalizedAxisReference === normalizedAxisType ){
+		return `${normalizedAxisType}axis`
+	}
+
+	if( normalizedAxisReference.startsWith( normalizedAxisType ) ){
+		const suffix = normalizedAxisReference.slice( normalizedAxisType.length )
+		return `${normalizedAxisType}axis${suffix}`
+	}
+
+	return `${normalizedAxisType}axis`
+}
+
+const resolveSpectralCalibrationGraphAxis = ( graphElement, axisReference = "", axisType = "x" ) => {
+	const axisKey = spectralCalibrationAxisReferenceToLayoutKey( axisReference, axisType )
+	return graphElement?._fullLayout?.[ axisKey ] ?? null
+}
+
+const readSpectralCalibrationTracePointDistance = ( tracePoints = [], clickedValue ) => {
+	let bestIndex = -1
+	let bestDistance = Number.POSITIVE_INFINITY
+
+	for( let index = 0; index < tracePoints.length; index += 1 ){
+		const tracePointValue = Number( tracePoints[ index ] )
+		if( Number.isFinite( tracePointValue ) === false ){
+			continue
+		}
+
+		const nextDistance = Math.abs( tracePointValue - clickedValue )
+		if( nextDistance < bestDistance ){
+			bestDistance = nextDistance
+			bestIndex = index
+		}
+	}
+
+	return bestIndex
+}
+
+const resolveSpectralCalibrationPointIndex = ( selectedPoint, selectedTrace ) => {
+	const candidateIndices = [
+		selectedPoint?.pointIndex,
+		selectedPoint?.pointNumber,
+		selectedPoint?.i
+	]
+	const tracePointCount = Array.isArray( selectedTrace?.x ) ? selectedTrace.x.length : 0
+
+	for( const candidateIndex of candidateIndices ){
+		const normalizedIndex = Number( candidateIndex )
+		if( Number.isInteger( normalizedIndex ) && normalizedIndex >= 0 && ( tracePointCount === 0 || normalizedIndex < tracePointCount ) ){
+			return normalizedIndex
+		}
+	}
+
+	const selectedX = Number( selectedPoint?.x )
+	if( Number.isFinite( selectedX ) && Array.isArray( selectedTrace?.x ) ){
+		const matchingIndex = selectedTrace.x.findIndex(( traceX ) => Math.abs( Number( traceX ) - selectedX ) < 1e-9 )
+		if( matchingIndex >= 0 ){
+			return matchingIndex
+		}
+	}
+
+	return null
+}
+
+const resolveSpectralCalibrationSourceXFromIndex = ( index, fallbackValue = null ) => {
+	const pointIndex = Number( index )
+	const rawValues = rawSpectralAxisValues()
+	if( Number.isInteger( pointIndex ) && pointIndex >= 0 && pointIndex < rawValues.length ){
+		const rawValue = Number( rawValues[ pointIndex ] )
+		if( Number.isFinite( rawValue ) ){
+			return rawValue
+		}
+	}
+
+	const fallback = Number( fallbackValue )
+	return Number.isFinite( fallback ) ? fallback : null
+}
+
+const isSpectralCalibrationClickableTrace = ( trace ) => {
+	if( trace === null || typeof trace !== "object" ){
+		return false
+	}
+	if( trace.visible === false || trace.visible === "legendonly" ){
+		return false
+	}
+	if( trace.hoverinfo === "skip" ){
+		return false
+	}
+	if( Array.isArray( trace.x ) === false || Array.isArray( trace.y ) === false ){
+		return false
+	}
+
+	return trace.x.length > 0 && trace.y.length > 0
+}
+
+const resolveSpectralCalibrationSelection = ( eventData ) => {
+	const candidatePoints = Array.isArray( eventData?.points ) ? eventData.points : []
+	for( const selectedPoint of candidatePoints ){
+		const selectedTrace = selectedPoint?.data ?? selectedPoint?.fullData ?? null
+		if( isSpectralCalibrationClickableTrace( selectedTrace ) === false ){
+			continue
+		}
+
+		const pointIndex = resolveSpectralCalibrationPointIndex( selectedPoint, selectedTrace )
+		const sourceX = resolveSpectralCalibrationSourceXFromIndex( pointIndex, selectedPoint?.x )
+		if( Number.isFinite( sourceX ) ){
+			return { sourceX, selectedPoint, selectedTrace }
+		}
+	}
+
+	return null
+}
+
+const resolveSpectralCalibrationSelectionFromGraphClick = ( graphElement, event ) => {
+	if( graphElement === null || event === null || event === undefined ){
+		return null
+	}
+
+	const fullLayout = graphElement?._fullLayout ?? null
+	const plotRect = typeof graphElement.getBoundingClientRect === "function"
+		? graphElement.getBoundingClientRect()
+		: null
+	if( fullLayout === null || plotRect === null ){
+		return null
+	}
+
+	const relativeX = event.clientX - plotRect.left
+	const relativeY = event.clientY - plotRect.top
+	const traces = Array.isArray( graphElement.data ) ? graphElement.data : []
+	const lowerBandTraceByLegendGroup = new Map()
+
+	for( const trace of traces ){
+		const legendGroup = typeof trace?.legendgroup === "string" ? trace.legendgroup.trim() : ""
+		if( isSpectralCalibrationClickableTrace( trace ) && legendGroup.length > 0 && trace?.fill !== "tonexty" ){
+			lowerBandTraceByLegendGroup.set( legendGroup, trace )
+		}
+	}
+
+	let bestSelection = null
+
+	for( const trace of traces ){
+		if( isSpectralCalibrationClickableTrace( trace ) === false ){
+			continue
+		}
+
+		const xAxis = resolveSpectralCalibrationGraphAxis( graphElement, trace?.xaxis, "x" )
+		const yAxis = resolveSpectralCalibrationGraphAxis( graphElement, trace?.yaxis, "y" )
+		if( xAxis === null || yAxis === null || typeof xAxis.p2d !== "function" || typeof xAxis.d2p !== "function" || typeof yAxis.d2p !== "function" ){
+			continue
+		}
+
+		const plotLeft = Number( xAxis._offset ?? 0 )
+		const plotTop = Number( yAxis._offset ?? 0 )
+		const plotRight = plotLeft + Number( xAxis._length ?? 0 )
+		const plotBottom = plotTop + Number( yAxis._length ?? 0 )
+		if( relativeX < plotLeft || relativeX > plotRight || relativeY < plotTop || relativeY > plotBottom ){
+			continue
+		}
+
+		const clickedXValue = Number( xAxis.p2d( relativeX - plotLeft ) )
+		if( Number.isFinite( clickedXValue ) === false ){
+			continue
+		}
+
+		const displayedXValues = Array.isArray( trace?.x ) ? trace.x : []
+		const yValues = Array.isArray( trace?.y ) ? trace.y : []
+		const nearestIndex = readSpectralCalibrationTracePointDistance( displayedXValues, clickedXValue )
+		if( nearestIndex < 0 ){
+			continue
+		}
+
+		const sourceX = resolveSpectralCalibrationSourceXFromIndex( nearestIndex, displayedXValues[ nearestIndex ] )
+		const displayedX = Number( displayedXValues[ nearestIndex ] )
+		if( Number.isFinite( sourceX ) === false || Number.isFinite( displayedX ) === false ){
+			continue
+		}
+
+		const projectedX = Number( xAxis.d2p( displayedX ) ) + plotLeft
+		const horizontalDistance = Math.abs( relativeX - projectedX )
+		if( horizontalDistance > MAX_SPECTRAL_CALIBRATION_CLICK_DISTANCE_PX ){
+			continue
+		}
+
+		let verticalDistance = Number.POSITIVE_INFINITY
+		if( trace?.fill === "tonexty" ){
+			const legendGroup = typeof trace?.legendgroup === "string" ? trace.legendgroup.trim() : ""
+			const lowerBandTrace = lowerBandTraceByLegendGroup.get( legendGroup ) ?? null
+			const lowerY = Number( lowerBandTrace?.y?.[ nearestIndex ] )
+			const upperY = Number( yValues[ nearestIndex ] )
+			if( Number.isFinite( lowerY ) === false || Number.isFinite( upperY ) === false ){
+				continue
+			}
+
+			const lowerPixel = Number( yAxis.d2p( lowerY ) ) + plotTop
+			const upperPixel = Number( yAxis.d2p( upperY ) ) + plotTop
+			const bandTop = Math.min( lowerPixel, upperPixel )
+			const bandBottom = Math.max( lowerPixel, upperPixel )
+			if( relativeY < bandTop ){
+				verticalDistance = bandTop - relativeY
+			} else if( relativeY > bandBottom ){
+				verticalDistance = relativeY - bandBottom
+			} else {
+				verticalDistance = 0
+			}
+		} else {
+			const displayedY = Number( yValues[ nearestIndex ] )
+			if( Number.isFinite( displayedY ) === false ){
+				continue
+			}
+
+			const projectedY = Number( yAxis.d2p( displayedY ) ) + plotTop
+			verticalDistance = Math.abs( relativeY - projectedY )
+		}
+
+		const score = horizontalDistance + verticalDistance
+		if( Number.isFinite( score ) === false ){
+			continue
+		}
+
+		if( bestSelection === null || score < bestSelection.score ){
+			bestSelection = {
+				sourceX,
+				score
+			}
+		}
+	}
+
+	return bestSelection
+}
+
+const applySpectralCalibrationSelection = ( sourceX ) => {
+	if( Number.isFinite( sourceX ) === false ){
+		return
+	}
+
+	const existingPoint = spectralCalibrationDraft.value.points.find(( point ) => Math.abs( Number( point.sourceX ) - sourceX ) < 1e-9 ) ?? null
+	if( existingPoint !== null ){
+		focusedSpectralCalibrationPointID.value = existingPoint.id
+		spectralCalibrationPanelOpen.value = true
+		return
+	}
+
+	spectralCalibrationDraftPointCounter.value += 1
+	const nextPoint = {
+		id: `calibration-point-${spectralCalibrationDraftPointCounter.value}`,
+		sourceX,
+		targetInput: String( sourceX )
+	}
+
+	spectralCalibrationDraft.value = {
+		...spectralCalibrationDraft.value,
+		points: [ ...spectralCalibrationDraft.value.points, nextPoint ]
+	}
+
+	focusedSpectralCalibrationPointID.value = nextPoint.id
+	spectralCalibrationPanelOpen.value = true
+}
+
+const detachSpectralCalibrationPlotClickListeners = () => {
+	const graphElements = [ deckTopPanelGraph.value, deckBottomPanelGraph.value ]
+
+	for( const graphElement of graphElements ){
+		if( graphElement === null ) continue
+
+		if( typeof graphElement.removeListener === "function" ){
+			if( spectralCalibrationPlotHoverHandler !== null ){
+				graphElement.removeListener( "plotly_hover", spectralCalibrationPlotHoverHandler )
+			}
+			if( spectralCalibrationPlotUnhoverHandler !== null ){
+				graphElement.removeListener( "plotly_unhover", spectralCalibrationPlotUnhoverHandler )
+			}
+		}
+
+		if( spectralCalibrationGraphClickFallbackHandler !== null ){
+			graphElement.removeEventListener( "click", spectralCalibrationGraphClickFallbackHandler )
+		}
+
+		spectralCalibrationHoverSelections.delete( graphElement )
+	}
+
+	lastSpectralCalibrationClickSignature = null
+}
+
+const syncSpectralCalibrationHoverSelection = ( graphElement, eventData ) => {
+	if( graphElement === null ){
+		return
+	}
+
+	const selection = resolveSpectralCalibrationSelection( eventData )
+	if( selection === null ){
+		spectralCalibrationHoverSelections.delete( graphElement )
+		return
+	}
+
+	spectralCalibrationHoverSelections.set( graphElement, selection )
+}
+
+const handleSpectralCalibrationGraphClickFallback = ( graphElement, event ) => {
+	if( spectralCalibrationEditingActive.value === false || graphElement === null ){
+		return
+	}
+
+	const clickSignature = buildSpectralCalibrationClickSignature( graphElement, event )
+	if( isDuplicateSpectralCalibrationClick( clickSignature ) ){
+		return
+	}
+
+	if( event?.target instanceof Element && event.target.closest( ".modebar" ) !== null ){
+		return
+	}
+
+	const directSelection = resolveSpectralCalibrationSelectionFromGraphClick( graphElement, event )
+	if( directSelection !== null ){
+		rememberSpectralCalibrationClick( clickSignature )
+		applySpectralCalibrationSelection( directSelection.sourceX )
+		return
+	}
+
+	const selection = spectralCalibrationHoverSelections.get( graphElement ) ??
+		resolveSpectralCalibrationSelection({ points: graphElement?._hoverdata }) ??
+		null
+	if( selection === null ){
+		return
+	}
+
+	rememberSpectralCalibrationClick( clickSignature )
+	applySpectralCalibrationSelection( selection.sourceX )
+}
+
+const syncSpectralCalibrationPlotClickListeners = () => {
+	detachSpectralCalibrationPlotClickListeners()
+
+	if( spectralCalibrationEditingActive.value === false ){
+		spectralCalibrationPlotClickHandler = null
+		spectralCalibrationPlotHoverHandler = null
+		spectralCalibrationPlotUnhoverHandler = null
+		spectralCalibrationGraphClickFallbackHandler = null
+		return
+	}
+
+	const graphElements = [ deckTopPanelGraph.value, deckBottomPanelGraph.value ]
+	spectralCalibrationPlotHoverHandler = function( eventData ){
+		syncSpectralCalibrationHoverSelection( this ?? null, eventData )
+	}
+	spectralCalibrationPlotUnhoverHandler = function(){
+		if( this !== null && this !== undefined ){
+			spectralCalibrationHoverSelections.delete( this )
+		}
+	}
+	spectralCalibrationGraphClickFallbackHandler = function( event ){
+		handleSpectralCalibrationGraphClickFallback( this ?? null, event )
+	}
+
+	for( const graphElement of graphElements ){
+		if( graphElement === null ) continue
+		if( typeof graphElement.on === "function" ){
+			graphElement.on( "plotly_hover", spectralCalibrationPlotHoverHandler )
+			graphElement.on( "plotly_unhover", spectralCalibrationPlotUnhoverHandler )
+		}
+		graphElement.addEventListener( "click", spectralCalibrationGraphClickFallbackHandler )
+	}
+}
+
+const syncSpectralCalibrationReferenceLines = async () => {
+	const graphElements = [ deckTopPanelGraph.value, deckBottomPanelGraph.value ]
+	const lines = spectralCalibrationReferenceLines.value
+	const operations = graphElements
+		.filter(( graphElement ) => graphElement !== null )
+		.map(( graphElement ) => spectralCalibrationEditingActive.value
+			? plot.showCalibrationLines( lines, graphElement, settings.value )
+			: plot.deleteMarker( graphElement ))
+
+	await Promise.all( operations )
+}
+
+const stopSpectralCalibrationPulse = () => {
+	if( spectralCalibrationPulseInterval !== null ){
+		clearInterval( spectralCalibrationPulseInterval )
+		spectralCalibrationPulseInterval = null
+	}
+
+	spectralCalibrationPulsePhase.value = 0
+}
+
+const syncSpectralCalibrationPulse = () => {
+	stopSpectralCalibrationPulse()
+
+	if( spectralCalibrationEditingActive.value === false || focusedSpectralCalibrationPointID.value.length === 0 ){
+		return
+	}
+
+	let phase = 0
+	spectralCalibrationPulseInterval = setInterval(() => {
+		phase += Math.PI / 10
+		spectralCalibrationPulsePhase.value = phase
+	}, 100 )
+}
+
+const openGpuInferenceModal = async () => {
+	if( spectralCalibrationSelectionDirty.value ){
+		const shouldSave = window.confirm(
+			"The selected spectral calibration profile has not been saved to this project. Save it before starting Raman inference?"
+		)
+		if( shouldSave === false ){
+			return
+		}
+
+		const saved = await assignSpectralCalibrationProfileToProject()
+		if( saved === false || spectralCalibrationSelectionDirty.value ){
+			return
+		}
+	}
+
+	await openGpuInferenceModalBase()
+}
+
+const toggleAllRoiOverlays = () => {
+	applyToggleAllRoiOverlays()
 }
 
 const saveRoi = async ( payload ) => {
-
-	if( savingRoi.value ) return
-	if( canMutateRois.value === false ) return
-
-	const boundingBox = normalizeSelectionBoundingBox( selectedHeatmapBoundingBox.value )
-	if( boundingBox === null ) return
-
-	savingRoi.value = true
-
 	try{
-		await hyperspectra.createRoi( project.value, {
-			name: payload?.name,
-			description: payload?.description ?? "",
-			shapeType: "bounding-box",
-			strictBounds: false,
-			boundingBox
-			},
-			activeGroupID(),
-			estimateConfidenceLevels )
-
-		await loadRoiList( true )
-		resetEstimatedRoiArtifacts()
-		await loadEstimatedRoiList( true )
-
-		const matchedRoiId = newestMatchingRoiId( payload?.name, payload?.description ?? "" )
-		if( matchedRoiId.length > 0 ){
-			selectedRoiIds.value = [ matchedRoiId ]
+		const saved = await persistRoi( payload )
+		if( saved ){
+			roiSaveModal.value?.close()
 		}
-
-		roiSaveModal.value?.close()
 	} catch( error ){
 		console.log( error )
-	} finally {
-		savingRoi.value = false
 	}
 }
 
 const deleteSelectedRoi = async () => {
-
-	if( deletingRoi.value ) return
-	if( canMutateRois.value === false ) return
-	if( selectedRois.value.length === 0 ) return
-
-	const roiIds = selectedRois.value
-		.map(( roi ) => String( roi?.roiId ?? "" ).trim() )
-		.filter(( roiId ) => roiId.length > 0 )
-	if( roiIds.length === 0 ) return
-	deletingRoi.value = true
-
 	try{
-		const deletionResults = await Promise.allSettled(
-			roiIds.map(( roiId ) => hyperspectra.deleteRoi( project.value, roiId ))
-		)
-		selectedRoiIds.value = selectedRoiIds.value.filter(( value ) => {
-			return roiIds.includes( String( value ?? "" ).trim() ) === false
-		})
-		await loadRoiList( true )
-		resetEstimatedRoiArtifacts()
-		await loadEstimatedRoiList( true )
-		roiDeleteModal.value?.close()
-
-		const failedDeletion = deletionResults.find(( result ) => result.status === "rejected" )
-		if( failedDeletion?.status === "rejected" ){
-			throw failedDeletion.reason
+		const deleted = await deleteSelectedRois()
+		if( deleted ){
+			roiDeleteModal.value?.close()
 		}
 	} catch( error ){
 		console.log( error )
-	} finally {
-		deletingRoi.value = false
 	}
-}
-
-const spectrumSourcesToQuery = () => {
-
-	if( hasEstimatedRamanSpectraReady.value === false ){
-		return [ "measurement" ]
-	}
-
-	const mode = spectrumSelectionMode.value
-	if( mode === "raman" ){
-		return [ "raman" ]
-	}
-	if( mode === "both" ){
-		return [ "measurement", "raman" ]
-	}
-
-	return [ "measurement" ]
-}
-
-const dataTypeForSpectrumSource = ( source ) => {
-	normalizeSpectrumSource( source )
-	return measurementDataType
-}
-
-const dataSourceForSpectrumSource = ( source ) => {
-	return normalizeSpectrumSource( source ) === "raman" ? "estimate" : ""
-}
-
-const confidenceLevelsForSpectrumSource = ( source ) => {
-	return normalizeSpectrumSource( source ) === "raman"
-		? estimateConfidenceLevels
-		: confidenceLevelOptions
-}
-
-const updateLatestSingleSpectrum = ( source, x, y, response ) => {
-
-	if( normalizeSpectrumSource( source ) === "raman" ){
-		latestRamanSingleSpectrum.value = { x, y, response }
-		latestRamanSelectedSpectrum.value = response ?? null
-		return
-	}
-
-	latestMeasurementSingleSpectrum.value = { x, y, response }
-	latestMeasurementSelectedSpectrum.value = response ?? null
-}
-
-const updateLatestMeanSpectrum = ( source, xIndices, yIndices, boundingBox, response ) => {
-
-	const payload = {
-		xIndices: [ ...xIndices ],
-		yIndices: [ ...yIndices ],
-		pixelCount: selectionBoundingBoxPixelCount( boundingBox ),
-		boundingBox: normalizeSelectionBoundingBox( boundingBox ),
-		response
-	}
-
-	if( normalizeSpectrumSource( source ) === "raman" ){
-		latestRamanMeanSpectrum.value = payload
-		latestRamanSelectedSpectrum.value = response ?? null
-		return
-	}
-
-	latestMeasurementMeanSpectrum.value = payload
-	latestMeasurementSelectedSpectrum.value = response ?? null
-}
-
-const cancelSelectionSpectrumQueryState = () => {
-	cancelSelectionSpectrumQuery( "measurement" )
-	cancelSelectionSpectrumQuery( "raman" )
-}
-
-const queryPointSpectrumForSource = async ( source, x, y, requestID ) => {
-
-	const normalizedSource = normalizeSpectrumSource( source )
-
-	try{
-		const response = await hyperspectra.spectrum(
-			project.value,
-			x,
-			y,
-			activeGroupID(),
-			dataTypeForSpectrumSource( normalizedSource ),
-			dataSourceForSpectrumSource( normalizedSource ),
-			confidenceLevelsForSpectrumSource( normalizedSource )
-		)
-
-		if( isSelectionSpectrumQueryCurrent( normalizedSource, requestID ) === false ) return
-
-		updateLatestSingleSpectrum( normalizedSource, x, y, response )
-		await queueSpectraPanelRender()
-	} catch( error ){
-		console.log( error )
-	} finally {
-		finishSelectionSpectrumQuery( normalizedSource, requestID )
-	}
-}
-
-const queryMeanSpectrumForSource = async ( source, xIndices, yIndices, boundingBox, requestID ) => {
-
-	const normalizedSource = normalizeSpectrumSource( source )
-
-	try{
-		const response = await hyperspectra.meanSpectrum(
-			project.value,
-			boundingBox,
-			activeGroupID(),
-			false,
-			dataTypeForSpectrumSource( normalizedSource ),
-			dataSourceForSpectrumSource( normalizedSource ),
-			confidenceLevelsForSpectrumSource( normalizedSource )
-		)
-
-		if( isSelectionSpectrumQueryCurrent( normalizedSource, requestID ) === false ) return
-
-		updateLatestMeanSpectrum( normalizedSource, xIndices, yIndices, boundingBox, response )
-		await queueSpectraPanelRender()
-	} catch( error ){
-		console.log( error )
-	} finally {
-		finishSelectionSpectrumQuery( normalizedSource, requestID )
-	}
-}
-
-const handleHeatmapPointSelection = async ( selection ) => {
-
-	if( project.value.id === "" ) return
-	if( selection === null || typeof selection !== "object" ) return
-
-	const x = Number.parseInt( selection.x, 10 )
-	const y = Number.parseInt( selection.y, 10 )
-
-	if( Number.isInteger( x ) === false || Number.isInteger( y ) === false ) return
-
-	selectedHeatmapIndices.value = {
-		xIndices: [ x ],
-		yIndices: [ y ]
-	}
-	selectedHeatmapBoundingBox.value = normalizeSelectionBoundingBox({
-		minX: x,
-		maxX: x,
-		minY: y,
-		maxY: y
-	})
-
-	const sources = spectrumSourcesToQuery()
-	cancelSelectionSpectrumQueriesForInactiveSources( sources )
-
-	for( const source of sources ){
-		const requestID = startSelectionSpectrumQuery( source )
-		void queryPointSpectrumForSource( source, x, y, requestID )
-	}
-}
-
-const handleHeatmapRegionSelection = async ( selection ) => {
-
-	if( project.value.id === "" ) return
-	if( selection === null || typeof selection !== "object" ) return
-
-	const xIndices = Array.isArray( selection.xIndices ) ? selection.xIndices : []
-	const yIndices = Array.isArray( selection.yIndices ) ? selection.yIndices : []
-	const boundingBox = normalizeSelectionBoundingBox( selection.boundingBox )
-
-	if( xIndices.length === 0 || yIndices.length === 0 || boundingBox === null ) return
-
-	selectedHeatmapIndices.value = {
-		xIndices: [ ...xIndices ],
-		yIndices: [ ...yIndices ]
-	}
-	selectedHeatmapBoundingBox.value = boundingBox
-
-	const sources = spectrumSourcesToQuery()
-	cancelSelectionSpectrumQueriesForInactiveSources( sources )
-
-	for( const source of sources ){
-		const requestID = startSelectionSpectrumQuery( source )
-		void queryMeanSpectrumForSource( source, xIndices, yIndices, boundingBox, requestID )
-	}
-}
-
-const handleHeatmapZoomRange = async ( payload ) => {
-
-	if( graph.value === null ) return
-	if( payload === null || typeof payload !== "object" ) return
-
-	const xRange = Array.isArray( payload.xRange ) ? payload.xRange : null
-	const yRange = Array.isArray( payload.yRange ) ? payload.yRange : null
-
-	try{
-		await hyperspectrum.relayoutHeatmapViewport( graph.value, xRange, yRange )
-	} catch( error ){
-		console.log( error )
-	}
-}
-
-const handleHeatmapResetZoom = async () => {
-
-	if( graph.value === null ) return
-
-	const width = Number( heatmapRendererPayload.value?.width )
-	const height = Number( heatmapRendererPayload.value?.height )
-	const heatmapOrigin = String( heatmapRendererPaneState.value?.heatmapOrigin ?? "top-left" )
-
-	try{
-		await hyperspectrum.resetHeatmapViewport( graph.value, width, height, heatmapOrigin )
-	} catch( error ){
-		console.log( error )
-	}
-}
-
-const syncExternalHeatmapRenderer = async () => {
-
-	if( graph.value === null ){
-		heatmapRendererPayload.value = null
-		heatmapRendererPaneState.value = null
-		return
-	}
-
-	if( heatmapRendererMode.value !== "deckgl" ){
-		heatmapRendererPayload.value = null
-		heatmapRendererPaneState.value = null
-		return
-	}
-
-	heatmapRendererPayload.value = hyperspectrum.getHeatmapRendererPayload( graph.value )
-	heatmapRendererPaneState.value = hyperspectrum.getHeatmapPaneState( graph.value )
-}
-
-const removeHeatmapViewportSyncListener = () => {
-
-	if( graph.value === null ) return
-	if( heatmapViewportSyncHandler === null ) return
-	if( typeof graph.value.removeListener !== "function" ) return
-
-	graph.value.removeListener( "plotly_relayout", heatmapViewportSyncHandler )
-	heatmapViewportSyncHandler = null
-}
-
-const syncHeatmapViewportSyncListener = () => {
-
-	removeHeatmapViewportSyncListener()
-
-	if( graph.value === null ) return
-	if( heatmapRendererMode.value !== "deckgl" ) return
-	if( typeof graph.value.on !== "function" ) return
-
-	heatmapViewportSyncHandler = () => {
-		void syncExternalHeatmapRenderer()
-	}
-
-	graph.value.on( "plotly_relayout", heatmapViewportSyncHandler )
 }
 
 const handleHeatmapRendererTiming = ( payload ) => {
@@ -6461,1132 +5749,43 @@ const mipHeatmapColorscale = () => {
 		: "Viridis"
 }
 
-const runWhenBrowserIdle = ( callback, options = {} ) => {
-
-	const delayMs = Math.max( 0, Number( options?.delayMs ) || 0 )
-	const timeoutMs = Number( options?.timeoutMs )
-	const hasTimeout = Number.isFinite( timeoutMs ) && timeoutMs >= 0
-	let cancelled = false
-	let idleHandle = null
-	let delayHandle = null
-
-	const invokeCallback = () => {
-		if( cancelled ) return
-		void callback()
-	}
-
-	const scheduleIdleCallback = () => {
-		if( cancelled ) return
-
-		if( typeof window !== "undefined" && typeof window.requestIdleCallback === "function" ){
-			idleHandle = hasTimeout
-				? window.requestIdleCallback( invokeCallback, { timeout: timeoutMs })
-				: window.requestIdleCallback( invokeCallback )
-			return
-		}
-
-		const timerScope = typeof window !== "undefined" ? window : globalThis
-		idleHandle = timerScope.setTimeout( invokeCallback, 32 )
-	}
-
-	if( delayMs > 0 ){
-		const timerScope = typeof window !== "undefined" ? window : globalThis
-		delayHandle = timerScope.setTimeout( scheduleIdleCallback, delayMs )
-	} else {
-		scheduleIdleCallback()
-	}
-
-	return () => {
-		cancelled = true
-
-		if( delayHandle !== null ){
-			const timerScope = typeof window !== "undefined" ? window : globalThis
-			timerScope.clearTimeout( delayHandle )
-		}
-
-		if( idleHandle !== null ){
-			if( typeof window !== "undefined" && typeof window.cancelIdleCallback === "function" ){
-				window.cancelIdleCallback( idleHandle )
-			} else {
-				const timerScope = typeof window !== "undefined" ? window : globalThis
-				timerScope.clearTimeout( idleHandle )
-			}
-		}
-	}
-}
-
-const normalizedLoadPriority = ( priority ) => {
-	return priority === "low" ? "low" : "high"
-}
-
-const shouldChunkBackgroundLoad = ( priority ) => {
-	return normalizedLoadPriority( priority ) === "low"
-}
-
-const yieldToBrowser = async () => {
-	await new Promise(( resolve ) => {
-		if( typeof window !== "undefined" && typeof window.requestAnimationFrame === "function" ){
-			window.requestAnimationFrame(() => resolve() )
-			return
-		}
-
-		const timerScope = typeof window !== "undefined" ? window : globalThis
-		timerScope.setTimeout( resolve, 0 )
-	})
-}
-
-const PROJECT_BACKGROUND_HYDRATION_GRACE_MS = 500
-const PROJECT_BACKGROUND_INTERACTION_COOLDOWN_MS = 500
-const PROJECT_BACKGROUND_BETWEEN_TASK_DELAY_MS = 120
-const PREPARATION_SPINNER_MIN_VISIBLE_MS = 140
-
-let cancelScheduledDisplayPayloadPrewarm = null
-const scheduledDisplayPayloadPrewarmTargets = new Set()
-let displayPayloadPrewarmRequestID = 0
-let cancelScheduledProjectBackgroundWork = null
-const projectBackgroundTasks = []
-let projectBackgroundWorkRequestID = 0
-let projectBackgroundGraceUntil = 0
-let projectBackgroundNextAllowedAt = 0
-let lastProjectBackgroundInteractionAt = 0
-let removeProjectBackgroundInteractionListeners = null
-
-const recordProjectBackgroundInteraction = ( eventType = "" ) => {
-
-	const now = Date.now()
-	if( eventType === "pointermove" &&
-		( now - lastProjectBackgroundInteractionAt ) < 160 ){
-		return
-	}
-
-	lastProjectBackgroundInteractionAt = now
-}
-
-const projectBackgroundBlockedUntil = () => {
-
-	let blockedUntil = projectBackgroundGraceUntil
-	blockedUntil = Math.max( blockedUntil, projectBackgroundNextAllowedAt )
-
-	if( lastProjectBackgroundInteractionAt > 0 ){
-		blockedUntil = Math.max(
-			blockedUntil,
-			lastProjectBackgroundInteractionAt + PROJECT_BACKGROUND_INTERACTION_COOLDOWN_MS
-		)
-	}
-
-	return blockedUntil
-}
-
-const waitForProjectBackgroundIdleWindow = async ( requestID = null ) => {
-
-	while( true ){
-		if( requestID !== null && requestID !== activeProjectLoadRequestID.value ){
-			return false
-		}
-
-		const blockedUntil = projectBackgroundBlockedUntil()
-		const remainingMs = blockedUntil - Date.now()
-		if( remainingMs <= 0 ){
-			await yieldToBrowser()
-			if( requestID !== null && requestID !== activeProjectLoadRequestID.value ){
-				return false
-			}
-			return true
-		}
-
-		const waitMs = Math.max( 32, Math.min( remainingMs, 200 ))
-		await new Promise(( resolve ) => {
-			const timerScope = typeof window !== "undefined" ? window : globalThis
-			timerScope.setTimeout( resolve, waitMs )
-		})
-	}
-}
-
-const installProjectBackgroundInteractionListeners = () => {
-
-	if( typeof window === "undefined" ) return
-	if( typeof removeProjectBackgroundInteractionListeners === "function" ) return
-
-	const onPointerDown = () => {
-		recordProjectBackgroundInteraction()
-	}
-
-	const onPointerMove = () => {
-		recordProjectBackgroundInteraction( "pointermove" )
-	}
-
-	const onKeyDown = () => {
-		recordProjectBackgroundInteraction()
-	}
-
-	const onWheel = () => {
-		recordProjectBackgroundInteraction()
-	}
-
-	const onTouchStart = () => {
-		recordProjectBackgroundInteraction()
-	}
-
-	window.addEventListener( "pointerdown", onPointerDown, { passive: true })
-	window.addEventListener( "pointermove", onPointerMove, { passive: true })
-	window.addEventListener( "keydown", onKeyDown, { passive: true })
-	window.addEventListener( "wheel", onWheel, { passive: true })
-	window.addEventListener( "touchstart", onTouchStart, { passive: true })
-
-	removeProjectBackgroundInteractionListeners = () => {
-		window.removeEventListener( "pointerdown", onPointerDown )
-		window.removeEventListener( "pointermove", onPointerMove )
-		window.removeEventListener( "keydown", onKeyDown )
-		window.removeEventListener( "wheel", onWheel )
-		window.removeEventListener( "touchstart", onTouchStart )
-		removeProjectBackgroundInteractionListeners = null
-	}
-}
-
-const clearProjectBackgroundWork = () => {
-
-	projectBackgroundTasks.length = 0
-	projectBackgroundWorkRequestID += 1
-	projectBackgroundGraceUntil = 0
-	projectBackgroundNextAllowedAt = 0
-
-	if( typeof cancelScheduledProjectBackgroundWork === "function" ){
-		cancelScheduledProjectBackgroundWork()
-		cancelScheduledProjectBackgroundWork = null
-	}
-}
-
-const scheduleProjectBackgroundWork = () => {
-
-	if( projectBackgroundTasks.length === 0 ) return
-	if( typeof cancelScheduledProjectBackgroundWork === "function" ) return
-
-	const requestID = projectBackgroundWorkRequestID
-	const delayMs = Math.max( 0, projectBackgroundBlockedUntil() - Date.now() )
-
-	cancelScheduledProjectBackgroundWork = runWhenBrowserIdle( async () => {
-
-		cancelScheduledProjectBackgroundWork = null
-		if( requestID !== projectBackgroundWorkRequestID ) return
-		if( projectBackgroundTasks.length === 0 ) return
-
-		if( projectBackgroundBlockedUntil() > Date.now() ){
-			scheduleProjectBackgroundWork()
-			return
-		}
-
-		const task = projectBackgroundTasks.shift()
-		if( typeof task === "function" ){
-			try{
-				await task()
-			} catch( error ){
-				console.log( error )
-			}
-		}
-
-		if( requestID !== projectBackgroundWorkRequestID ) return
-		projectBackgroundNextAllowedAt = Date.now() + PROJECT_BACKGROUND_BETWEEN_TASK_DELAY_MS
-		if( projectBackgroundTasks.length > 0 ){
-			scheduleProjectBackgroundWork()
-		}
-	}, { delayMs } )
-}
-
-const enqueueProjectBackgroundTask = ( task ) => {
-
-	if( typeof task !== "function" ) return
-
-	projectBackgroundTasks.push( task )
-	scheduleProjectBackgroundWork()
-}
-
-const loadVisualizationTargetData = async ( target, initialLayerIndex, priority = "high" ) => {
-
-	if( target === "mip" ){
-		if( heatmapUsesEstimatedRaman.value ){
-			try{
-				const estimatedMipMatrix = await loadEstimatedMip( priority )
-				if( estimatedMipMatrix !== null ){
-					return
-				}
-			} catch( error ){
-				console.log( error )
-			}
-		}
-
-		if( mip.value === null ){
-			mip.value = await hyperspectrumCache.getMip( project.value, {
-				...cacheOptions,
-				priority: normalizedLoadPriority( priority )
-			} )
-		}
-		return
-	}
-
-	if( target === "mip_hsv" ){
-		if( heatmapUsesEstimatedRaman.value ){
-			try{
-				const estimatedMipHsvMatrix = await loadEstimatedMipHsv( priority )
-				if( estimatedMipHsvMatrix !== null ){
-					return
-				}
-			} catch( error ){
-				console.log( error )
-			}
-		}
-
-		await loadMipHsv( priority )
-		return
-	}
-
-	if( target === "umap" ){
-		if( heatmapUsesEstimatedRaman.value ){
-			try{
-				const estimatedUmapMatrix = await loadEstimatedUmap( priority )
-				if( estimatedUmapMatrix !== null ){
-					return
-				}
-			} catch( error ){
-				console.log( error )
-			}
-		}
-
-		await loadUmap( priority )
-		return
-	}
-
-	if( target === "z_blend" ){
-		if( heatmapUsesEstimatedRaman.value ){
-			try{
-				const estimatedSource = await loadZBlendSource( true, priority )
-				if( estimatedSource !== null ){
-					return
-				}
-			} catch( error ){
-				console.log( error )
-			}
-		}
-
-		await loadZBlendSource( false, priority )
-		return
-	}
-
-	if( target === "layer_window" ){
-		const layerIndex = Number.isInteger( initialLayerIndex ) ? initialLayerIndex : normalizeLayerInput( layerInput.value )
-
-		if( heatmapUsesEstimatedRaman.value ){
-			try{
-				await loadEstimatedLayer( layerIndex, priority )
-				await ensureEstimatedLayerWindowReady( layerIndex, priority )
-				return
-			} catch( error ){
-				console.log( error )
-			}
-		}
-
-		await loadLayer( layerIndex, priority )
-		await ensureMeasurementLayerWindowReady( layerIndex, priority )
-		return
-	}
-
-	if( target === "pca" ){
-		resetActivePcaComponents( pcaClassificationComponentCount.value )
-
-		if( heatmapUsesEstimatedRaman.value ){
-			try{
-				const estimatedClassificationMip = await loadEstimatedPcaClassificationMip( activePcaClassificationCount(), priority )
-				if( estimatedClassificationMip !== null ){
-					return
-				}
-			} catch( error ){
-				console.log( error )
-			}
-		}
-
-		await loadPcaClassificationMip( pcaClassificationComponentCount.value, priority )
-		return
-	}
-
-	if( target === "pca_mip" ){
-		resetActivePcaComponents( pcaMipComponentCount.value )
-
-		if( heatmapUsesEstimatedRaman.value ){
-			try{
-				const estimatedPcaMipMatrix = await loadEstimatedPcaMip( pcaMipComponentCount.value, priority )
-				if( estimatedPcaMipMatrix !== null ){
-					return
-				}
-			} catch( error ){
-				console.log( error )
-			}
-		}
-
-		await loadPcaMip( pcaMipComponentCount.value, priority )
-		return
-	}
-
-	if( target === "pca_rgb" ){
-		if( heatmapUsesEstimatedRaman.value ){
-			try{
-				const estimatedClassification = await loadEstimatedPcaClassification( priority )
-				if( estimatedClassification !== null ){
-					return
-				}
-			} catch( error ){
-				console.log( error )
-			}
-		}
-
-		await loadPcaClassification( priority )
-		return
-	}
-
-	if( target === "rpca" ){
-		resetActivePcaComponents( pcaClassificationComponentCount.value )
-
-		if( heatmapUsesEstimatedRaman.value ){
-			try{
-				const estimatedClassificationMip = await loadEstimatedRpcaClassificationMip( activePcaClassificationCount(), priority )
-				if( estimatedClassificationMip !== null ){
-					return
-				}
-			} catch( error ){
-				console.log( error )
-			}
-		}
-
-		await loadRpcaClassificationMip( pcaClassificationComponentCount.value, priority )
-		return
-	}
-
-	if( target === "rpca_mip" ){
-		resetActivePcaComponents( pcaMipComponentCount.value )
-
-		if( heatmapUsesEstimatedRaman.value ){
-			try{
-				const estimatedMipMatrix = await loadEstimatedRpcaMip( pcaMipComponentCount.value, priority )
-				if( estimatedMipMatrix !== null ){
-					return
-				}
-			} catch( error ){
-				console.log( error )
-			}
-		}
-
-		await loadRpcaMip( pcaMipComponentCount.value, priority )
-		return
-	}
-
-	if( target === "rpca_rgb" ){
-		if( heatmapUsesEstimatedRaman.value ){
-			try{
-				const estimatedClassification = await loadEstimatedRpcaClassification( priority )
-				if( estimatedClassification !== null ){
-					return
-				}
-			} catch( error ){
-				console.log( error )
-			}
-		}
-
-		await loadRpcaClassification( priority )
-	}
-}
-
-const loadBackgroundVisualizationTargetData = async ( target, initialLayerIndex, priority = "low" ) => {
-
-	if( target === "mip" ){
-		if( heatmapUsesEstimatedRaman.value ){
-			try{
-				const estimatedMipMatrix = await loadEstimatedArtifact( "mip", priority )
-				if( estimatedMipMatrix !== null ){
-					return estimatedMipMatrix
-				}
-			} catch( error ){
-				console.log( error )
-			}
-		}
-
-		return await hyperspectrumCache.getMip( project.value, {
-			...cacheOptions,
-			priority: normalizedLoadPriority( priority )
-		} )
-	}
-
-	if( target === "mip_hsv" ){
-		if( heatmapUsesEstimatedRaman.value ){
-			try{
-				const estimatedMipHsvMatrix = await loadEstimatedArtifact( "mip_hsv", priority )
-				if( estimatedMipHsvMatrix !== null ){
-					return estimatedMipHsvMatrix
-				}
-			} catch( error ){
-				console.log( error )
-			}
-		}
-
-		return await hyperspectrumCache.getMipHsv( project.value, {
-			...cacheOptions,
-			priority: normalizedLoadPriority( priority )
-		} )
-	}
-
-	if( target === "umap" ){
-		if( heatmapUsesEstimatedRaman.value ){
-			try{
-				const estimatedUmap = {
-					r: await loadEstimatedArtifact( "umap/r", priority ),
-					g: await loadEstimatedArtifact( "umap/g", priority ),
-					b: await loadEstimatedArtifact( "umap/b", priority )
-				}
-				return estimatedUmap
-			} catch( error ){
-				console.log( error )
-			}
-		}
-
-		return {
-			r: await hyperspectrumCache.getArtifact( project.value, "umap/r", {
-				...cacheOptions,
-				priority: normalizedLoadPriority( priority )
-			} ),
-			g: await hyperspectrumCache.getArtifact( project.value, "umap/g", {
-				...cacheOptions,
-				priority: normalizedLoadPriority( priority )
-			} ),
-			b: await hyperspectrumCache.getArtifact( project.value, "umap/b", {
-				...cacheOptions,
-				priority: normalizedLoadPriority( priority )
-			} )
-		}
-	}
-
-	if( target === "z_blend" ){
-		if( heatmapUsesEstimatedRaman.value ){
-			try{
-				const estimatedSource = await loadZBlendSource( true, priority )
-				if( estimatedSource !== null ){
-					return estimatedSource
-				}
-			} catch( error ){
-				console.log( error )
-			}
-		}
-
-		return await loadZBlendSource( false, priority )
-	}
-
-	if( target === "layer_window" ){
-		const layerIndex = Number.isInteger( initialLayerIndex ) ? initialLayerIndex : normalizeLayerInput( layerInput.value )
-		const indices = resolveLayerWindowIndices( layerIndex, true )
-
-		if( heatmapUsesEstimatedRaman.value ){
-			try{
-				for( const candidateIndex of indices ){
-					await loadEstimatedArtifact( "layers/" + candidateIndex, priority )
-					await yieldToBrowser()
-				}
-				return { estimated: true, layerIndex }
-			} catch( error ){
-				console.log( error )
-			}
-		}
-
-		for( const candidateIndex of indices ){
-			await hyperspectrumCache.getLayer( project.value, candidateIndex, {
-				...layerCacheOptions(),
-				priority: normalizedLoadPriority( priority )
-			} )
-			await yieldToBrowser()
-		}
-
-		return { estimated: false, layerIndex }
-	}
-
-	if( target === "pca" ){
-		if( heatmapUsesEstimatedRaman.value ){
-			try{
-				const estimatedClassificationMip = await loadEstimatedArtifact(
-					decompositionMipMode( "pca", activePcaClassificationCount() ),
-					priority
-				)
-				if( estimatedClassificationMip !== null ){
-					return estimatedClassificationMip
-				}
-			} catch( error ){
-				console.log( error )
-			}
-		}
-
-		return await hyperspectrumCache.getPcaMip( project.value, {
-			...cacheOptions,
-			componentCount: normalizePcaComponentInput( pcaClassificationComponentCount.value ),
-			priority: normalizedLoadPriority( priority )
-		} )
-	}
-
-	if( target === "pca_mip" ){
-		if( heatmapUsesEstimatedRaman.value ){
-			try{
-				const estimatedPcaMipMatrix = await loadEstimatedArtifact(
-					decompositionMipMode( "pca", pcaMipComponentCount.value ),
-					priority
-				)
-				if( estimatedPcaMipMatrix !== null ){
-					return estimatedPcaMipMatrix
-				}
-			} catch( error ){
-				console.log( error )
-			}
-		}
-
-		return await hyperspectrumCache.getPcaMip( project.value, {
-			...cacheOptions,
-			componentCount: normalizePcaComponentInput( pcaMipComponentCount.value ),
-			priority: normalizedLoadPriority( priority )
-		} )
-	}
-
-	if( target === "pca_rgb" ){
-		const combinedScores = {}
-
-		if( heatmapUsesEstimatedRaman.value ){
-			try{
-				for( const componentIndex of pcaComponentIndices ){
-					combinedScores[ componentIndex ] = await loadEstimatedArtifact(
-						decompositionScoreMode( "pca", componentIndex ),
-						priority
-					)
-					await yieldToBrowser()
-				}
-				return combinedScores
-			} catch( error ){
-				console.log( error )
-			}
-		}
-
-		for( const componentIndex of pcaComponentIndices ){
-			combinedScores[ componentIndex ] = await hyperspectrumCache.getPcaScore( project.value, componentIndex, {
-				...cacheOptions,
-				priority: normalizedLoadPriority( priority )
-			} )
-			await yieldToBrowser()
-		}
-
-		return combinedScores
-	}
-
-	if( target === "rpca" ){
-		if( heatmapUsesEstimatedRaman.value ){
-			try{
-				const estimatedClassificationMip = await loadEstimatedArtifact(
-					decompositionMipMode( "rpca", activePcaClassificationCount() ),
-					priority
-				)
-				if( estimatedClassificationMip !== null ){
-					return estimatedClassificationMip
-				}
-			} catch( error ){
-				console.log( error )
-			}
-		}
-
-		return await hyperspectrumCache.getRpcaMip( project.value, {
-			...cacheOptions,
-			componentCount: normalizePcaComponentInput( pcaClassificationComponentCount.value ),
-			priority: normalizedLoadPriority( priority )
-		} )
-	}
-
-	if( target === "rpca_mip" ){
-		if( heatmapUsesEstimatedRaman.value ){
-			try{
-				const estimatedRpcaMipMatrix = await loadEstimatedArtifact(
-					decompositionMipMode( "rpca", pcaMipComponentCount.value ),
-					priority
-				)
-				if( estimatedRpcaMipMatrix !== null ){
-					return estimatedRpcaMipMatrix
-				}
-			} catch( error ){
-				console.log( error )
-			}
-		}
-
-		return await hyperspectrumCache.getRpcaMip( project.value, {
-			...cacheOptions,
-			componentCount: normalizePcaComponentInput( pcaMipComponentCount.value ),
-			priority: normalizedLoadPriority( priority )
-		} )
-	}
-
-	if( target === "rpca_rgb" ){
-		const combinedScores = {}
-
-		if( heatmapUsesEstimatedRaman.value ){
-			try{
-				for( const componentIndex of pcaComponentIndices ){
-					combinedScores[ componentIndex ] = await loadEstimatedArtifact(
-						decompositionScoreMode( "rpca", componentIndex ),
-						priority
-					)
-					await yieldToBrowser()
-				}
-				return combinedScores
-			} catch( error ){
-				console.log( error )
-			}
-		}
-
-		for( const componentIndex of pcaComponentIndices ){
-			combinedScores[ componentIndex ] = await hyperspectrumCache.getRpcaScore( project.value, componentIndex, {
-				...cacheOptions,
-				priority: normalizedLoadPriority( priority )
-			} )
-			await yieldToBrowser()
-		}
-
-		return combinedScores
-	}
-
-	return null
-}
-
-const prewarmVisualizationTargetPayload = async ( target, loadedData = null ) => {
-
-	if( heatmapRendererMode.value !== "deckgl" ) return
-	if( graph.value === null ) return
-
-	if( target === "mip" ){
-		const matrix = loadedData ?? ( heatmapUsesEstimatedRaman.value ? estimatedMip.value : mip.value )
-		if( matrix === null ) return
-		hyperspectrum.prewarmScalarHeatmapRendererPayload( graph.value, matrix, {
-			colorscale: mipHeatmapColorscale()
-		} )
-		return
-	}
-
-	if( target === "mip_hsv" ){
-		const matrix = loadedData ?? ( heatmapUsesEstimatedRaman.value ? estimatedMipHsv.value : mipHsv.value )
-		if( matrix === null ) return
-		await hyperspectrum.prewarmRgbHeatmapRendererPayloadAsync( graph.value, matrix )
-		return
-	}
-
-	if( target === "umap" ){
-		const matrix = loadedData ?? ( heatmapUsesEstimatedRaman.value ? estimatedUmap.value : umap.value )
-		if( matrix === null ) return
-		await hyperspectrum.prewarmUmapHeatmapRendererPayloadAsync( graph.value, matrix, {
-			channelColors: resolvedUmapChannelColors()
-		} )
-		return
-	}
-
-	if( target === "z_blend" ){
-		const source = loadedData ?? ( heatmapUsesEstimatedRaman.value ? zBlendEstimatedSource.value : zBlendMeasurementSource.value )
-		if( source === null ) return
-		hyperspectrum.prewarmZBlendHeatmapRendererPayload( graph.value, source )
-		return
-	}
-
-	if( target === "pca" ){
-		const matrix = loadedData ?? ( heatmapUsesEstimatedRaman.value ? estimatedPcaClassificationMip.value : pcaClassificationMip.value )
-		if( matrix === null ) return
-		await hyperspectrum.prewarmPcaClassificationHeatmapRendererPayloadAsync( graph.value, matrix )
-		return
-	}
-
-	if( target === "pca_mip" ){
-		const matrix = loadedData ?? ( heatmapUsesEstimatedRaman.value ? estimatedPcaMip.value : pcaMip.value )
-		if( matrix === null ) return
-		await hyperspectrum.prewarmPcaMipHeatmapRendererPayloadAsync( graph.value, matrix )
-		return
-	}
-
-	if( target === "pca_rgb" ){
-		const matrix = loadedData ?? ( heatmapUsesEstimatedRaman.value ? estimatedPcaClassification.value : pcaClassification.value )
-		if( matrix === null ) return
-		await hyperspectrum.prewarmPcaRgbHeatmapRendererPayloadAsync( graph.value, matrix, {
-			channels: { ...pcaRgbChannels.value }
-		} )
-		return
-	}
-
-	if( target === "rpca" ){
-		const matrix = loadedData ?? ( heatmapUsesEstimatedRaman.value ? estimatedRpcaClassificationMip.value : rpcaClassificationMip.value )
-		if( matrix === null ) return
-		await hyperspectrum.prewarmPcaClassificationHeatmapRendererPayloadAsync( graph.value, matrix )
-		return
-	}
-
-	if( target === "rpca_mip" ){
-		const matrix = loadedData ?? ( heatmapUsesEstimatedRaman.value ? estimatedRpcaMip.value : rpcaMip.value )
-		if( matrix === null ) return
-		await hyperspectrum.prewarmPcaMipHeatmapRendererPayloadAsync( graph.value, matrix )
-		return
-	}
-
-	if( target === "rpca_rgb" ){
-		const matrix = loadedData ?? ( heatmapUsesEstimatedRaman.value ? estimatedRpcaClassification.value : rpcaClassification.value )
-		if( matrix === null ) return
-		await hyperspectrum.prewarmPcaRgbHeatmapRendererPayloadAsync( graph.value, matrix, {
-			channels: { ...pcaRgbChannels.value }
-		} )
-	}
-}
-
-const prepareBackgroundVisualizationTarget = async ( target, initialLayerIndex ) => {
-
-	const loadedData = await loadBackgroundVisualizationTargetData( target, initialLayerIndex, "low" )
-
-	if( target === "layer_window" ){
-		if( heatmapUsesEstimatedRaman.value ){
-			prefetchEstimatedLayerWindow( initialLayerIndex )
-			scheduleLayerPayloadPrewarm( initialLayerIndex, true )
-		} else {
-			prefetchMeasurementLayerWindow( initialLayerIndex )
-			scheduleLayerPayloadPrewarm( initialLayerIndex, false )
-		}
-		return
-	}
-
-	const idleWindowAvailable = await waitForProjectBackgroundIdleWindow( activeProjectLoadRequestID.value )
-	if( idleWindowAvailable === false ){
-		return
-	}
-
-	await prewarmVisualizationTargetPayload( target, loadedData )
-}
-
-const queueProjectBackgroundHydration = ( requestID, initialLayerIndex, startingDisplayMode ) => {
-
-	projectBackgroundGraceUntil = Date.now() + PROJECT_BACKGROUND_HYDRATION_GRACE_MS
-
-	const prioritizedTargets = resolvePrioritizedPreparationTargets( startingDisplayMode )
-	const deferredTargets = resolveDeferredPreparationTargets( startingDisplayMode )
-	const trailingTargets = resolveTrailingPreparationTargets( startingDisplayMode )
-	queuedPreparationTargets.value = [ ...prioritizedTargets, ...deferredTargets, ...trailingTargets ]
-
-	const enqueueHydrationTask = ( callback ) => {
-		enqueueProjectBackgroundTask( async () => {
-			if( requestID !== activeProjectLoadRequestID.value ) return
-			await callback()
-			if( requestID !== activeProjectLoadRequestID.value ) return
-		})
-	}
-
-	for( const target of [ ...prioritizedTargets, ...deferredTargets, ...trailingTargets ] ){
-		enqueueHydrationTask( async () => {
-			markPreparationStarted( target )
-			const spinnerStartedAt = typeof performance !== "undefined"
-				? performance.now()
-				: Date.now()
-			await nextTick()
-			await yieldToBrowser()
-
-			try{
-				await prepareBackgroundVisualizationTarget( target, initialLayerIndex )
-				const now = typeof performance !== "undefined"
-					? performance.now()
-					: Date.now()
-				const remainingVisibleMs = PREPARATION_SPINNER_MIN_VISIBLE_MS - ( now - spinnerStartedAt )
-				if( remainingVisibleMs > 0 ){
-					await new Promise(( resolve ) => {
-						const timerScope = typeof window !== "undefined" ? window : globalThis
-						timerScope.setTimeout( resolve, remainingVisibleMs )
-					})
-				}
-				markPreparationCompleted( target )
-			} catch( error ){
-				console.log( error )
-				markPreparationFailed( target )
-			}
-		})
-	}
-}
-
-const prewarmLoadedDisplayPayload = async ( target ) => {
-	await prewarmVisualizationTargetPayload( target, null )
-}
-
-const scheduleDisplayPayloadPrewarm = ( targets = [] ) => {
-
-	if( heatmapRendererMode.value !== "deckgl" ) return
-	if( graph.value === null ) return
-
-	for( const target of Array.isArray( targets ) ? targets : [ targets ] ){
-		if( typeof target !== "string" || target.length === 0 ) continue
-		scheduledDisplayPayloadPrewarmTargets.add( target )
-	}
-
-	if( scheduledDisplayPayloadPrewarmTargets.size === 0 ) return
-
-	if( typeof cancelScheduledDisplayPayloadPrewarm === "function" ){
-		cancelScheduledDisplayPayloadPrewarm()
-		cancelScheduledDisplayPayloadPrewarm = null
-	}
-
-	const requestID = displayPayloadPrewarmRequestID + 1
-	displayPayloadPrewarmRequestID = requestID
-
-	cancelScheduledDisplayPayloadPrewarm = runWhenBrowserIdle( async () => {
-
-		const iterator = scheduledDisplayPayloadPrewarmTargets.values().next()
-		if( iterator.done ){
-			cancelScheduledDisplayPayloadPrewarm = null
-			return
-		}
-
-		const target = iterator.value
-		scheduledDisplayPayloadPrewarmTargets.delete( target )
-
-		if( requestID !== displayPayloadPrewarmRequestID ) return
-
-		try{
-			await prewarmLoadedDisplayPayload( target )
-		} catch( error ){
-			console.log( error )
-		}
-
-		if( requestID === displayPayloadPrewarmRequestID ){
-			cancelScheduledDisplayPayloadPrewarm = null
-		}
-
-		if( scheduledDisplayPayloadPrewarmTargets.size > 0 ){
-			scheduleDisplayPayloadPrewarm()
-		}
-	}, { delayMs: 250 } )
-}
-
-let cancelScheduledLayerPayloadPrewarm = null
-
-const resolveLayerWindowIndices = ( centerIndex, includeCenter = true ) => {
-
-	if( Number.isInteger( centerIndex ) === false ){
-		return []
-	}
-
-	const maximumIndex = Number.isInteger( maxLayerIndex.value ) &&
-		maxLayerIndex.value >= 0 &&
-		maxLayerIndex.value < Number.MAX_SAFE_INTEGER
-		? maxLayerIndex.value
-		: null
-	const center = maximumIndex === null
-		? Math.max( 0, centerIndex )
-		: Math.max( 0, Math.min( maximumIndex, centerIndex ))
-
-	let start = Math.max( 0, center - LAYER_CACHE_WINDOW_RADIUS )
-	let end = maximumIndex === null
-		? center + LAYER_CACHE_WINDOW_RADIUS
-		: Math.min( maximumIndex, center + LAYER_CACHE_WINDOW_RADIUS )
-
-	if( maximumIndex !== null ){
-		const targetCount = Math.min( maximumIndex + 1, ( LAYER_CACHE_WINDOW_RADIUS * 2 ) + 1 )
-
-		while(( end - start + 1 ) < targetCount ){
-			if( start > 0 ){
-				start -= 1
-				continue
-			}
-
-			if( end < maximumIndex ){
-				end += 1
-				continue
-			}
-
-			break
-		}
-	}
-
-	const indices = includeCenter ? [ center ] : []
-	for( let distance = 1; distance <= ( end - start ); distance++ ){
-		const left = center - distance
-		const right = center + distance
-
-		if( left >= start ){
-			indices.push( left )
-		}
-
-		if( right <= end ){
-			indices.push( right )
-		}
-	}
-
-	return indices
-}
-
-const prefetchMeasurementLayerWindow = ( centerIndex ) => {
-
-	if( Number.isInteger( centerIndex ) === false ){
-		return
-	}
-
-	void hyperspectrumCache.prefetchWindow(
-		project.value,
-		centerIndex,
-		LAYER_CACHE_WINDOW_RADIUS,
-		layerCacheOptions()
-	)
-}
-
-const prefetchEstimatedLayerWindow = ( centerIndex ) => {
-
-	if( Number.isInteger( centerIndex ) === false ){
-		return
-	}
-
-	hyperspectrumCache.setActiveLayer( project.value, centerIndex, layerCacheOptions() )
-
-	for( const layerIndex of resolveLayerWindowIndices( centerIndex, false ) ){
-		void loadEstimatedArtifact( "layers/" + layerIndex, "low" ).catch(() => null)
-	}
-}
-
-const ensureMeasurementLayerWindowReady = async ( centerIndex, priority = "high" ) => {
-
-	if( Number.isInteger( centerIndex ) === false ){
-		return
-	}
-
-	const requestPriority = normalizedLoadPriority( priority )
-	const indices = resolveLayerWindowIndices( centerIndex, true )
-
-	if( shouldChunkBackgroundLoad( priority ) ){
-		for( const layerIndex of indices ){
-			await hyperspectrumCache.getLayer( project.value, layerIndex, {
-				...layerCacheOptions(),
-				priority: requestPriority
-			} )
-			await yieldToBrowser()
-		}
-		return
-	}
-
-	await Promise.all( indices.map(( layerIndex ) => {
-		return hyperspectrumCache.getLayer( project.value, layerIndex, {
-			...layerCacheOptions(),
-			priority: requestPriority
-		} )
-	}) )
-}
-
-const ensureEstimatedLayerWindowReady = async ( centerIndex, priority = "high" ) => {
-
-	if( Number.isInteger( centerIndex ) === false ){
-		return
-	}
-
-	const indices = resolveLayerWindowIndices( centerIndex, true )
-	if( shouldChunkBackgroundLoad( priority ) ){
-		for( const layerIndex of indices ){
-			await loadEstimatedArtifact( "layers/" + layerIndex, priority )
-			await yieldToBrowser()
-		}
-		return
-	}
-
-	await Promise.all( indices.map(( layerIndex ) => {
-		return loadEstimatedArtifact( "layers/" + layerIndex, priority )
-	}) )
-}
-
-const scheduleLayerPayloadPrewarm = ( centerIndex, estimated = false ) => {
-
-	if( heatmapRendererMode.value !== "deckgl" ) return
-	if( activePlot.value !== "layer" ) return
-	if( graph.value === null ) return
-	if( Number.isInteger( centerIndex ) === false ) return
-
-	const candidateIndices = resolveLayerWindowIndices( centerIndex, false )
-
-	if( candidateIndices.length === 0 ) return
-
-	if( typeof cancelScheduledLayerPayloadPrewarm === "function" ){
-		cancelScheduledLayerPayloadPrewarm()
-		cancelScheduledLayerPayloadPrewarm = null
-	}
-
-	const requestID = activeLayerPayloadPrewarmRequestID.value + 1
-	activeLayerPayloadPrewarmRequestID.value = requestID
-	const colorscale = layerHeatmapColorscale()
-	const remainingCandidateIndices = [ ...candidateIndices ]
-
-	const runNextCandidate = () => {
-
-		cancelScheduledLayerPayloadPrewarm = runWhenBrowserIdle( async () => {
-
-			cancelScheduledLayerPayloadPrewarm = null
-			if( requestID !== activeLayerPayloadPrewarmRequestID.value ) return
-
-			const candidateIndex = remainingCandidateIndices.shift()
-			if( Number.isInteger( candidateIndex ) === false ){
-				return
-			}
-
-			try{
-				const candidateLayer = estimated
-					? await loadEstimatedArtifact( "layers/" + candidateIndex, "low" )
-					: await hyperspectrumCache.getLayer(
-						project.value,
-						candidateIndex,
-						{ ...cacheOptions, priority: "low" }
-					)
-
-				if( requestID !== activeLayerPayloadPrewarmRequestID.value ) return
-				if( Array.isArray( candidateLayer ) && candidateLayer.length > 0 ){
-					hyperspectrum.prewarmScalarHeatmapRendererPayload( graph.value, candidateLayer, { colorscale } )
-				}
-			} catch( error ){
-				console.log( error )
-			}
-
-			if( requestID !== activeLayerPayloadPrewarmRequestID.value ) return
-			if( remainingCandidateIndices.length > 0 ){
-				runNextCandidate()
-			}
-		}, { delayMs: 150 } )
-	}
-
-	runNextCandidate()
-}
-
-const finalizeHeatmapRender = async ( renderStartedAt = null ) => {
-	if( heatmapRendererMode.value !== "deckgl" || heatmapInteractionMode.value === "zoom" ){
-		await applyHeatmapInteraction()
-	}
-	syncHeatmapViewportSyncListener()
-	await syncExternalHeatmapRenderer()
-
-	if( heatmapRendererMode.value === "plotly" && Number.isFinite( renderStartedAt ) ){
-		heatmapRenderBenchmark.value = {
-			renderer: "plotly",
-			viewMode: activePlot.value,
-			initialRenderMs: performance.now() - renderStartedAt,
-			lastMeasuredAt: new Date().toISOString()
-		}
-	}
-}
-
-const applyHeatmapInteraction = async () => {
-
-	if( graph.value === null ) return
-
-	const dimensions = matrixDimensions( currentMatrix() )
-	if( dimensions === null ) return
-
-	await hyperspectrum.configureHeatmapInteraction( graph.value, {
-		mode: heatmapInteractionMode.value,
-		rendererMode: heatmapRendererMode.value,
-		width: dimensions.width,
-		height: dimensions.height,
-		onPointSelect: ( selection ) => {
-			void handleHeatmapPointSelection( selection )
-		},
-		onRegionSelect: ( selection ) => {
-			void handleHeatmapRegionSelection( selection )
-		}
-	})
-}
+const hyperspectrumDisplayRegistry = createHyperspectrumDisplayRegistry({
+	graph,
+	heatmapRendererMode,
+	heatmapUsesEstimatedRaman,
+	hyperspectrum,
+	mip,
+	estimatedMip,
+	mipHsv,
+	estimatedMipHsv,
+	umap,
+	estimatedUmap,
+	zBlendMeasurementSource,
+	zBlendEstimatedSource,
+	pcaClassificationMip,
+	estimatedPcaClassificationMip,
+	pcaMip,
+	estimatedPcaMip,
+	pcaClassification,
+	estimatedPcaClassification,
+	rpcaClassificationMip,
+	estimatedRpcaClassificationMip,
+	rpcaMip,
+	estimatedRpcaMip,
+	rpcaClassification,
+	estimatedRpcaClassification,
+	mipHeatmapColorscale,
+	resolvedUmapChannelColors,
+	activePlot,
+	settings,
+	pcaRgbChannels,
+	resolvedPcaLoadings,
+	resolvedRpcaLoadings,
+	pcaClassificationLoadingComponents,
+	pcaMipLoadingComponents
+})
+
+const { prewarmVisualizationTargetPayload, resolveCurrentPlotRenderSpec } = hyperspectrumDisplayRegistry
 
 const stopDeckPaneResize = () => {
 
@@ -7725,238 +5924,6 @@ const startDeckSpectraPaneResize = ( event ) => {
 	event.preventDefault()
 }
 
-const plotlyGraphHasData = ( graphContainer ) => {
-	return Array.isArray( graphContainer?.data ) && graphContainer.data.length > 0
-}
-
-const resolveCurrentPlotRenderSpec = ( sharedOptions ) => {
-
-	if( activePlot.value === "pca" ){
-		return {
-			initialize: hyperspectrum.initializePcaClassification,
-			update: hyperspectrum.updatePcaClassification,
-			options: {
-				...sharedOptions,
-				loadings: resolvedPcaLoadings(),
-				loadingComponents: pcaClassificationLoadingComponents()
-			}
-		}
-	}
-
-	if( activePlot.value === "rpca" ){
-		return {
-			initialize: hyperspectrum.initializePcaClassification,
-			update: hyperspectrum.updatePcaClassification,
-			options: {
-				...sharedOptions,
-				loadings: resolvedRpcaLoadings(),
-				loadingComponents: pcaClassificationLoadingComponents()
-			}
-		}
-	}
-
-	if( activePlot.value === "pca_mip" ){
-		return {
-			initialize: hyperspectrum.initializePcaMip,
-			update: hyperspectrum.updatePcaMip,
-			options: {
-				...sharedOptions,
-				loadings: resolvedPcaLoadings(),
-				loadingComponents: pcaMipLoadingComponents()
-			}
-		}
-	}
-
-	if( activePlot.value === "rpca_mip" ){
-		return {
-			initialize: hyperspectrum.initializePcaMip,
-			update: hyperspectrum.updatePcaMip,
-			options: {
-				...sharedOptions,
-				loadings: resolvedRpcaLoadings(),
-				loadingComponents: pcaMipLoadingComponents()
-			}
-		}
-	}
-
-	if( activePlot.value === "pca_rgb" || activePlot.value === "rpca_rgb" ){
-		const redComponentLabel = String( pcaRgbChannels.value.r ).padStart( 2, "0" )
-		const greenComponentLabel = String( pcaRgbChannels.value.g ).padStart( 2, "0" )
-		const blueComponentLabel = String( pcaRgbChannels.value.b ).padStart( 2, "0" )
-
-		return {
-			initialize: hyperspectrum.initializePcaRgb,
-			update: hyperspectrum.updatePcaRgb,
-			options: {
-				...sharedOptions,
-				channels: { ...pcaRgbChannels.value },
-				loadings: activePlot.value === "pca_rgb" ? resolvedPcaLoadings() : resolvedRpcaLoadings(),
-				loadingSeries: [
-					{
-						componentIndex: pcaRgbChannels.value.r,
-						legendKey: `loading-r-${pcaRgbChannels.value.r}`,
-						label: "R - PC" + redComponentLabel,
-						color: "rgb(239, 68, 68)"
-					},
-					{
-						componentIndex: pcaRgbChannels.value.g,
-						legendKey: `loading-g-${pcaRgbChannels.value.g}`,
-						label: "G - PC" + greenComponentLabel,
-						color: "rgb(34, 197, 94)"
-					},
-					{
-						componentIndex: pcaRgbChannels.value.b,
-						legendKey: `loading-b-${pcaRgbChannels.value.b}`,
-						label: "B - PC" + blueComponentLabel,
-						color: "rgb(59, 130, 246)"
-					}
-				]
-			}
-		}
-	}
-
-	if( activePlot.value === "umap" ){
-		return {
-			initialize: hyperspectrum.initializeUmap,
-			update: hyperspectrum.updateUmap,
-			options: {
-				...sharedOptions,
-				channelColors: resolvedUmapChannelColors()
-			}
-		}
-	}
-
-	if( activePlot.value === "z_blend" ){
-		return {
-			initialize: hyperspectrum.initializeZBlend,
-			update: hyperspectrum.updateZBlend,
-			options: sharedOptions
-		}
-	}
-
-	if( activePlot.value === "mip_hsv" ){
-		return {
-			initialize: hyperspectrum.initializeRgb,
-			update: hyperspectrum.updateRgb,
-			options: sharedOptions
-		}
-	}
-
-	const scalarColorscale = activePlot.value === "layer"
-		? settings.value?.colormaps?.layer
-		: settings.value?.colormaps?.mip
-	const colorscale = typeof scalarColorscale === "string" && scalarColorscale.length > 0
-		? scalarColorscale
-		: "Viridis"
-
-	return {
-		initialize: hyperspectrum.initialize,
-		update: hyperspectrum.update,
-		options: {
-			...sharedOptions,
-			colorscale
-		}
-	}
-}
-
-const renderDeckSidePanels = async ( plotOptions, initialize = false ) => {
-
-	if( deckTopPanelGraph.value === null || deckBottomPanelGraph.value === null ){
-		return
-	}
-
-	deckTopPanelGraph.value.__harkanaSpectrumLegendVisible = topSpectrumPaneLegendVisible.value
-	deckTopPanelGraph.value.__harkanaSpectrumHighlightGroup = hoveredSpectrumLegendKey.value
-	deckBottomPanelGraph.value.__harkanaSpectrumHighlightGroup = hoveredSpectrumLegendKey.value
-	deckTopPanelGraph.value.__harkanaHiddenSpectrumTraceGroups = normalizedHiddenSpectrumLegendKeys.value
-	deckBottomPanelGraph.value.__harkanaHiddenSpectrumTraceGroups = normalizedHiddenSpectrumLegendKeys.value
-
-	const nextUpperKey = upperPanelRenderKey( plotOptions )
-	const nextLowerKey = lowerPanelRenderKey( plotOptions )
-	const shouldRenderUpper = initialize ||
-		nextUpperKey !== lastDeckUpperPanelKey.value ||
-		plotlyGraphHasData( deckTopPanelGraph.value ) === false
-	const shouldRenderLower = initialize ||
-		nextLowerKey !== lastDeckLowerPanelKey.value ||
-		plotlyGraphHasData( deckBottomPanelGraph.value ) === false
-
-	if( shouldRenderUpper ){
-		const upperRenderer = plotlyGraphHasData( deckTopPanelGraph.value ) ? hyperspectrum.updateUpperPanel : hyperspectrum.initializeUpperPanel
-		await upperRenderer( deckTopPanelGraph.value, settings.value, plotOptions )
-		lastDeckUpperPanelKey.value = nextUpperKey
-	}
-
-	if( shouldRenderLower ){
-		const lowerRenderer = plotlyGraphHasData( deckBottomPanelGraph.value ) ? hyperspectrum.updateLowerPanel : hyperspectrum.initializeLowerPanel
-		await lowerRenderer( deckBottomPanelGraph.value, settings.value, plotOptions )
-		lastDeckLowerPanelKey.value = nextLowerKey
-	}
-}
-
-const renderDeckHeatmapPane = async ( matrix, plotSpec, initialize = false ) => {
-
-	if( graph.value === null ) return
-
-	const nextPaneKey = heatmapPaneLayoutKey( matrix, plotSpec.options?.axes )
-	const shouldRenderPaneFigure = initialize ||
-		nextPaneKey !== lastDeckHeatmapPaneKey.value ||
-		plotlyGraphHasData( graph.value ) === false
-	const renderOptions = {
-		...plotSpec.options,
-		panelMode: "heatmap-only",
-		skipFigureRender: shouldRenderPaneFigure === false
-	}
-	const renderFunction = shouldRenderPaneFigure || plotlyGraphHasData( graph.value ) === false
-		? plotSpec.initialize
-		: plotSpec.update
-
-	await renderFunction( matrix, graph.value, settings.value, renderOptions )
-	lastDeckHeatmapPaneKey.value = nextPaneKey
-}
-
-const currentPlotSharedOptions = () => {
-
-	const bottomLeftOptions = bottomLeftSpectrumOptions()
-
-	return {
-		selectedSpectrum: bottomLeftOptions.selectedSpectrum,
-		bottomLeftSpectrum: bottomLeftOptions.bottomLeftSpectrum,
-		topLeftSpectrum: topLeftSpectrumOptions(),
-		topSpectrumGridlineSource: topSpectrumGridlineSourceKey(),
-		bottomSpectrumGridlineSource: bottomSpectrumGridlineSourceKey(),
-		projectSpectrumGridlines: normalizeProjectSpectrumGridlineState( projectSpectrumGridlinesVisible.value ),
-		roiOverlays: activeRoiOverlays(),
-		axes: plotAxes(),
-		heatmapRenderer: heatmapRendererMode.value
-	}
-}
-
-const renderCurrentSpectraPanels = async () => {
-
-	if( graph.value === null ) return
-
-	const matrix = currentMatrix()
-	if( matrix === null ) return
-
-	const plotSpec = resolveCurrentPlotRenderSpec( currentPlotSharedOptions() )
-
-	if( heatmapRendererMode.value === "deckgl" ){
-		await renderDeckSidePanels( plotSpec.options, false )
-		return
-	}
-
-	const renderFunction = plotlyGraphHasData( graph.value ) ? plotSpec.update : plotSpec.initialize
-	await renderFunction( matrix, graph.value, settings.value, plotSpec.options )
-}
-
-const queueSpectraPanelRender = () => {
-	queuedSpectraPanelRender = queuedSpectraPanelRender
-		.catch(() => {})
-		.then(() => renderCurrentSpectraPanels() )
-
-	return queuedSpectraPanelRender
-}
-
 const togglePcaComponent = async ( componentIndex ) => {
 
 	const normalizedComponent = Number.parseInt( componentIndex, 10 )
@@ -7981,65 +5948,6 @@ const togglePcaComponent = async ( componentIndex ) => {
 
 	await renderCurrentMatrix()
 }
-
-const renderCurrentMatrix = async ( initialize = false ) => {
-
-	if( activePlot.value === "z_blend" ){
-		await ensureZBlendVisualizationMatrix( "high" )
-	} else if( heatmapUsesEstimatedRaman.value ){
-		await ensureEstimatedVisualizationMatrix( "high" )
-	}
-
-	await ensureActivePlotLoadings( "high" )
-
-	if( heatmapRendererMode.value === "deckgl" &&
-		( graph.value === null || deckTopPanelGraph.value === null || deckBottomPanelGraph.value === null )){
-		await nextTick()
-	}
-
-	syncSpectrumGridlineGraphListeners()
-	syncSpectrumLegendGraphListeners()
-	syncHeatmapModebarGraphListeners()
-	hyperspectrum.syncHeatmapModebarState( graph.value, heatmapInteractionMode.value, heatmapZoomAspectRatio.value )
-	await applyProjectSpectrumGridlineState( projectSpectrumGridlinesVisible.value )
-
-	const matrix = currentMatrix()
-	if( matrix === null || graph.value === null ) return
-	if( heatmapRendererMode.value === "deckgl" && deckHeatmapPaneWidthTouched.value === false ){
-		deckHeatmapPaneWidth.value = defaultDeckHeatmapPaneWidth()
-	}
-	if( heatmapRendererMode.value === "deckgl" && deckTopSpectrumPaneHeightTouched.value === false ){
-		deckTopSpectrumPaneHeight.value = defaultDeckTopSpectrumPaneHeight()
-	}
-	const renderStartedAt = performance.now()
-	if( heatmapRendererMode.value === "deckgl" ){
-		const benchmarkToken = heatmapRenderBenchmarkToken.value + 1
-		heatmapRenderBenchmarkToken.value = benchmarkToken
-		pendingDeckRenderBenchmark.value = {
-			token: benchmarkToken,
-			startedAt: renderStartedAt,
-			viewMode: activePlot.value
-		}
-	} else {
-		pendingDeckRenderBenchmark.value = null
-	}
-	const plotSpec = resolveCurrentPlotRenderSpec( currentPlotSharedOptions() )
-
-	if( heatmapRendererMode.value === "deckgl" ){
-		await renderDeckSidePanels( plotSpec.options, initialize )
-		await renderDeckHeatmapPane( matrix, plotSpec, initialize )
-		await finalizeHeatmapRender( renderStartedAt )
-		if( reconcileDeckHeatmapPaneWidthWithPlotlyLayout( matrix ) ){
-			queueDeckPaneResponsiveResize()
-		}
-		return
-	}
-
-	const renderFunction = initialize ? plotSpec.initialize : plotSpec.update
-	await renderFunction( matrix, graph.value, settings.value, plotSpec.options )
-	await finalizeHeatmapRender( renderStartedAt )
-}
-
 const loadLayer = async ( layerIndex, priority = "high" ) => {
 
 	if( layer.value !== null && layerIndex === activeLayerIndex.value ){
@@ -9038,6 +6946,18 @@ const refreshOnResize = debounce( async () => {
 	await renderCurrentMatrix()
 }, 100 )
 
+const ensureViewerResizeObserver = () => {
+
+	if( resizeObserver !== null ) return
+	if( typeof ResizeObserver === "undefined" ) return
+	if( graph.value === null ) return
+
+	resizeObserver = new ResizeObserver(() => {
+		void refreshOnResize()
+	})
+	resizeObserver.observe( graph.value )
+}
+
 const debouncedApplyLayerInput = debounce( async () => {
 
 	if( activePlot.value !== "layer" ) return
@@ -9088,27 +7008,14 @@ const debouncedApplyPcaMipComponentCount = debounce( async () => {
 
 const resetViewerState = () => {
 
-	stopGpuInferenceStatusPolling()
-	gpuStatusPollInFlight = false
-	removeHeatmapViewportSyncListener()
+	resetGpuInferenceState()
+	resetHeatmapToolbarState()
 	stopDeckPaneResize()
-	if( typeof cancelScheduledLayerPayloadPrewarm === "function" ){
-		cancelScheduledLayerPayloadPrewarm()
-		cancelScheduledLayerPayloadPrewarm = null
-	}
-	if( typeof cancelScheduledDisplayPayloadPrewarm === "function" ){
-		cancelScheduledDisplayPayloadPrewarm()
-		cancelScheduledDisplayPayloadPrewarm = null
-	}
+	invalidateLayerPayloadPrewarm()
+	invalidateDisplayPayloadPrewarm()
 	clearProjectBackgroundWork()
-	scheduledDisplayPayloadPrewarmTargets.clear()
-	debouncedSaveProjectSpectrumGridlinePreset.cancel()
-	clearSpectrumGridlineGraphListeners()
-	clearSpectrumLegendGraphListeners()
-	clearHeatmapModebarGraphListeners()
-	displayPayloadPrewarmRequestID += 1
+	resetSpectrumPlotSyncState()
 	activeLayerRequestID.value += 1
-	activeLayerPayloadPrewarmRequestID.value += 1
 	activeMipHsvRequestID.value += 1
 	activeUmapRequestID.value += 1
 	activeXyzRequestID.value += 1
@@ -9134,26 +7041,16 @@ const resetViewerState = () => {
 	deckTopSpectrumPaneHeight.value = null
 	deckTopSpectrumPaneHeightTouched.value = false
 	resetPreparationState()
-	viewerTutorialPromptVisible.value = false
-	viewerTutorialVisible.value = false
-	viewerTutorialStepIndex.value = 0
-	viewerTutorialRunToken.value += 1
-	tutorialDisplayOptionsOpen.value = false
-	viewerTutorialOriginalDisplayMode.value = ""
-	viewerTutorialOriginalInteractionMode.value = ""
+	resetViewerTutorialState()
 
 	project.value = { id: "" }
-	gpuInferenceJobId.value = ""
-	gpuInferenceStatus.value = ""
-	gpuInferenceEstimateSpectraReady.value = false
+	resetSelectionState()
 	visualizationDataSource.value = resolvedDefaultVisualizationDataSource()
-	spectrumDataSource.value = "measurement"
-	primarySpectrumSource.value = "measurement"
+	selectedConfidenceLevel.value = defaultSelectionConfidenceLevel()
 	activePlot.value = defaultDisplayMode()
 	heatmapInteractionMode.value = defaultHeatmapInteractionMode()
 	heatmapRendererMode.value = defaultHeatmapRendererMode()
 	heatmapZoomAspectRatio.value = defaultHeatmapZoomAspectRatio()
-	projectSpectrumGridlinesVisible.value = defaultProjectSpectrumGridlinesVisible()
 	zBlendChannels.value = []
 	zBlendSaving.value = false
 	zBlendPresetStatus.value = "idle"
@@ -9176,6 +7073,25 @@ const resetViewerState = () => {
 	mipHsv.value = null
 	umap.value = null
 	xyzAxes.value = null
+	stopSpectralCalibrationPulse()
+	detachSpectralCalibrationPlotClickListeners()
+	spectralCalibrationProfilesSupported.value = true
+	spectralCalibrationProfilesLoading.value = false
+	spectralCalibrationAssignmentSaving.value = false
+	spectralCalibrationProfileSaving.value = false
+	spectralCalibrationProfiles.value = []
+	spectralCalibrationAssignedProfileID.value = ""
+	spectralCalibrationSelectedProfileID.value = ""
+	spectralCalibrationAssignedProfile.value = null
+	spectralCalibrationSelectedProfile.value = null
+	spectralCalibrationPreview.value = null
+	spectralCalibrationPanelOpen.value = false
+	focusedSpectralCalibrationPointID.value = ""
+	spectralCalibrationPulsePhase.value = 0
+	spectralCalibrationDraftPointCounter.value = 0
+	spectralCalibrationDraft.value = buildSpectralCalibrationDraftFromModel( buildDefaultSpectralCalibrationModel() )
+	spectralCalibrationError.value = ""
+	spectralCalibrationSidebarOpen.value = false
 	layer.value = null
 	estimatedMip.value = null
 	estimatedMipHsv.value = null
@@ -9202,18 +7118,7 @@ const resetViewerState = () => {
 	rpcaLoadings.value = null
 	showPcaLoadings.value = defaultShowPcaLoadings()
 	showSelectedSpectra.value = true
-	cancelSelectionSpectrumQueryState()
-	rois.value = []
-	resetEstimatedRoiArtifacts()
-	selectedRoiIds.value = []
-	selectedHeatmapIndices.value = { xIndices: [], yIndices: [] }
-	selectedHeatmapBoundingBox.value = null
-	latestMeasurementSingleSpectrum.value = null
-	latestMeasurementMeanSpectrum.value = null
-	latestMeasurementSelectedSpectrum.value = null
-	latestRamanSingleSpectrum.value = null
-	latestRamanMeanSpectrum.value = null
-	latestRamanSelectedSpectrum.value = null
+	resetRoiState()
 	activeLayerIndex.value = 0
 	activePcaClassificationComponentCount.value = 0
 	activePcaMipComponentCount.value = 0
@@ -9225,178 +7130,70 @@ const resetViewerState = () => {
 	activeEstimatedRpcaMipComponentCount.value = 0
 }
 
-const restoreGpuInferenceState = async ( requestID ) => {
+useProjectViewLifecycle({
+	route,
+	project,
+	projects,
+	settings,
+	billingSettings,
+	activeProjectLoadRequestID,
+	activePlot,
+	layerInput,
+	mip,
+	maxLayerIndex,
+	cacheOptions,
+	projectlib,
+	settingslib,
+	hyperspectrumCache,
+	navigation,
+	resetViewerState: () => resetViewerState(),
+	restoreGpuInferenceState: ( requestID ) => restoreGpuInferenceState( requestID ),
+	loadRoiList: () => loadRoiList(),
+	loadXyz: ( priority ) => loadXyz( priority ),
+	loadSpectralCalibrationState: () => loadSpectralCalibrationState(),
+	layerCacheOptions: () => layerCacheOptions(),
+	ensureDefaultZBlendState: () => ensureDefaultZBlendState(),
+	loadProjectSpectrumGridlinePreset: ( requestID ) => loadProjectSpectrumGridlinePreset( requestID ),
+	loadZBlendPreset: ( requestID ) => loadZBlendPreset( requestID ),
+	blockingPreparationTargetForDisplayMode: ( displayMode ) => blockingPreparationTargetForDisplayMode( displayMode ),
+	markPreparationStarted: ( target ) => markPreparationStarted( target ),
+	markPreparationFailed: ( target ) => markPreparationFailed( target ),
+	markPreparationCompleted: ( target ) => markPreparationCompleted( target ),
+	loadVisualizationTargetData: ( target, initialLayerIndex, priority ) => loadVisualizationTargetData( target, initialLayerIndex, priority ),
+	nextTick,
+	renderCurrentMatrix: ( initialize = false ) => renderCurrentMatrix( initialize ),
+	emitLoadedOnce: () => emitLoadedOnce(),
+	maybeOfferViewerTutorialPrompt: ( requestID ) => maybeOfferViewerTutorialPrompt( requestID ),
+	queueProjectBackgroundHydration: ( requestID, initialLayerIndex, startingDisplayMode ) => {
+		queueProjectBackgroundHydration( requestID, initialLayerIndex, startingDisplayMode )
+	},
+	ensureResizeObserver: () => ensureViewerResizeObserver(),
+	installProjectBackgroundInteractionListeners: () => installProjectBackgroundInteractionListeners(),
+	currentProjectID: () => currentProjectID()
+})
 
-	if( project.value?.shared ){
-		const sharedStatusCandidates = [
-			project.value?.gpuInferenceStatus,
-			project.value?.inferenceStatus,
-			project.value?.status
-		]
-
-		var sharedStatus = ""
-		for( const candidate of sharedStatusCandidates ){
-			const normalizedCandidate = normalizedGpuInferenceStatus( candidate )
-			if( normalizedCandidate.length === 0 ) continue
-			sharedStatus = normalizedCandidate
-			break
-		}
-
-		const sharedEstimateSpectraReady =
-			project.value?.gpuInferenceEstimateSpectraReady === true ||
-			project.value?.estimateSpectraReady === true ||
-			sharedStatus === "SUCCEEDED"
-
-		if( sharedStatus.length > 0 ){
-			gpuInferenceStatus.value = sharedStatus
-		}
-		gpuInferenceEstimateSpectraReady.value = sharedEstimateSpectraReady
-		return
-	}
-
-	if( typeof project.value?.id !== "string" || project.value.id.length === 0 ) return
-
-	try{
-		const projectInfo = await projectlib.getInfo( project.value )
-		if( requestID !== activeProjectLoadRequestID.value ) return
-		if( projectInfo === null || typeof projectInfo !== "object" || projectInfo instanceof Error ){
-			return
-		}
-
-		const storedJobId = String( projectInfo.gpuInferenceJobId ?? "" ).trim()
-		const storedStatus = String( projectInfo.gpuInferenceStatus ?? "" ).trim()
-		const storedEstimateSpectraReady = projectInfo.gpuInferenceEstimateSpectraReady === true ||
-			normalizedGpuInferenceStatus( storedStatus ) === "SUCCEEDED"
-
-		if( storedJobId.length === 0 ) return
-
-		gpuInferenceJobId.value = storedJobId
-		gpuInferenceStatus.value = normalizedGpuInferenceStatus( storedStatus )
-		gpuInferenceEstimateSpectraReady.value = storedEstimateSpectraReady
-
-		const response = await hyperspectra.status( storedJobId )
-		if( requestID !== activeProjectLoadRequestID.value ) return
-
-		await updateGpuInferenceState( response, { announce: true })
-	} catch( error ){
-		if( requestID !== activeProjectLoadRequestID.value ) return
-		console.log( error )
-	}
-}
-
-const initializeProjectView = async () => {
-
-	const nextProjectID = currentProjectID()
-	if( nextProjectID.length === 0 ) return
-
-	const requestID = activeProjectLoadRequestID.value + 1
-	activeProjectLoadRequestID.value = requestID
-
-	resetViewerState()
-
-	try{
-		projects.value = await projectlib.list()
-		if( requestID !== activeProjectLoadRequestID.value ) return
-
-		const nextProject = projects.value[ nextProjectID ]
-		if( nextProject === undefined ){
-			throw new Error( "Project not found: " + nextProjectID )
-		}
-
-		project.value = nextProject
-		await restoreGpuInferenceState( requestID )
-		if( requestID !== activeProjectLoadRequestID.value ) return
-
-		await hyperspectrumCache.initProjectCache( project.value, cacheOptions )
-		if( requestID !== activeProjectLoadRequestID.value ) return
-
-		hyperspectrumCache.setActiveLayer( project.value, 0, cacheOptions )
-		hyperspectrumCache.setActivePca( project.value, 5, cacheOptions )
-		hyperspectrumCache.setActiveRpca( project.value, 5, cacheOptions )
-		await loadRoiList()
-		if( requestID !== activeProjectLoadRequestID.value ) return
-
-		try{
-			await loadXyz( "high" )
-		} catch( xyzError ){
-			console.log( xyzError )
-		}
-
-		if( requestID !== activeProjectLoadRequestID.value ) return
-
-		const initialLayerIndex = Math.floor( maxLayerIndex.value / 2 )
-		layerInput.value = initialLayerIndex
-		hyperspectrumCache.setActiveLayer( project.value, initialLayerIndex, layerCacheOptions() )
-		hyperspectrumCache.setInitialLayerWindow( project.value, initialLayerIndex, layerCacheOptions() )
-		ensureDefaultZBlendState()
-		await loadProjectSpectrumGridlinePreset( requestID )
-		void loadZBlendPreset( requestID )
-		const startingDisplayMode = activePlot.value
-		const blockingPreparationTarget = blockingPreparationTargetForDisplayMode( startingDisplayMode )
-		markPreparationStarted( blockingPreparationTarget )
-
-		const loadedMip = await hyperspectrumCache.getMip( project.value, cacheOptions )
-		if( requestID !== activeProjectLoadRequestID.value ) return
-		mip.value = loadedMip
-
-		try{
-			await loadVisualizationTargetData( blockingPreparationTarget, initialLayerIndex, "high" )
-		} catch( blockingError ){
-			console.log( blockingError )
-
-			if( startingDisplayMode !== "mip" ){
-				markPreparationFailed( blockingPreparationTarget )
-				activePlot.value = "mip"
-				markPreparationStarted( "mip" )
-				await loadVisualizationTargetData( "mip", initialLayerIndex, "high" )
-			} else {
-				throw blockingError
-			}
-		}
-
-		if( requestID !== activeProjectLoadRequestID.value ) return
-
-		await nextTick()
-		if( requestID !== activeProjectLoadRequestID.value ) return
-
-		await renderCurrentMatrix( true )
-		markPreparationCompleted( blockingPreparationTargetForDisplayMode( activePlot.value ) )
-		emitLoadedOnce()
-		maybeOfferViewerTutorialPrompt( requestID )
-		queueProjectBackgroundHydration( requestID, initialLayerIndex, activePlot.value )
-
-		if( resizeObserver === null && typeof ResizeObserver !== "undefined" && graph.value ){
-			resizeObserver = new ResizeObserver(() => {
-				void refreshOnResize()
-			})
-			resizeObserver.observe( graph.value )
-		}
-	} catch( error ){
-		if( requestID !== activeProjectLoadRequestID.value ) return
-		console.log( error )
-		navigation.route("Main menu", {})
-	}
-}
-
-onMounted( async () => {
-
-    try{
-		installProjectBackgroundInteractionListeners()
-
-        var savedSettings = await settingslib.get()
-		var savedBilling = await settingslib.getBilling()
-
-        settings.value = savedSettings
-		if( savedBilling && typeof savedBilling === "object" ){
-			billingSettings.value = {
-				groupID: typeof savedBilling.groupID === "string" ? savedBilling.groupID : ""
-			}
-		}
-		await initializeProjectView()
-    } catch( error ){
-		console.log( error )
-        navigation.route("Main menu", {})
-    }
+useDisplayModeWorkflow({
+	activePlot,
+	project,
+	heatmapUsesEstimatedRaman,
+	showPcaLoadings,
+	pcaMipComponentCount,
+	pcaClassificationComponentCount,
+	renderCurrentMatrix: () => renderCurrentMatrix(),
+	loadMipHsv: ( priority ) => loadMipHsv( priority ),
+	loadUmap: ( priority ) => loadUmap( priority ),
+	ensureZBlendVisualizationMatrix: ( priority ) => ensureZBlendVisualizationMatrix( priority ),
+	renderZBlendHeatmapOnly: () => renderZBlendHeatmapOnly(),
+	applyLayerInput: () => applyLayerInput(),
+	resetActivePcaComponents: ( count ) => resetActivePcaComponents( count ),
+	loadPcaMip: ( count ) => loadPcaMip( count ),
+	loadPcaClassificationMip: () => loadPcaClassificationMip(),
+	loadPcaClassification: () => loadPcaClassification(),
+	loadPcaLoadings: () => loadPcaLoadings(),
+	loadRpcaMip: ( count ) => loadRpcaMip( count ),
+	loadRpcaClassificationMip: () => loadRpcaClassificationMip(),
+	loadRpcaClassification: () => loadRpcaClassification(),
+	loadRpcaLoadings: () => loadRpcaLoadings()
 })
 
 watch( pcaLegend, async ( legendEntries ) => {
@@ -9418,163 +7215,6 @@ watch( pcaLegend, async ( legendEntries ) => {
 		console.log( error )
 	}
 }, { immediate: true })
-
-watch( [ topSpectrumPaneLegendVisible, () => topSpectrumPaneLegendEntries.value.length ], async () => {
-
-	hoveredSpectrumLegendKey.value = ""
-
-	await nextTick()
-	await new Promise(( resolve ) => requestAnimationFrame( resolve ))
-	await resizePlotlyContainer( deckTopPanelGraph.value )
-}, { flush: "post" })
-
-watch( topSpectrumPaneLegendEntries, ( legendEntries ) => {
-	const currentKey = String( hoveredSpectrumLegendKey.value ?? "" ).trim()
-	if( currentKey.length === 0 ){
-		return
-	}
-
-	const hasCurrentEntry = Array.isArray( legendEntries ) && legendEntries.some(( entry ) => entry?.key === currentKey )
-	if( hasCurrentEntry === false ){
-		hoveredSpectrumLegendKey.value = ""
-	}
-}, { flush: "post" })
-
-watch( hoveredSpectrumLegendKey, async ( nextKey ) => {
-	try{
-		await Promise.all([
-			hyperspectrum.setSpectrumHighlightGroup( deckTopPanelGraph.value, nextKey ),
-			hyperspectrum.setSpectrumHighlightGroup( deckBottomPanelGraph.value, nextKey )
-		])
-	} catch( error ){
-		console.log( error )
-	}
-}, { flush: "post" })
-
-watch( normalizedHiddenSpectrumLegendKeys, async ( nextKeys ) => {
-	try{
-		await Promise.all([
-			hyperspectrum.setSpectrumHiddenGroups( deckTopPanelGraph.value, nextKeys ),
-			hyperspectrum.setSpectrumHiddenGroups( deckBottomPanelGraph.value, nextKeys )
-		])
-	} catch( error ){
-		console.log( error )
-	}
-}, { flush: "post" })
-
-watch( () => route.params.id, async ( nextProjectID, previousProjectID ) => {
-
-	if( typeof nextProjectID !== "string" || nextProjectID.length === 0 ) return
-	if( nextProjectID === previousProjectID ) return
-
-	await initializeProjectView()
-})
-
-watch( activePlot, async ( plotMode ) => {
-
-	if( project.value.id === "" ) return
-
-	try{
-		if( plotMode === "mip" ){
-			await renderCurrentMatrix()
-			return
-		}
-
-		if( plotMode === "mip_hsv" ){
-			if( heatmapUsesEstimatedRaman.value === false ){
-				await loadMipHsv( "high" )
-			}
-			await renderCurrentMatrix()
-			return
-		}
-
-		if( plotMode === "umap" ){
-			if( heatmapUsesEstimatedRaman.value === false ){
-				await loadUmap( "high" )
-			}
-			await renderCurrentMatrix()
-			return
-		}
-
-		if( plotMode === "z_blend" ){
-			await ensureZBlendVisualizationMatrix( "high" )
-			await renderCurrentMatrix()
-			await renderZBlendHeatmapOnly()
-			return
-		}
-
-		if( plotMode === "layer" ){
-			await applyLayerInput()
-			return
-		}
-
-			if( plotMode === "pca_mip" ){
-				resetActivePcaComponents( pcaMipComponentCount.value )
-				await loadPcaMip( pcaMipComponentCount.value )
-				await renderCurrentMatrix()
-				if( showPcaLoadings.value ){
-					void loadPcaLoadings().catch(( loadingsError ) => {
-						console.log( loadingsError )
-					})
-				}
-				return
-			}
-
-			if( plotMode === "pca" ){
-				resetActivePcaComponents( pcaClassificationComponentCount.value )
-				await loadPcaClassificationMip()
-				await renderCurrentMatrix()
-				if( showPcaLoadings.value ){
-					void loadPcaLoadings().catch(( loadingsError ) => {
-						console.log( loadingsError )
-					})
-				}
-				return
-			}
-
-			if( plotMode === "pca_rgb" ){
-				await loadPcaClassification()
-				await renderCurrentMatrix()
-				if( showPcaLoadings.value ){
-					void loadPcaLoadings().catch(( loadingsError ) => {
-						console.log( loadingsError )
-					})
-				}
-				return
-			}
-
-			if( plotMode === "rpca_mip" ){
-				resetActivePcaComponents( pcaMipComponentCount.value )
-				await loadRpcaMip( pcaMipComponentCount.value )
-				if( showPcaLoadings.value ){
-					await loadRpcaLoadings()
-				}
-				await renderCurrentMatrix()
-				return
-			}
-
-			if( plotMode === "rpca" ){
-				resetActivePcaComponents( pcaClassificationComponentCount.value )
-				await loadRpcaClassificationMip()
-				if( showPcaLoadings.value ){
-					await loadRpcaLoadings()
-				}
-				await renderCurrentMatrix()
-				return
-			}
-
-			if( plotMode === "rpca_rgb" ){
-				await loadRpcaClassification()
-				if( showPcaLoadings.value ){
-					await loadRpcaLoadings()
-				}
-				await renderCurrentMatrix()
-				return
-			}
-	} catch( error ){
-		console.log( error )
-	}
-})
 
 watch(
 	[
@@ -9617,17 +7257,8 @@ watch( heatmapInteractionMode, async () => {
 
 watch( heatmapRendererMode, async () => {
 
-	if( typeof cancelScheduledLayerPayloadPrewarm === "function" ){
-		cancelScheduledLayerPayloadPrewarm()
-		cancelScheduledLayerPayloadPrewarm = null
-	}
-	activeLayerPayloadPrewarmRequestID.value += 1
-	displayPayloadPrewarmRequestID += 1
-	if( typeof cancelScheduledDisplayPayloadPrewarm === "function" ){
-		cancelScheduledDisplayPayloadPrewarm()
-		cancelScheduledDisplayPayloadPrewarm = null
-	}
-	scheduledDisplayPayloadPrewarmTargets.clear()
+	invalidateLayerPayloadPrewarm()
+	invalidateDisplayPayloadPrewarm()
 	resetDeckPanelRenderKeys()
 	removeHeatmapViewportSyncListener()
 
@@ -9785,11 +7416,8 @@ watch( hasEstimatedRamanSpectraReady, async ( isReady ) => {
 		spectrumDataSource.value = "measurement"
 		primarySpectrumSource.value = "measurement"
 		cancelSelectionSpectrumQuery( "raman" )
-		ramanRoiSpectraById.value = {}
-		activeRamanRoiRequestIDs.value = {}
-		latestRamanSingleSpectrum.value = null
-		latestRamanMeanSpectrum.value = null
-		latestRamanSelectedSpectrum.value = null
+		resetEstimatedRoiArtifacts()
+		clearSpectrumSourceState( "raman" )
 
 		if( graph.value !== null ){
 			try{
@@ -9841,35 +7469,69 @@ watch( hasSuccessfulRamanInference, async ( isReady ) => {
 	}
 })
 
-watch( [ gpuInferenceJobId, gpuInferenceStatus, () => project.value?.id, () => project.value?.shared ], () => {
-	syncGpuInferenceStatusPolling()
-}, { immediate: true })
+watch( spectralCalibrationMaxOrder, ( nextMaxOrder ) => {
+	const normalizedIncludedOrders = normalizeSpectralCalibrationIncludedOrders(
+		spectralCalibrationDraft.value.includedOrders,
+		Math.min( spectralCalibrationDraft.value.polynomialOrder, nextMaxOrder )
+	)
+	const includedOrdersChanged =
+		normalizedIncludedOrders.length !== ( Array.isArray( spectralCalibrationDraft.value.includedOrders ) ? spectralCalibrationDraft.value.includedOrders.length : 0 ) ||
+		normalizedIncludedOrders.some(( order, index ) => order !== spectralCalibrationDraft.value.includedOrders?.[index] )
+
+	if( spectralCalibrationDraft.value.polynomialOrder <= nextMaxOrder && includedOrdersChanged === false ){
+		return
+	}
+
+	spectralCalibrationDraft.value = {
+		...spectralCalibrationDraft.value,
+		polynomialOrder: Math.min( spectralCalibrationDraft.value.polynomialOrder, nextMaxOrder ),
+		includedOrders: normalizedIncludedOrders
+	}
+})
+
+watch( spectralCalibrationSidebarOpen, async ( isOpen ) => {
+	if( isOpen ){
+		await nextTick()
+		syncSpectralCalibrationPlotClickListeners()
+		await syncSpectralCalibrationReferenceLines()
+		return
+	}
+
+	spectralCalibrationPanelOpen.value = false
+	focusedSpectralCalibrationPointID.value = ""
+	detachSpectralCalibrationPlotClickListeners()
+	stopSpectralCalibrationPulse()
+	await syncSpectralCalibrationReferenceLines()
+})
+
+watch( [ spectralCalibrationEditingActive, focusedSpectralCalibrationPointID ], () => {
+	syncSpectralCalibrationPulse()
+}, { flush: "post" })
+
+watch( [ spectralCalibrationReferenceLines, spectralCalibrationEditingActive ], async () => {
+	await syncSpectralCalibrationReferenceLines()
+}, { deep: true, flush: "post" })
 
 onBeforeUnmount( () => {
 
 	stopGpuInferenceStatusPolling()
-	gpuStatusPollInFlight = false
-	removeHeatmapViewportSyncListener()
+	stopSpectralCalibrationPulse()
+	detachSpectralCalibrationPlotClickListeners()
+	resetHeatmapToolbarState()
 	stopDeckPaneResize()
-	debouncedSaveProjectSpectrumGridlinePreset.cancel()
+	cancelSpectrumGridlinePresetSave()
 	cancelSelectionSpectrumQueryState()
-	clearSpectrumGridlineGraphListeners()
-	clearSpectrumLegendGraphListeners()
-	clearHeatmapModebarGraphListeners()
+	clearSpectrumPlotGraphListeners()
 	clearProjectBackgroundWork()
-	if( typeof removeProjectBackgroundInteractionListeners === "function" ){
-		removeProjectBackgroundInteractionListeners()
-	}
+	removeBackgroundInteractionListeners()
 
 	if( resizeObserver !== null ){
 		resizeObserver.disconnect()
 		resizeObserver = null
 	}
 
-	if( typeof cancelScheduledLayerPayloadPrewarm === "function" ){
-		cancelScheduledLayerPayloadPrewarm()
-		cancelScheduledLayerPayloadPrewarm = null
-	}
+	invalidateLayerPayloadPrewarm()
+	invalidateDisplayPayloadPrewarm()
 
 	refreshOnResize.cancel()
 	debouncedApplyLayerInput.cancel()
@@ -9878,9 +7540,7 @@ onBeforeUnmount( () => {
 	debouncedApplyPcaRgbInput.cancel()
 	debouncedApplyPcaClassificationComponentCount.cancel()
 	debouncedApplyPcaMipComponentCount.cancel()
-	viewerTutorialPromptVisible.value = false
-	viewerTutorialVisible.value = false
-	tutorialDisplayOptionsOpen.value = false
+	resetViewerTutorialState()
 })
 
 </script>

@@ -131,7 +131,7 @@ const processingList = ref({})
 const searchPattern = ref("")
 
 const activeProject = ref({})
-const activeProjects = ref({})
+const activeProjects = ref([])
 const activeIDs = ref( new Set() )
 const selectedProjects = computed(() => {
 
@@ -281,8 +281,6 @@ onMounted( async () => {
 	projectList.value = await projects.list()
 	processingList.value = await projects.listProcessing()
 	userFolders.value = await parseFolders()
-
-	console.log( processingList.value )
 
 	emit("loaded")
 })

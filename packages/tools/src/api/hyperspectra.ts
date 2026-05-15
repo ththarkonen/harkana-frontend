@@ -39,8 +39,10 @@ type InspectLayerAxisOption = {
     size: number
 }
 
+type HyperspectrumSourceFormat = "oir" | "ome-zarr" | "ome-tiff" | "tiff"
+
 type InspectSource = {
-    format: "oir" | "ome-zarr" | "ome-tiff"
+    format: HyperspectrumSourceFormat
     kind: "s3-object" | "s3-prefix"
     s3Uri: string
     bucket: string
@@ -54,10 +56,7 @@ type InspectDimensions = {
     shape: number[]
     shapeByAxis: Record<string, number>
     axes: InspectAxis[]
-    analysisRoles: {
-        required: string[]
-        optional: string[]
-    }
+    analysisRoles: Record<string, unknown>
     layerAxisOptions: InspectLayerAxisOption[]
     recommendedLayerAxis: string | null
 }
@@ -138,7 +137,66 @@ type OmeTiffInspectResponse = {
     warnings: string[]
 }
 
-type HyperspectrumSourceInspectResponse = OirInspectResponse | OmeZarrInspectResponse | OmeTiffInspectResponse
+type TiffInspectResponse = {
+    version: "hyperspectrum-source-inspect-v1"
+    projectID: string
+    dataType: "hypercars" | "hyperraman"
+    source: InspectSource & {
+        format: "tiff"
+        kind: "s3-object"
+        extension: "tif" | "tiff"
+    }
+    dimensions: {
+        axisOrder: "tczyx"
+        shape: [1, number, 1, number, number]
+        shapeByAxis: {
+            t: 1
+            c: number
+            z: 1
+            y: number
+            x: number
+        }
+        axes: [
+            { index: 0, name: "t", type: "time", unit: null, size: 1 },
+            { index: 1, name: "c", type: "channel", unit: null, size: number },
+            { index: 2, name: "z", type: "space", unit: null, size: 1 },
+            { index: 3, name: "y", type: "space", unit: string | null, size: number },
+            { index: 4, name: "x", type: "space", unit: string | null, size: number }
+        ]
+        analysisRoles: {
+            required: ["x", "y"]
+            optional: []
+            fixed: {
+                x: "x"
+                y: "y"
+                c: "c"
+                t: "t"
+                z: "z"
+            }
+        }
+        layerAxisOptions: [
+            { index: 1, name: "c", type: "channel", unit: null, size: number }
+        ]
+        recommendedLayerAxis: "c"
+    }
+    metadata: {
+        seriesIndex: 0
+        seriesCount: number
+        seriesAxes: string | null
+        seriesShape: number[]
+        dtype: string
+        isOme: boolean
+        omeXmlPresent: boolean
+        imagejMetadataPresent: boolean
+        pixelSizeX: number | null
+        pixelSizeY: number | null
+        pixelSizeXUnit: string | null
+        pixelSizeYUnit: string | null
+    }
+    warnings: string[]
+}
+
+type HyperspectrumSourceInspectResponse = OirInspectResponse | OmeZarrInspectResponse | OmeTiffInspectResponse | TiffInspectResponse
 
 type HyperspectrumSourceAnalysisRequest = {
     projectID: string
@@ -152,6 +210,12 @@ type HyperspectrumSourceAnalysisRequest = {
         t?: string
     }
     fixedIndices?: Record<string, number>
+}
+
+type HyperspectrumTiffAnalysisRequest = {
+    projectID: string
+    dataType?: "hypercars" | "hyperraman"
+    inputS3Uri?: string
 }
 
 type ParseJobResponse = {
@@ -481,6 +545,48 @@ var launchOirAnalysis = async (
         dataType,
         "/hyperspectrum/oir/analysis"
     )
+}
+
+var launchTiffAnalysis = async (
+    project: any,
+    groupID: string = "",
+    payload: Partial<HyperspectrumTiffAnalysisRequest> = {},
+    dataType: string = ""
+) => {
+
+    const projectReference = resolveProjectReference( project )
+    if( projectReference.projectID.length === 0 ){
+        throw new Error( "Missing projectID for hyperspectrum TIFF analysis request." )
+    }
+
+    if( projectReference.isShared ){
+        throw new Error( "Hyperspectrum TIFF analysis launch is not available for shared projects." )
+    }
+
+    const normalizedDataType = resolveHyperspectrumDataType( dataType )
+    const parameters: Record<string, string> = {
+        projectID: projectReference.projectID,
+        dataType: normalizedDataType,
+        groupID: groupID ?? ""
+    }
+
+    const body: HyperspectrumTiffAnalysisRequest = {
+        projectID: projectReference.projectID,
+        dataType: normalizedDataType
+    }
+
+    const inputS3Uri = String( payload?.inputS3Uri ?? "" ).trim()
+    if( inputS3Uri.length > 0 ){
+        body.inputS3Uri = inputS3Uri
+    }
+
+    const base = (import.meta as any).env.VITE_BASE_URL + "/hyperspectrum/tiff/analysis"
+    const url = base + "?" + buildQueryString( parameters )
+
+    return await apiFetch<ParseJobResponse>( url, {
+        method: "POST",
+        body: JSON.stringify( body )
+    })
 }
 
 var spectrum = async (
@@ -897,6 +1003,7 @@ export default {
     estimate,
     inspectSource,
     launchOirAnalysis,
+    launchTiffAnalysis,
     launchOmeZarrAnalysis,
     launchOmeTiffAnalysis,
     spectrum,

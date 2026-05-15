@@ -1,4 +1,5 @@
 import Plotly from 'plotly.js-dist'
+import { applyCalibrationToValues } from './calibration.js'
 
 const SPECTRUM_GRID_MODEBAR_ICON = {
     width: 512,
@@ -14,8 +15,37 @@ export const splitSpectrumLegendGroups = Object.freeze({
     estimateQ50: "estimate-q50",
     estimateQ75: "estimate-q75",
     estimateQ90: "estimate-q90",
-    estimateQ95: "estimate-q95"
+    estimateQ95: "estimate-q95",
+    calibrationMeasurement: "calibration-measurement",
+    calibrationEstimateMedian: "calibration-estimate-median",
+    calibrationEstimateQ50: "calibration-estimate-q50",
+    calibrationEstimateQ75: "calibration-estimate-q75",
+    calibrationEstimateQ90: "calibration-estimate-q90",
+    calibrationEstimateQ95: "calibration-estimate-q95"
 })
+
+export function buildComparisonProjectLegendGroup( projectID, traceFamily = "project" ){
+    const normalizedProjectID = String( projectID ?? "" ).trim()
+    const normalizedTraceFamily = String( traceFamily ?? "project" ).trim().toLowerCase()
+    return `comparison-project:${normalizedProjectID.length > 0 ? normalizedProjectID : "unknown"}:${normalizedTraceFamily.length > 0 ? normalizedTraceFamily : "project"}`
+}
+
+function parseComparisonProjectLegendGroup( legendGroup = "" ){
+    const normalizedLegendGroup = normalizeLegendGroupKey( legendGroup )
+    if( normalizedLegendGroup.startsWith( "comparison-project:" ) === false ){
+        return null
+    }
+
+    const parts = normalizedLegendGroup.split( ":" )
+    if( parts.length < 3 ){
+        return null
+    }
+
+    return {
+        projectID: parts.slice( 1, -1 ).join( ":" ),
+        traceFamily: parts[ parts.length - 1 ]
+    }
+}
 
 function normalizeGridlineVisibility( value, fallback = false ) {
     if( typeof value === "boolean" ) return value
@@ -49,7 +79,77 @@ const SPECTRUM_HIGHLIGHT_ANIMATION_DURATION_MS = 140
 const SPECTRUM_HIGHLIGHT_PULSE_DURATION_MS = 1840
 
 function isSpectrumUncertaintyLegendGroup( legendGroup = "" ){
-    return normalizeLegendGroupKey( legendGroup ).startsWith( "estimate-q" )
+    const normalizedLegendGroup = normalizeLegendGroupKey( legendGroup )
+    if( normalizedLegendGroup.startsWith( "estimate-q" ) ){
+        return true
+    }
+    if( normalizedLegendGroup.startsWith( "calibration-estimate-q" ) ){
+        return true
+    }
+
+    const parsedComparisonLegendGroup = parseComparisonProjectLegendGroup( normalizedLegendGroup )
+    return [ "q50", "q75", "q90", "q95" ].includes( parsedComparisonLegendGroup?.traceFamily )
+}
+
+function resolveAssociatedMedianLegendGroup( highlightedGroup = "" ){
+    const normalizedGroup = normalizeLegendGroupKey( highlightedGroup )
+    if( normalizedGroup.length === 0 ){
+        return ""
+    }
+
+    if([
+        splitSpectrumLegendGroups.estimateQ50,
+        splitSpectrumLegendGroups.estimateQ75,
+        splitSpectrumLegendGroups.estimateQ90,
+        splitSpectrumLegendGroups.estimateQ95
+    ].includes( normalizedGroup ) ){
+        return splitSpectrumLegendGroups.estimateMedian
+    }
+    if([
+        splitSpectrumLegendGroups.calibrationEstimateQ50,
+        splitSpectrumLegendGroups.calibrationEstimateQ75,
+        splitSpectrumLegendGroups.calibrationEstimateQ90,
+        splitSpectrumLegendGroups.calibrationEstimateQ95
+    ].includes( normalizedGroup ) ){
+        return splitSpectrumLegendGroups.calibrationEstimateMedian
+    }
+
+    const parsedComparisonLegendGroup = parseComparisonProjectLegendGroup( normalizedGroup )
+    if([ "q50", "q75", "q90", "q95" ].includes( parsedComparisonLegendGroup?.traceFamily ) ){
+        return buildComparisonProjectLegendGroup( parsedComparisonLegendGroup.projectID, "median" )
+    }
+
+    return ""
+}
+
+function resolveSpectrumTraceKind( trace ){
+    const traceKind = String( trace?.meta?.harkanaTraceKind ?? "" ).trim().toLowerCase()
+    if([ "line", "band-line", "band-fill" ].includes( traceKind ) ){
+        return traceKind
+    }
+
+    if( isSpectrumFillTrace( trace ) ){
+        return "band-fill"
+    }
+
+    if( isSpectrumUncertaintyLegendGroup( trace?.legendgroup ) ){
+        return "band-line"
+    }
+
+    return "line"
+}
+
+function resolveSpectrumTraceBaseVisible( trace ){
+    const baseVisible = trace?.meta?.harkanaBaseVisible
+    if( baseVisible === "legendonly" ){
+        return "legendonly"
+    }
+
+    if( baseVisible === false ){
+        return false
+    }
+
+    return true
 }
 
 function isSpectrumFillTrace( trace ){
@@ -107,7 +207,7 @@ function cloneTraceStyleState( state ){
 }
 
 function defaultTraceLineWidth( trace ){
-    return isSpectrumUncertaintyLegendGroup( trace?.legendgroup )
+    return resolveSpectrumTraceKind( trace ) !== "line"
         ? DEFAULT_SPECTRUM_BAND_LINE_WIDTH
         : DEFAULT_SPECTRUM_TRACE_LINE_WIDTH
 }
@@ -313,7 +413,7 @@ async function restyleTraceStyleState( graphContainer, traceIndices, state ){
 function buildHighlightedTraceStyleState( traces = [], highlightedGroup = "", options = {} ){
     const normalizedGroup = normalizeHighlightedTraceGroup( highlightedGroup )
     const emphasizeSelected = options?.emphasizeSelected !== false
-    const keepEstimateMedianVisible = isSpectrumUncertaintyLegendGroup( normalizedGroup )
+    const associatedMedianLegendGroup = resolveAssociatedMedianLegendGroup( normalizedGroup )
     const hasMatchingGroup = normalizedGroup.length > 0 && traces.some(( trace ) => {
         return normalizeLegendGroupKey( trace?.legendgroup ) === normalizedGroup &&
             trace?.visible !== "legendonly" &&
@@ -327,6 +427,7 @@ function buildHighlightedTraceStyleState( traces = [], highlightedGroup = "", op
             }
 
             const traceGroup = normalizeLegendGroupKey( trace?.legendgroup )
+            const traceKind = resolveSpectrumTraceKind( trace )
             if( traceGroup.length === 0 ){
                 return DIMMED_SPECTRUM_TRACE_OPACITY
             }
@@ -335,25 +436,25 @@ function buildHighlightedTraceStyleState( traces = [], highlightedGroup = "", op
                 return 1
             }
 
-            if( keepEstimateMedianVisible && traceGroup === splitSpectrumLegendGroups.estimateMedian ){
+            if( associatedMedianLegendGroup.length > 0 && traceGroup === associatedMedianLegendGroup ){
                 return 1
             }
 
-            return isSpectrumUncertaintyLegendGroup( traceGroup )
+            return traceKind === "band-line" || traceKind === "band-fill"
                 ? 1
                 : DIMMED_SPECTRUM_TRACE_OPACITY
         }),
         lineWidths: traces.map(( trace ) => {
             const traceGroup = normalizeLegendGroupKey( trace?.legendgroup )
-            const isUncertaintyGroup = isSpectrumUncertaintyLegendGroup( traceGroup )
+            const traceKind = resolveSpectrumTraceKind( trace )
 
             if( hasMatchingGroup === false ){
-                return isUncertaintyGroup
+                return traceKind !== "line"
                     ? DEFAULT_SPECTRUM_BAND_LINE_WIDTH
                     : DEFAULT_SPECTRUM_TRACE_LINE_WIDTH
             }
 
-            if( isUncertaintyGroup ){
+            if( traceKind !== "line" ){
                 return DEFAULT_SPECTRUM_BAND_LINE_WIDTH
             }
 
@@ -362,7 +463,7 @@ function buildHighlightedTraceStyleState( traces = [], highlightedGroup = "", op
                 : DEFAULT_SPECTRUM_TRACE_LINE_WIDTH
         }),
         fillAlphas: traces.map(( trace ) => {
-            if( isSpectrumFillTrace( trace ) === false ){
+            if( resolveSpectrumTraceKind( trace ) !== "band-fill" ){
                 return null
             }
 
@@ -371,7 +472,7 @@ function buildHighlightedTraceStyleState( traces = [], highlightedGroup = "", op
             }
 
             const traceGroup = normalizeLegendGroupKey( trace?.legendgroup )
-            if( traceGroup === normalizedGroup && isSpectrumUncertaintyLegendGroup( traceGroup ) ){
+            if( traceGroup === normalizedGroup ){
                 return emphasizeSelected
                     ? HIGHLIGHTED_SPECTRUM_BAND_FILL_ALPHA
                     : DEFAULT_SPECTRUM_BAND_FILL_ALPHA
@@ -624,14 +725,15 @@ function singlePaneLayout( graphContainer, settings, options = {} ){
 }
 
 function measurementTrace( data, settings, options = {} ){
-    const calibrationOffset = Number( data?.calibration?.x ?? 0 )
-    const calibratedDataX = data.x.map(( x ) => x + calibrationOffset )
+    const calibratedDataX = applyCalibrationToValues( data?.x, data?.calibration )
+    const sourceDataX = Array.isArray( data?.x ) ? data.x : calibratedDataX
     const legendLabel = String( options?.legendLabel ?? settings.legends.data ).replace(/\\/g, "\\")
     const color = String( options?.color ?? settings.colors.data )
     const visible = options?.visible === false ? "legendonly" : true
 
     var trace = {}
     trace.x = calibratedDataX
+    trace.customdata = sourceDataX
     trace.y = data.y
     trace.mode = "lines"
     trace.name = "$" + legendLabel + "$"
@@ -641,6 +743,12 @@ function measurementTrace( data, settings, options = {} ){
     }
     trace.showlegend = options?.showlegend !== false
     trace.visible = visible
+    trace.meta = {
+        ...( trace.meta ?? {} ),
+        harkanaTraceKind: "line",
+        harkanaBaseVisible: visible,
+        harkanaCalibrationSource: String( options?.calibrationSource ?? "" ).trim()
+    }
     trace.legendrank = Number.isFinite( Number( options?.legendrank )) ? Number( options.legendrank ) : 0
     const legendGroup = normalizeLegendGroupKey( options?.legendGroup )
     if( legendGroup.length > 0 ){
@@ -660,19 +768,24 @@ function estimateLegends( settings ){
 }
 
 function estimateTraces( data, estimate, settings, options = {} ){
-    const calibrationOffset = Number( data?.calibration?.x ?? 0 )
-    const calibratedEstimateX = estimate.x.map(( x ) => x + calibrationOffset )
+    const calibratedEstimateX = applyCalibrationToValues( estimate?.x, data?.calibration )
+    const sourceEstimateX = Array.isArray( estimate?.x ) ? estimate.x : calibratedEstimateX
     const visibility = options?.visibility ?? settings.visibility.plot
     const medianLabel = String( options?.medianLabel ?? settings.legends.median ).replace(/\\/g, "\\")
     const medianColor = hexToRgba( String( options?.medianColor ?? settings.colors.median ), 1 )
-    const areaColor = hexToRgba( String( options?.areaColor ?? settings.colors.area ), 0.10 )
-    const areaLineColor = hexToRgba( String( options?.areaLineColor ?? options?.areaColor ?? settings.colors.area ), 0 )
+    const areaColor = typeof options?.areaColor === "string" && options.areaColor.length > 0
+        ? options.areaColor
+        : hexToRgba( String( settings.colors.area ), 0.10 )
+    const areaLineColor = typeof options?.areaLineColor === "string" && options.areaLineColor.length > 0
+        ? options.areaLineColor
+        : hexToRgba( String( options?.areaColor ?? settings.colors.area ), 0 )
     const legendFlag = String( options?.legendFlag ?? "" )
     const axes = options?.axes ?? { xaxis: "x", yaxis: "y" }
     const legendGroups = options?.legendGroups ?? {}
 
     var traceEstimate = {}
     traceEstimate.x = calibratedEstimateX
+    traceEstimate.customdata = sourceEstimateX
     traceEstimate.y = estimate.median
     traceEstimate.mode = "lines"
     traceEstimate.name = "$" + medianLabel + "$"
@@ -682,6 +795,12 @@ function estimateTraces( data, estimate, settings, options = {} ){
     }
     traceEstimate.showlegend = options?.showlegend !== false
     traceEstimate.visible = visibility.median == false ? "legendonly" : true
+    traceEstimate.meta = {
+        ...( traceEstimate.meta ?? {} ),
+        harkanaTraceKind: "line",
+        harkanaBaseVisible: traceEstimate.visible,
+        harkanaCalibrationSource: String( options?.calibrationSource ?? "" ).trim()
+    }
     traceEstimate.legendrank = Number.isFinite( Number( options?.legendrank )) ? Number( options.legendrank ) : 1
     const medianLegendGroup = normalizeLegendGroupKey( legendGroups.median )
     if( medianLegendGroup.length > 0 ){
@@ -706,7 +825,9 @@ function estimateTraces( data, estimate, settings, options = {} ){
             {
                 legendGroup: legendGroups[`q${quantiles[ii]}`],
                 showlegend: options?.showlegend,
-                lineColor: areaLineColor
+                lineColor: areaLineColor,
+                calibrationSource: options?.calibrationSource,
+                sourceX: sourceEstimateX
             }
         )
 
@@ -719,32 +840,17 @@ function estimateTraces( data, estimate, settings, options = {} ){
 var renderMeasurementPane = async function( data, graphContainer, settings, options = {} ){
     const showLegend = options?.showlegend === true
     const { layout, config } = singlePaneLayout( graphContainer, settings, { showlegend: showLegend } )
-    const traceData = measurementTrace( data, settings, {
-        visible: settings.visibility.plot.data != false,
-        showlegend: showLegend,
-        legendGroup: options?.legendGroup ?? splitSpectrumLegendGroups.measurement
-    })
-
-    await Plotly.newPlot( graphContainer, [ traceData ], layout, config )
-    normalizeModebarButtonSpacing( graphContainer )
-}
-
-var renderMeasurementComparisonPane = async function( data, comparisonData, graphContainer, settings ){
-    const { layout, config } = singlePaneLayout( graphContainer, settings )
-    const visibility = settings.visibility.comparison ?? {}
     const traces = [
         measurementTrace( data, settings, {
-            visible: visibility.data != false,
-            legendrank: 0,
-            showlegend: false,
-            legendGroup: splitSpectrumLegendGroups.measurement
+        visible: settings.visibility.plot.data != false,
+        showlegend: showLegend,
+        legendGroup: options?.legendGroup ?? splitSpectrumLegendGroups.measurement,
+        calibrationSource: "measurement"
         }),
-        measurementTrace( comparisonData, settings, {
-            color: settings.comparisonColors.data,
-            visible: visibility.data != false,
-            legendrank: 1,
-            showlegend: false,
-            legendGroup: splitSpectrumLegendGroups.measurement
+        ...buildCalibrationPreviewMeasurementTrace( data, settings, {
+            calibrationPreview: options?.calibrationPreview,
+            visible: settings.visibility.plot.data != false,
+            legendrank: 100
         })
     ]
 
@@ -752,7 +858,37 @@ var renderMeasurementComparisonPane = async function( data, comparisonData, grap
     normalizeModebarButtonSpacing( graphContainer )
 }
 
-var renderEstimatePane = async function( data, estimate, graphContainer, settings ){
+var renderMeasurementComparisonPane = async function( data, comparisonEntriesInput, graphContainer, settings, options = {} ){
+    const { layout, config } = singlePaneLayout( graphContainer, settings )
+    const visibility = settings.visibility.comparison ?? {}
+    const comparisonEntries = normalizeComparisonEntriesInput( comparisonEntriesInput )
+    const traces = [
+        ...comparisonEntries.map(( entry, index ) => measurementTrace( entry.data, settings, {
+            color: resolveComparisonEntryColor( entry, index, settings ),
+            visible: visibility.data != false,
+            legendrank: index + 1,
+            showlegend: false,
+            legendGroup: buildComparisonProjectLegendGroup( entry.projectID, "measurement" )
+        })),
+        measurementTrace( data, settings, {
+            visible: visibility.data != false,
+            legendrank: 0,
+            showlegend: false,
+            legendGroup: splitSpectrumLegendGroups.measurement,
+            calibrationSource: "measurement"
+        }),
+        ...buildCalibrationPreviewMeasurementTrace( data, settings, {
+            calibrationPreview: options?.calibrationPreview,
+            visible: visibility.data != false,
+            legendrank: 100
+        })
+    ]
+
+    await Plotly.newPlot( graphContainer, traces, layout, config )
+    normalizeModebarButtonSpacing( graphContainer )
+}
+
+var renderEstimatePane = async function( data, estimate, graphContainer, settings, options = {} ){
     if( hasEstimatePayload( estimate ) === false ){
         Plotly.purge( graphContainer )
         return
@@ -763,6 +899,7 @@ var renderEstimatePane = async function( data, estimate, graphContainer, setting
         visibility: settings.visibility.plot,
         axes: { xaxis: "x", yaxis: "y" },
         showlegend: false,
+        calibrationSource: "estimate",
         legendGroups: {
             median: splitSpectrumLegendGroups.estimateMedian,
             q50: splitSpectrumLegendGroups.estimateQ50,
@@ -770,7 +907,14 @@ var renderEstimatePane = async function( data, estimate, graphContainer, setting
             q90: splitSpectrumLegendGroups.estimateQ90,
             q95: splitSpectrumLegendGroups.estimateQ95
         }
-    })
+    }).concat(
+        buildCalibrationPreviewEstimateTraces( data, estimate, settings, {
+            calibrationPreview: options?.calibrationPreview,
+            visibility: settings.visibility.plot,
+            axes: { xaxis: "x", yaxis: "y" },
+            legendrank: 101
+        })
+    )
 
     await Plotly.newPlot( graphContainer, traces, layout, config )
     normalizeModebarButtonSpacing( graphContainer )
@@ -779,12 +923,14 @@ var renderEstimatePane = async function( data, estimate, graphContainer, setting
 var renderEstimateComparisonPane = async function(
     data,
     estimate,
-    comparisonData,
-    comparisonEstimate,
+    comparisonEntriesInput,
     graphContainer,
-    settings
+    settings,
+    options = {}
 ) {
-    if( hasEstimatePayload( estimate ) === false || hasEstimatePayload( comparisonEstimate ) === false ){
+    const comparisonEntries = normalizeComparisonEntriesInput( comparisonEntriesInput )
+        .filter(( entry ) => hasEstimatePayload( entry?.estimate ) )
+    if( hasEstimatePayload( estimate ) === false || comparisonEntries.length === 0 ){
         Plotly.purge( graphContainer )
         return
     }
@@ -792,12 +938,36 @@ var renderEstimateComparisonPane = async function(
     const { layout, config } = singlePaneLayout( graphContainer, settings )
     const visibility = settings.visibility.comparison ?? {}
     const traces = [
+        ...comparisonEntries.flatMap(( entry, index ) => {
+            const measurementLegendGroup = buildComparisonProjectLegendGroup( entry.projectID, "measurement" )
+            const medianLegendGroup = buildComparisonProjectLegendGroup( entry.projectID, "median" )
+            const color = resolveComparisonEntryColor( entry, index, settings )
+            return estimateTraces( entry.data, entry.estimate, settings, {
+                visibility,
+                axes: { xaxis: "x", yaxis: "y" },
+                medianColor: color,
+                areaColor: hexToRgba( color, normalizeComparisonOpacity( settings ) ),
+                areaLineColor: hexToRgba( color, 0 ),
+                legendFlag: String( index + 2 ),
+                legendrank: 10 + index,
+                showlegend: false,
+                legendGroups: {
+                    measurement: measurementLegendGroup,
+                    median: medianLegendGroup,
+                    q50: buildComparisonProjectLegendGroup( entry.projectID, "q50" ),
+                    q75: buildComparisonProjectLegendGroup( entry.projectID, "q75" ),
+                    q90: buildComparisonProjectLegendGroup( entry.projectID, "q90" ),
+                    q95: buildComparisonProjectLegendGroup( entry.projectID, "q95" )
+                }
+            } )
+        }),
         ...estimateTraces( data, estimate, settings, {
             visibility,
             axes: { xaxis: "x", yaxis: "y" },
             legendFlag: "",
             legendrank: 0,
             showlegend: false,
+            calibrationSource: "estimate",
             legendGroups: {
                 median: splitSpectrumLegendGroups.estimateMedian,
                 q50: splitSpectrumLegendGroups.estimateQ50,
@@ -806,21 +976,11 @@ var renderEstimateComparisonPane = async function(
                 q95: splitSpectrumLegendGroups.estimateQ95
             }
         }),
-        ...estimateTraces( comparisonData, comparisonEstimate, settings, {
+        ...buildCalibrationPreviewEstimateTraces( data, estimate, settings, {
+            calibrationPreview: options?.calibrationPreview,
             visibility,
             axes: { xaxis: "x", yaxis: "y" },
-            medianColor: settings.comparisonColors.median,
-            areaColor: settings.comparisonColors.area,
-            legendFlag: "2",
-            legendrank: 10,
-            showlegend: false,
-            legendGroups: {
-                median: splitSpectrumLegendGroups.estimateMedian,
-                q50: splitSpectrumLegendGroups.estimateQ50,
-                q75: splitSpectrumLegendGroups.estimateQ75,
-                q90: splitSpectrumLegendGroups.estimateQ90,
-                q95: splitSpectrumLegendGroups.estimateQ95
-            }
+            legendrank: 101
         })
     ]
 
@@ -832,10 +992,10 @@ var initializeDataOnly = async function( data, graphContainer, settings ){
     await renderMeasurementPane( data, graphContainer, settings )
 }
 
-var initialize = async function( data, estimate, graphContainer, settings) {
+var initialize = async function( data, estimate, graphContainer, settings, options = {}) {
 
     if( hasEstimatePayload( estimate ) === false ){
-        await initializeDataOnly( data, graphContainer, settings )
+        await renderMeasurementPane( data, graphContainer, settings, options )
         return
     }
 
@@ -861,11 +1021,12 @@ var initialize = async function( data, estimate, graphContainer, settings) {
     const areaColorRGBA = hexToRgba( settings.colors.area, 0.10);
     const areaLineColorRGBA = hexToRgba( settings.colors.area, 0);
 
-    const calibratedDataX = data.x.map( x => x + data.calibration.x);
-    const calibratedEstimateX = estimate.x.map( x => x + data.calibration.x);
+    const calibratedDataX = applyCalibrationToValues( data?.x, data?.calibration )
+    const calibratedEstimateX = applyCalibrationToValues( estimate?.x, data?.calibration )
 
     var traceData = {};
     traceData.x = calibratedDataX;
+    traceData.customdata = Array.isArray( data?.x ) ? data.x : calibratedDataX;
     traceData.y = data.y;
     traceData.mode = "lines";
     traceData.name = "$" + dataLegend  + "$";
@@ -874,12 +1035,18 @@ var initialize = async function( data, estimate, graphContainer, settings) {
     traceData.line.width = DEFAULT_SPECTRUM_TRACE_LINE_WIDTH;
     traceData.showlegend = false;
     traceData.visible = settings.visibility.plot.data == false ? "legendonly" : true;
+    traceData.meta = {
+        harkanaTraceKind: "line",
+        harkanaBaseVisible: traceData.visible,
+        harkanaCalibrationSource: "measurement"
+    }
     traceData.legendrank = 0;
     traceData.legendgroup = splitSpectrumLegendGroups.measurement;
     traceData.hovertemplate = "(%{x}, %{y})<extra></extra>"
 
     var traceEstimate = {};
     traceEstimate.x = calibratedEstimateX;
+    traceEstimate.customdata = Array.isArray( estimate?.x ) ? estimate.x : calibratedEstimateX;
     traceEstimate.y = estimate.median;
     traceEstimate.mode = "lines";
     traceEstimate.name = "$" + medianLabel + "$";
@@ -888,6 +1055,11 @@ var initialize = async function( data, estimate, graphContainer, settings) {
     traceEstimate.line.width = DEFAULT_SPECTRUM_TRACE_LINE_WIDTH;
     traceEstimate.showlegend = false;
     traceEstimate.visible = settings.visibility.plot.median == false ? "legendonly" : true;
+    traceEstimate.meta = {
+        harkanaTraceKind: "line",
+        harkanaBaseVisible: traceEstimate.visible,
+        harkanaCalibrationSource: "estimate"
+    }
     traceEstimate.legendrank = 1;
     traceEstimate.legendgroup = splitSpectrumLegendGroups.estimateMedian;
     traceEstimate.xaxis = "x2";
@@ -913,11 +1085,27 @@ var initialize = async function( data, estimate, graphContainer, settings) {
                                                                     {
                                                                         legendGroup: splitSpectrumLegendGroups[`estimateQ${quantiles[ii]}`],
                                                                         showlegend: false,
-                                                                        lineColor: areaLineColorRGBA
+                                                                        lineColor: areaLineColorRGBA,
+                                                                        calibrationSource: "estimate",
+                                                                        sourceX: Array.isArray( estimate?.x ) ? estimate.x : calibratedEstimateX
                                                                     });
 
         traces.push( traceLowerBound, traceUpperBound)
     }
+
+    traces.push(
+        ...buildCalibrationPreviewMeasurementTrace( data, settings, {
+            calibrationPreview: options?.calibrationPreview,
+            visible: settings.visibility.plot.data != false,
+            legendrank: 100
+        }),
+        ...buildCalibrationPreviewEstimateTraces( data, estimate, settings, {
+            calibrationPreview: options?.calibrationPreview,
+            visibility: settings.visibility.plot,
+            axes: { xaxis: "x2", yaxis: "y2" },
+            legendrank: 101
+        })
+    )
 
     var tracesAll = structuredClone( traces )
 
@@ -1039,9 +1227,11 @@ function uncertaintyTraces( x, lowerBounds, upperBounds, quantile, legends, visi
     const lineColor = typeof options?.lineColor === "string" && options.lineColor.length > 0
         ? options.lineColor
         : color
+    const sourceX = Array.isArray( options?.sourceX ) ? options.sourceX : x
 
     var traceLowerBound = {};
     traceLowerBound.x = x;
+    traceLowerBound.customdata = sourceX;
     traceLowerBound.y = lowerBounds[ quantile ];
     traceLowerBound.mode = "lines";
     if( typeof axes?.xaxis === "string" && axes.xaxis.length > 0 ){
@@ -1055,11 +1245,18 @@ function uncertaintyTraces( x, lowerBounds, upperBounds, quantile, legends, visi
     traceLowerBound.line.width = DEFAULT_SPECTRUM_BAND_LINE_WIDTH;
     traceLowerBound.showlegend = false;
     traceLowerBound.visible = visibility["interval" + quantile] == false ? "legendonly" : true;
+    traceLowerBound.meta = {
+        ...( traceLowerBound.meta ?? {} ),
+        harkanaTraceKind: "band-line",
+        harkanaBaseVisible: traceLowerBound.visible,
+        harkanaCalibrationSource: String( options?.calibrationSource ?? "" ).trim()
+    }
     traceLowerBound.legendgroup = legendGroup;
     traceLowerBound.hovertemplate = "(%{x}, %{y})<extra></extra>"
 
     var traceUpperBound = {};
     traceUpperBound.x = x;
+    traceUpperBound.customdata = sourceX;
     traceUpperBound.y = upperBounds[ quantile ];
     traceUpperBound.mode = "lines";
     traceUpperBound.name = "$" + legend  + "$"
@@ -1076,6 +1273,12 @@ function uncertaintyTraces( x, lowerBounds, upperBounds, quantile, legends, visi
     }
     traceUpperBound.showlegend = options?.showlegend !== false;
     traceUpperBound.visible = visibility["interval" + quantile] == false ? "legendonly" : true;
+    traceUpperBound.meta = {
+        ...( traceUpperBound.meta ?? {} ),
+        harkanaTraceKind: "band-fill",
+        harkanaBaseVisible: traceUpperBound.visible,
+        harkanaCalibrationSource: String( options?.calibrationSource ?? "" ).trim()
+    }
     traceUpperBound.legendgroup = legendGroup;
     traceUpperBound.hovertemplate = "(%{x}, %{y})<extra></extra>"
 
@@ -1106,6 +1309,150 @@ var setHiddenTraceGroups = async function( graphContainer, hiddenGroups = [] ){
 
     await Plotly.restyle( graphContainer, { visible: nextVisibility }, traceIndices )
     normalizeModebarButtonSpacing( graphContainer )
+}
+
+function normalizeComparisonEntriesInput( comparisonEntries, comparisonEstimate = null ){
+    if( Array.isArray( comparisonEntries ) ){
+        return comparisonEntries.filter(( entry ) => {
+            return entry !== null &&
+                typeof entry === "object" &&
+                entry.data !== null &&
+                typeof entry.data === "object"
+        })
+    }
+
+    if( comparisonEntries !== null &&
+        typeof comparisonEntries === "object" &&
+        Array.isArray( comparisonEntries?.x ) ){
+        return [{
+            projectID: comparisonEntries?.projectID ?? comparisonEntries?.id ?? "",
+            projectName: comparisonEntries?.projectName ?? comparisonEntries?.name ?? "",
+            color: comparisonEntries?.color,
+            data: comparisonEntries,
+            estimate: comparisonEstimate
+        }]
+    }
+
+    return []
+}
+
+function resolveComparisonColorPalette( settings ){
+    const storedPalette = Array.isArray( settings?.comparisonColors?.palette )
+        ? settings.comparisonColors.palette
+        : []
+    const normalizedPalette = storedPalette
+        .map(( color ) => String( color ?? "" ).trim() )
+        .filter(( color ) => color.length > 0 )
+
+    if( normalizedPalette.length > 0 ){
+        return normalizedPalette
+    }
+
+    const fallbackColor = String(
+        settings?.comparisonColors?.data ??
+        settings?.colors?.median ??
+        "#ff7f0e"
+    ).trim()
+
+    return fallbackColor.length > 0 ? [ fallbackColor ] : [ "#ff7f0e" ]
+}
+
+function resolveComparisonEntryColor( entry, index, settings ){
+    const explicitColor = String( entry?.color ?? "" ).trim()
+    if( explicitColor.length > 0 ){
+        return explicitColor
+    }
+
+    const palette = resolveComparisonColorPalette( settings )
+    return palette[ index % palette.length ]
+}
+
+function normalizeComparisonOpacity( settings ){
+    const numericOpacity = Number( settings?.comparisonColors?.opacity )
+    if( Number.isFinite( numericOpacity ) ){
+        return Math.min( 1, Math.max( 0, numericOpacity ) )
+    }
+
+    return 0.15
+}
+
+function normalizeCalibrationPreviewColor( settings ){
+    const calibrationColor = String( settings?.colors?.calibration ?? "" ).trim()
+    return calibrationColor.length > 0 ? calibrationColor : "#333333"
+}
+
+function normalizeCalibrationPreviewOpacity( settings ){
+    const numericOpacity = Number( settings?.colors?.opacity )
+    if( Number.isFinite( numericOpacity ) ){
+        return Math.min( 1, Math.max( 0, numericOpacity ) )
+    }
+
+    return 0.15
+}
+
+function hasCalibrationPreview( calibrationPreview ){
+    if( calibrationPreview === null || typeof calibrationPreview !== "object" ){
+        return false
+    }
+
+    if( calibrationPreview?.__harkanaForcePreview === true ){
+        return true
+    }
+
+    const points = Array.isArray( calibrationPreview?.points ) ? calibrationPreview.points : []
+    return points.some(( point ) => Number.isFinite( Number( point?.targetX ) ) )
+}
+
+function buildCalibrationPreviewMeasurementTrace( data, settings, options = {} ){
+    const calibrationPreview = options?.calibrationPreview
+    if( hasCalibrationPreview( calibrationPreview ) === false ){
+        return []
+    }
+
+    const previewData = {
+        ...data,
+        calibration: calibrationPreview
+    }
+
+    return [
+        measurementTrace( previewData, settings, {
+            color: options?.color ?? normalizeCalibrationPreviewColor( settings ),
+            visible: options?.visible,
+            showlegend: false,
+            legendrank: Number.isFinite( Number( options?.legendrank ) ) ? Number( options.legendrank ) : 100,
+            legendGroup: splitSpectrumLegendGroups.calibrationMeasurement
+        })
+    ]
+}
+
+function buildCalibrationPreviewEstimateTraces( data, estimate, settings, options = {} ){
+    const calibrationPreview = options?.calibrationPreview
+    if( hasCalibrationPreview( calibrationPreview ) === false || hasEstimatePayload( estimate ) === false ){
+        return []
+    }
+
+    const previewData = {
+        ...data,
+        calibration: calibrationPreview
+    }
+    const previewColor = options?.color ?? normalizeCalibrationPreviewColor( settings )
+
+    return estimateTraces( previewData, estimate, settings, {
+        visibility: options?.visibility ?? settings.visibility.plot,
+        axes: options?.axes ?? { xaxis: "x", yaxis: "y" },
+        showlegend: false,
+        legendrank: Number.isFinite( Number( options?.legendrank ) ) ? Number( options.legendrank ) : 101,
+        medianColor: previewColor,
+        areaColor: hexToRgba( previewColor, normalizeCalibrationPreviewOpacity( settings ) ),
+        areaLineColor: hexToRgba( previewColor, 0 ),
+        legendGroups: {
+            median: splitSpectrumLegendGroups.calibrationEstimateMedian,
+            q50: splitSpectrumLegendGroups.calibrationEstimateQ50,
+            q75: splitSpectrumLegendGroups.calibrationEstimateQ75,
+            q90: splitSpectrumLegendGroups.calibrationEstimateQ90,
+            q95: splitSpectrumLegendGroups.calibrationEstimateQ95
+        }
+    })
 }
 
 var setHighlightedTraceGroup = async function( graphContainer, highlightedGroup = "" ){
@@ -1143,146 +1490,90 @@ var setHighlightedTraceGroup = async function( graphContainer, highlightedGroup 
 
 
 var comparison = async function( data, estimate,
-                                 comparisonData, comparisonEstimate,
-                                 graphContainer, settings) {
+                                 comparisonEntriesInput,
+                                 graphContainer, settings, options = {}) {
+
+    const comparisonEntries = normalizeComparisonEntriesInput( comparisonEntriesInput )
+        .filter(( entry ) => hasEstimatePayload( entry?.estimate ) )
+    if( hasEstimatePayload( estimate ) === false || comparisonEntries.length === 0 ){
+        await initialize( data, estimate, graphContainer, settings )
+        return
+    }
 
     const xLabel = settings.labels.horizontal.replace(/\\/g, "\\");
-
-    const dataLegend = settings.legends.data.replace(/\\/g, "\\");
-    const medianLabel = settings.legends.median.replace(/\\/g, "\\");
-
-    var legends = {};
-    legends["95"] = settings.legends.interval95.replace(/\\/g, "\\");
-    legends["90"] = settings.legends.interval90.replace(/\\/g, "\\");
-    legends["75"] = settings.legends.interval75.replace(/\\/g, "\\");
-    legends["50"] = settings.legends.interval50.replace(/\\/g, "\\");
 
     const tickFontSize = settings.font.sizes.axis;
     const labelFontSize = settings.font.sizes.label;
     const legendFontSize = settings.font.sizes.legend;
     
     const horizontalReverse = settings.layout.reversed == "true" ? "reversed" : true;
+    const comparisonVisibility = settings.visibility.comparison ?? {}
+    const traces = [
+        ...comparisonEntries.flatMap(( entry, index ) => {
+            const measurementLegendGroup = buildComparisonProjectLegendGroup( entry.projectID, "measurement" )
+            const medianLegendGroup = buildComparisonProjectLegendGroup( entry.projectID, "median" )
+            const color = resolveComparisonEntryColor( entry, index, settings )
 
-    const dataColorRGBA = hexToRgba( settings.colors.data, 1);
-    const medianColorRGBA = hexToRgba( settings.colors.median, 1);
-    const areaColorRGBA = hexToRgba( settings.colors.area, 0.10);
-
-    const dataComparisonColorRGBA = hexToRgba( settings.comparisonColors.data, 1);
-    const medianComparisonColorRGBA = hexToRgba( settings.comparisonColors.median, 1);
-    const areaComparisonColorRGBA = hexToRgba( settings.comparisonColors.area, 0.10);
-    const areaLineColorRGBA = hexToRgba( settings.colors.area, 0);
-    const areaComparisonLineColorRGBA = hexToRgba( settings.comparisonColors.area, 0);
-
-    const calibratedDataX = data.x.map( x => x + data.calibration.x);
-    const calibratedEstimateX = estimate.x.map( x => x + data.calibration.x);
-
-    const calibrateComparisondDataX = comparisonData.x.map( x => x + comparisonData.calibration.x);
-    const calibratedComparisonEstimateX = comparisonEstimate.x.map( x => x + comparisonData.calibration.x);
-
-    var traceData = {};
-    traceData.x = calibratedDataX;
-    traceData.y = data.y;
-    traceData.mode = "lines";
-    traceData.name = "$" + dataLegend  + "$";
-    traceData.line = {};
-    traceData.line.color = dataColorRGBA;
-    traceData.line.width = DEFAULT_SPECTRUM_TRACE_LINE_WIDTH;
-    traceData.visible = settings.visibility.comparison.data == false ? "legendonly" : true;
-    traceData.showlegend = false;
-    traceData.legendrank = 0;
-    traceData.legendgroup = splitSpectrumLegendGroups.measurement;
-    traceData.hovertemplate = "(%{x}, %{y})<extra></extra>"
-
-    var traceEstimate = {};
-    traceEstimate.x = calibratedEstimateX;
-    traceEstimate.y = estimate.median;
-    traceEstimate.mode = "lines";
-    traceEstimate.name = "$" + medianLabel + "$";
-    traceEstimate.line = {};
-    traceEstimate.line.color = medianColorRGBA;
-    traceEstimate.line.width = DEFAULT_SPECTRUM_TRACE_LINE_WIDTH;
-    traceEstimate.visible = settings.visibility.comparison.median == false ? "legendonly" : true;
-    traceEstimate.showlegend = false;
-    traceEstimate.legendrank = 1;
-    traceEstimate.legendgroup = splitSpectrumLegendGroups.estimateMedian;
-    traceEstimate.xaxis = "x2";
-    traceEstimate.yaxis = "y2";
-    traceEstimate.hovertemplate = "(%{x}, %{y})<extra></extra>"
-
-    var traceDataComparison = {};
-    traceDataComparison.x = calibrateComparisondDataX;
-    traceDataComparison.y = comparisonData.y;
-    traceDataComparison.mode = "lines";
-    traceDataComparison.name = "$" + dataLegend  + "$";
-    traceDataComparison.line = {};
-    traceDataComparison.line.color = dataComparisonColorRGBA;
-    traceDataComparison.line.width = DEFAULT_SPECTRUM_TRACE_LINE_WIDTH;
-    traceDataComparison.visible = settings.visibility.comparison.data == false ? "legendonly" : true;
-    traceDataComparison.showlegend = false;
-    traceDataComparison.legendgroup = splitSpectrumLegendGroups.measurement;
-    traceDataComparison.hovertemplate = "(%{x}, %{y})<extra></extra>"
-
-    var traceEstimateComparison = {};
-    traceEstimateComparison.x = calibratedComparisonEstimateX;
-    traceEstimateComparison.y = comparisonEstimate.median;
-    traceEstimateComparison.mode = "lines";
-    traceEstimateComparison.name = "$" + medianLabel + "$";
-    traceEstimateComparison.line = {};
-    traceEstimateComparison.line.color = medianComparisonColorRGBA;
-    traceEstimateComparison.line.width = DEFAULT_SPECTRUM_TRACE_LINE_WIDTH;
-    traceEstimateComparison.visible = settings.visibility.comparison.median == false ? "legendonly" : true;
-    traceEstimateComparison.showlegend = false;
-    traceEstimateComparison.legendgroup = splitSpectrumLegendGroups.estimateMedian;
-    traceEstimateComparison.xaxis = "x2";
-    traceEstimateComparison.yaxis = "y2";
-    traceEstimateComparison.hovertemplate = "(%{x}, %{y})<extra></extra>"
-
-    const quantiles = [ 50, 75, 90, 95];
-
-    var traces = [];
-    traces.push( traceData, traceEstimate);
-
-    for( var ii = 0; ii < quantiles.length; ii++ ){
-
-        var [ traceLowerBound, traceUpperBound] = uncertaintyTraces( estimate.x,
-                                                                    estimate.lowerBound,
-                                                                    estimate.upperBound,
-                                                                    quantiles[ii],
-                                                                    legends,
-                                                                    settings.visibility.comparison,
-                                                                    areaColorRGBA,
-                                                                    "",
-                                                                    { xaxis: "x2", yaxis: "y2" },
-                                                                    {
-                                                                        legendGroup: splitSpectrumLegendGroups[`estimateQ${quantiles[ii]}`],
-                                                                        showlegend: false,
-                                                                        lineColor: areaLineColorRGBA
-                                                                    });
-
-        traces.push( traceLowerBound, traceUpperBound)
-    }
-
-    traces.push( traceDataComparison, traceEstimateComparison)
-
-    for( var ii = 0; ii < quantiles.length; ii++ ){
-
-        var [ traceLowerBound, traceUpperBound] = uncertaintyTraces( comparisonEstimate.x,
-                                                                    comparisonEstimate.lowerBound,
-                                                                    comparisonEstimate.upperBound,
-                                                                    quantiles[ii],
-                                                                    legends,
-                                                                    settings.visibility.comparison,
-                                                                    areaComparisonColorRGBA,
-                                                                    "2",
-                                                                    { xaxis: "x2", yaxis: "y2" },
-                                                                    {
-                                                                        legendGroup: splitSpectrumLegendGroups[`estimateQ${quantiles[ii]}`],
-                                                                        showlegend: false,
-                                                                        lineColor: areaComparisonLineColorRGBA
-                                                                    });
-
-        traces.push( traceLowerBound, traceUpperBound)
-    }
+            return [
+                measurementTrace( entry.data, settings, {
+                    color,
+                    visible: comparisonVisibility.data != false,
+                    legendrank: 10 + index,
+                    showlegend: false,
+                    legendGroup: measurementLegendGroup
+                }),
+                ...estimateTraces( entry.data, entry.estimate, settings, {
+                    visibility: comparisonVisibility,
+                    axes: { xaxis: "x2", yaxis: "y2" },
+                    medianColor: color,
+                    areaColor: hexToRgba( color, normalizeComparisonOpacity( settings ) ),
+                    areaLineColor: hexToRgba( color, 0 ),
+                    legendFlag: String( index + 2 ),
+                    legendrank: 20 + index,
+                    showlegend: false,
+                    legendGroups: {
+                        median: medianLegendGroup,
+                        q50: buildComparisonProjectLegendGroup( entry.projectID, "q50" ),
+                        q75: buildComparisonProjectLegendGroup( entry.projectID, "q75" ),
+                        q90: buildComparisonProjectLegendGroup( entry.projectID, "q90" ),
+                        q95: buildComparisonProjectLegendGroup( entry.projectID, "q95" )
+                    }
+                })
+            ]
+        }),
+        measurementTrace( data, settings, {
+            visible: comparisonVisibility.data != false,
+            legendrank: 0,
+            showlegend: false,
+            legendGroup: splitSpectrumLegendGroups.measurement,
+            calibrationSource: "measurement"
+        }),
+        ...estimateTraces( data, estimate, settings, {
+            visibility: comparisonVisibility,
+            axes: { xaxis: "x2", yaxis: "y2" },
+            showlegend: false,
+            legendrank: 1,
+            calibrationSource: "estimate",
+            legendGroups: {
+                median: splitSpectrumLegendGroups.estimateMedian,
+                q50: splitSpectrumLegendGroups.estimateQ50,
+                q75: splitSpectrumLegendGroups.estimateQ75,
+                q90: splitSpectrumLegendGroups.estimateQ90,
+                q95: splitSpectrumLegendGroups.estimateQ95
+            }
+        }),
+        ...buildCalibrationPreviewMeasurementTrace( data, settings, {
+            calibrationPreview: options?.calibrationPreview,
+            visible: comparisonVisibility.data != false,
+            legendrank: 100
+        }),
+        ...buildCalibrationPreviewEstimateTraces( data, estimate, settings, {
+            calibrationPreview: options?.calibrationPreview,
+            visibility: comparisonVisibility,
+            axes: { xaxis: "x2", yaxis: "y2" },
+            legendrank: 101
+        })
+    ]
 
     var tracesAll = structuredClone( traces )
 
@@ -1398,36 +1689,52 @@ var comparison = async function( data, estimate,
 };
 
 
-var showMarker = async function( marker, graphContainer, settings){
-    
-    var updatedShape = {}
-    updatedShape.type = "line";
-    updatedShape.x0 = marker.x;
-    updatedShape.x1 = marker.x;
+function buildCalibrationLineShape( line = {}, axisRefs = { xref: "x", yref: "paper" } ){
+    const xValue = Number( line?.x )
+    if( Number.isFinite( xValue ) === false ){
+        return null
+    }
 
-    updatedShape.y0 = 0;
-    updatedShape.y1 = 10;
+    return {
+        type: "line",
+        x0: xValue,
+        x1: xValue,
+        y0: 0,
+        y1: 1,
+        xref: axisRefs.xref,
+        yref: axisRefs.yref,
+        line: {
+            color: typeof line?.color === "string" && line.color.length > 0 ? line.color : "black",
+            dash: typeof line?.dash === "string" && line.dash.length > 0 ? line.dash : "dash",
+            width: Number.isFinite( Number( line?.width ) ) ? Number( line.width ) : 1
+        }
+    }
+}
 
-    updatedShape.xref = "x";
-    updatedShape.yref = "y";
-
-    updatedShape.line = {};
-    updatedShape.line.color = "black";
-    updatedShape.line.dash = "dash";
-
-    var updatedShapeSecondAxis = structuredClone( updatedShape );
-    updatedShapeSecondAxis.xref = "x2";
-    updatedShapeSecondAxis.yref = "y2";
-
-    const updatedShapes = [ updatedShape, updatedShapeSecondAxis]
-
+var showCalibrationLines = async function( lines, graphContainer, settings ){
+    const normalizedLines = Array.isArray( lines ) ? lines : ( lines ? [ lines ] : [] )
     const hasSecondAxis = graphContainer?.layout?.xaxis2 !== undefined && graphContainer?.layout?.yaxis2 !== undefined
+    const shapes = []
 
-    if( settings.layout.layout !== "single" && hasSecondAxis ){
-        Plotly.relayout( graphContainer, { shapes: updatedShapes });
-    } else {
-        Plotly.relayout( graphContainer, { shapes: updatedShape })
-    };
+    for( const line of normalizedLines ){
+        const primaryShape = buildCalibrationLineShape( line, { xref: "x", yref: "paper" } )
+        if( primaryShape !== null ){
+            shapes.push( primaryShape )
+        }
+
+        if( settings.layout.layout !== "single" && hasSecondAxis ){
+            const secondaryShape = buildCalibrationLineShape( line, { xref: "x2", yref: "paper" } )
+            if( secondaryShape !== null ){
+                shapes.push( secondaryShape )
+            }
+        }
+    }
+
+    await Plotly.relayout( graphContainer, { shapes })
+}
+
+var showMarker = async function( marker, graphContainer, settings){
+    await showCalibrationLines( marker, graphContainer, settings )
 }
 
 var deleteMarker = async function( graphContainer ){
@@ -1454,6 +1761,13 @@ var resize = async function( graphContainer ){
 
 
 function hexToRgba(hex, alpha = 1) {
+    if( typeof hex === "string" && /^rgba?\(/i.test( hex.trim() ) ){
+        const parsedColor = parseRgbaColor( hex )
+        if( parsedColor !== null ){
+            return `rgba(${parsedColor.r}, ${parsedColor.g}, ${parsedColor.b}, ${alpha})`
+        }
+    }
+
     // Remove '#' if present
     hex = hex.replace(/^#/, '');
   
@@ -1482,5 +1796,6 @@ export default {
     setHighlightedTraceGroup,
     showMarker,
     deleteMarker,
+    showCalibrationLines,
     resize
 }

@@ -43,7 +43,19 @@ var getDefaultSettings = async function() {
 
     const isHyperspectrum = import.meta.env.VITE_DATA_TYPE === "hypercars"
     const defaultSpectrumColor = "#1f77b4"
-    const defaultComparisonSpectrumColor = "#d62728"
+    const defaultComparisonPalette = [
+        "#ff7f0e",
+        "#2ca02c",
+        "#d62728",
+        "#9467bd",
+        "#8c564b",
+        "#e377c2",
+        "#7f7f7f",
+        "#bcbd22",
+        "#17becf",
+        "#333333"
+    ]
+    const defaultCalibrationColor = defaultComparisonPalette[ defaultComparisonPalette.length - 1 ]
 
     return {
         layout: {
@@ -82,12 +94,14 @@ var getDefaultSettings = async function() {
             data: defaultSpectrumColor,
             median: defaultSpectrumColor,
             area: defaultSpectrumColor,
+            calibration: defaultCalibrationColor,
             opacity: 0.15
         },
         comparisonColors: {
-            data: defaultComparisonSpectrumColor,
-            median: defaultComparisonSpectrumColor,
-            area: defaultComparisonSpectrumColor,
+            data: defaultComparisonPalette[0],
+            median: defaultComparisonPalette[0],
+            area: defaultComparisonPalette[0],
+            palette: [ ...defaultComparisonPalette ],
             opacity: 0.15
         },
         colormaps: {

@@ -39,7 +39,12 @@ export var get = async function( project ){
 
 export var setDefault = async function( project ){
 
-    const defaultCalibration = { x: 0};
+    const defaultCalibration = {
+        x: 0,
+        polynomialOrder: 0,
+        includedOrders: [ 0 ],
+        points: []
+    };
     const response = await set( project, defaultCalibration);
 
     const isError = response instanceof Error;
@@ -52,4 +57,4 @@ export default {
     set,
     get,
     setDefault
-}   
+}

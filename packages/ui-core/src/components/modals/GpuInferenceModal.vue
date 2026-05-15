@@ -12,6 +12,10 @@
 			A flipped spectral axis will result in incorrect estimates for the Raman spectrum. The spectral axis is assumed to be linear in terms of
 			energy, e.g., the axis should be in wavenumbers, frequency, or electron volts.
 		</div>
+		<div v-if = "spectralCalibrationProfileName.trim().length > 0"
+			 class = "mt-3 rounded border border-brand/70 bg-brand/10 px-3 py-2 text-sm text-white">
+			<strong>Active spectral calibration:</strong> {{ spectralCalibrationProfileName }}
+		</div>
 
 		<div v-if = "!isReady && !inferenceInProgress" class = "mt-3 mb-4 rounded border border-gray-600 bg-gray-800/70 px-3 py-2 text-sm text-white">
 			<p><strong>Active token source:</strong> {{ tokenGroupName }}</p>
@@ -92,7 +96,8 @@ const props = defineProps({
 	project: { type: Object, required: true },
 	defaultGroupId: { type: String, default: "" },
 	initialJobId: { type: String, default: "" },
-	initialStatus: { type: String, default: "" }
+	initialStatus: { type: String, default: "" },
+	spectralCalibrationProfileName: { type: String, default: "" }
 })
 
 const emit = defineEmits([ "submitted", "status" ])
