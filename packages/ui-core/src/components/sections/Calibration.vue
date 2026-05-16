@@ -438,12 +438,32 @@ const normalizeCalibrationProfileModel = ( profile = {} ) => {
 	}
 }
 
+const normalizeCalibrationSourceAxis = ( sourceAxis = null ) => {
+	const values = Array.isArray( sourceAxis?.values )
+		? sourceAxis.values
+			.map(( value ) => Number( value ))
+			.filter(( value ) => Number.isFinite( value ))
+		: []
+
+	if( values.length === 0 ){
+		return null
+	}
+
+	return {
+		axisKey: "z",
+		values,
+		unit: String( sourceAxis?.unit ?? "index" ).trim() || "index",
+		valueCount: values.length
+	}
+}
+
 const buildCalibrationProfileWritePayload = ( profile, metadata = {} ) => {
 	const model = normalizeCalibrationProfileModel( profile )
+	const sourceAxis = normalizeCalibrationSourceAxis( profile?.sourceAxis )
 	const friendlyName = String( metadata?.friendlyName ?? profile?.friendlyName ?? "" ).trim()
 	const sourceProjectID = String( profile?.sourceProjectID ?? "" ).trim()
 
-	return {
+	const payload = {
 		version: "calibration-profile-write-v2",
 		profileKind: "axis-calibration",
 		axisRole: calibrationAxisRole,
@@ -456,6 +476,12 @@ const buildCalibrationProfileWritePayload = ( profile, metadata = {} ) => {
 		points: model.points,
 		model
 	}
+
+	if( sourceAxis !== null ){
+		payload.sourceAxis = sourceAxis
+	}
+
+	return payload
 }
 
 const buildCalibrationProfileCopyPayload = ( profile ) => {
