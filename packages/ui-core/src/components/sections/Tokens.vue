@@ -1,6 +1,6 @@
 <template>
-<div class = "prose prose-gray h-full max-w-none">
-<div class = "not-prose flex h-full min-h-0 max-w-none flex-col font-sans">
+<div class = "prose prose-gray h-full min-h-0 max-w-none overflow-hidden">
+<div class = "not-prose flex h-full min-h-0 max-w-none flex-col overflow-hidden font-sans">
     <div class = "mb-6 flex w-full max-w-2xl flex-none flex-wrap gap-2 rounded-lg border border-black/10 bg-black/[0.03] p-2 not-prose"
          role = "tablist"
          aria-label = "Compute token sections">
@@ -19,7 +19,9 @@
         </button>
     </div>
 
-    <div v-show = "activeTokenTab === 'overview'" role = "tabpanel" class = "max-w-2xl space-y-10">
+    <div v-show = "activeTokenTab === 'overview'"
+         role = "tabpanel"
+         class = "min-h-0 flex-1 max-w-2xl space-y-10 overflow-y-auto overscroll-contain pb-6 pr-1">
         <div class = "space-y-4 text-sm text-black/70">
             <p class = "m-0">
                 <strong>Compute tokens</strong> allow you to manage usage and collaboration within the platform.
@@ -88,11 +90,151 @@
                 Purchase tokens
             </SettingsButton>
         </div>
+
+        <div class = "border-4 border-brand rounded-lg p-4 mb-4 space-y-3">
+            <div class = "flex flex-wrap items-start justify-between gap-3">
+                <div>
+                    <div class = "text-xs font-semibold uppercase tracking-wide text-black/70">Upcoming monthly billing estimate</div>
+                    <p class = "m-0 mt-1 text-sm text-black/75">
+                        Estimated total for {{ billingPreviewMonthLabel }}:
+                        <span class = "font-bold text-black">{{ formatTokenAmount( totalBillingDueTokens ) }}</span>
+                        compute tokens
+                    </p>
+                </div>
+
+                <button type = "button"
+                        @click = "billingPreviewExpanded = !billingPreviewExpanded"
+                        class = "inline-flex items-center gap-2 rounded-full border border-brand/70 bg-brand/10 px-3 py-1 text-xs font-semibold text-brand transition hover:bg-brand hover:text-white"
+                        :aria-expanded = "billingPreviewExpanded ? 'true' : 'false'">
+                    <span>{{ billingPreviewExpanded ? "Hide details" : "Billing details" }}</span>
+                    <i class = "fas"
+                       :class = "billingPreviewExpanded ? 'fa-chevron-up' : 'fa-chevron-down'"
+                       aria-hidden = "true"></i>
+                </button>
+            </div>
+
+            <p v-if = "billingPreviewLoading" class = "m-0 text-sm text-black/65">
+                Loading billing preview...
+            </p>
+            <p v-if = "billingPreviewError.length > 0" class = "m-0 text-sm text-red-600">
+                {{ billingPreviewError }}
+            </p>
+            <p v-if = "billingPreviewLoading === false && billingPreviewError.length === 0 && hasBillingPreviewLineItems === false"
+               class = "m-0 text-sm text-black/65">
+                No personal or owned token group billing is currently projected for the coming month.
+            </p>
+
+            <div v-if = "missedMonthsPreview !== null"
+                 class = "inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold"
+                 :class = "missedMonthsPreview.wouldDeleteOnNextMiss ? 'border-red-500/70 bg-red-50 text-red-700' : 'border-black/10 bg-black/[0.03] text-black/65'">
+                <i class = "fas fa-exclamation-triangle" aria-hidden = "true"></i>
+                <span>
+                    Your missed billing months: {{ missedMonthsPreview.missedMonths }}
+                </span>
+            </div>
+            <p v-if = "missedMonthsError.length > 0" class = "m-0 text-xs text-red-600">
+                {{ missedMonthsError }}
+            </p>
+
+            <div v-if = "billingPreviewExpanded"
+                 class = "space-y-3 pt-1">
+                <div class = "rounded-lg border border-black/10 bg-white/70 p-3 text-sm text-black">
+                    <div class = "flex flex-wrap items-center justify-between gap-2">
+                        <div class = "font-semibold">Personal token balance</div>
+                        <div class = "font-bold">{{ formatTokenAmount( personalBillingPreview.dueTokens ) }} tokens</div>
+                    </div>
+                    <div v-if = "personalBillingPreview.billedToPersonal"
+                         class = "mt-1 text-black/65">
+                        {{ personalBillingPreview.projectCount }} projects billed to personal balance, balance {{ formatTokenAmount( personalBillingPreview.tokenBalance ) }} tokens
+                    </div>
+                    <div v-if = "activeBillingGroupLabels.length > 0"
+                         class = "mt-1 text-black/65">
+                        Project buckets billed to token groups: {{ activeBillingGroupSummary }}.
+                    </div>
+                    <div v-if = "personalBillingPreview.billedToPersonal === false && activeBillingGroupLabels.length === 0"
+                         class = "mt-1 text-black/65">
+                        No project buckets are currently billed to personal tokens.
+                    </div>
+                    <div v-if = "personalBillingPreview.wouldDeleteOnNextMiss"
+                         class = "mt-1 text-red-600">
+                        Personal billing is at risk on the next missed month.
+                    </div>
+                    <div v-if = "personalBillingPreview.bucketUsage.length > 0"
+                         class = "mt-2 flex flex-wrap gap-1">
+                        <span v-for = "bucket in personalBillingPreview.bucketUsage"
+                              :key = "'personal-billing-bucket-' + bucket.bucket"
+                              class = "inline-flex rounded-full border border-black/10 bg-white px-2 py-0.5 text-[11px] text-black/65">
+                            {{ formatBillingBucketUsage( bucket ) }}
+                        </span>
+                    </div>
+                </div>
+
+                <div v-for = "group in billingPreviewGroups"
+                     :key = "'overview-billing-preview-' + group.groupID"
+                     class = "rounded-lg border border-black/10 bg-white/70 p-3 text-sm text-black">
+                    <div class = "flex flex-wrap items-center justify-between gap-2">
+                        <button type = "button"
+                                @click = "togglePreviewBillingGroupExpanded( group.groupID )"
+                                class = "inline-flex items-center gap-2 rounded-full px-0 py-1 text-left font-semibold text-black transition hover:text-brand"
+                                :aria-expanded = "isPreviewBillingGroupExpanded( group.groupID ) ? 'true' : 'false'">
+                            <span>{{ group.groupName || group.groupID }}</span>
+                            <i class = "fas text-xs text-brand"
+                               :class = "isPreviewBillingGroupExpanded( group.groupID ) ? 'fa-chevron-up' : 'fa-chevron-down'"
+                               aria-hidden = "true"></i>
+                        </button>
+                        <div class = "font-bold">{{ formatTokenAmount( group.dueTokens ) }} tokens</div>
+                    </div>
+                    <div class = "mt-1 text-black/65">
+                        {{ group.userCount }} users, {{ group.projectCount }} projects, balance {{ formatTokenAmount( group.tokenBalance ) }} tokens
+                    </div>
+                    <div v-if = "group.usersAtRiskCount > 0" class = "mt-1 text-red-600">
+                        {{ group.usersAtRiskCount }} users at risk on next missed month.
+                    </div>
+                    <div v-if = "isPreviewBillingGroupExpanded( group.groupID )"
+                         class = "mt-3 space-y-2">
+                        <div v-if = "group.users.length === 0"
+                             class = "rounded-md border border-black/10 bg-black/[0.02] p-2 text-xs text-black/65">
+                            No user-level billing details are available for this group.
+                        </div>
+                        <div v-for = "user in group.users"
+                             :key = "'overview-billing-user-' + group.groupID + '-' + user.identityID + '-' + user.userSub"
+                             class = "rounded-md border border-black/10 bg-black/[0.02] p-2">
+                            <div class = "flex flex-wrap items-center justify-between gap-2">
+                                <div class = "font-semibold">{{ formatBillingPreviewUser( user ) }}</div>
+                                <div class = "font-bold">{{ formatTokenAmount( user.dueTokens ) }} tokens</div>
+                            </div>
+                            <div class = "mt-1 text-xs text-black/60">
+                                {{ user.projectCount }} projects billed to this group
+                                <span v-if = "user.wouldDeleteOnNextMiss" class = "font-semibold text-red-600">
+                                    | would be deleted on next miss
+                                </span>
+                            </div>
+                            <div v-if = "user.bucketUsage.length > 0"
+                                 class = "mt-2 flex flex-wrap gap-1">
+                                <span v-for = "bucket in user.bucketUsage"
+                                      :key = "'overview-billing-bucket-' + group.groupID + '-' + user.identityID + '-' + bucket.bucket"
+                                      class = "inline-flex rounded-full border border-black/10 bg-white px-2 py-0.5 text-[11px] text-black/65">
+                                    {{ formatBillingBucketUsage( bucket ) }}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div v-if = "billingPreviewWarnings.length > 0"
+                 class = "space-y-1 rounded-md border border-amber-500/60 bg-amber-50 p-2 text-xs text-amber-800">
+                <div v-for = "warning in billingPreviewWarnings"
+                     :key = "'billing-preview-warning-' + warning">
+                    {{ warning }}
+                </div>
+            </div>
+        </div>
     </div>
 
     <div v-show = "activeTokenTab === 'history'"
          role = "tabpanel"
-         class = "flex min-h-0 flex-1 flex-col gap-8 max-w-2xl">
+         class = "flex min-h-0 flex-1 max-w-2xl flex-col gap-8 overflow-hidden pb-6">
         <div class = "flex-none space-y-6">
 
             <div class = "space-y-5">
@@ -222,7 +364,9 @@
         </div>
     </div>
 
-    <div v-show = "activeTokenTab === 'owned'" role = "tabpanel" class = "space-y-8">
+    <div v-show = "activeTokenTab === 'owned'"
+         role = "tabpanel"
+         class = "min-h-0 flex-1 space-y-8 overflow-y-auto overscroll-contain pb-6 pr-1">
         <div>
             <div>
 
@@ -231,10 +375,70 @@
                 </div>
 
                 <ul v-else>
-                    <div v-for = "group in ownedGroups" class = "border-4 border-brand rounded-lg p-4 mb-4 shadow-black">
+                    <div v-for = "group in ownedGroups"
+                         :key = "'owned-token-group-' + group.groupId"
+                         class = "border-4 border-brand rounded-lg p-4 mb-4 shadow-black">
 
                         <div>Group name: <span class = "font-bold">{{ group.groupName }}</span></div>
                         <div>Balance: <span class = "font-bold">{{ group.tokenBalance }}</span> compute tokens</div>
+                        <div class = "mt-2 flex flex-wrap items-center gap-2">
+                            <button type = "button"
+                                    @click = "toggleBillingGroupExpanded( group.groupId )"
+                                    class = "inline-flex items-center gap-2 rounded-full border border-brand/70 bg-brand/10 px-3 py-1 text-xs font-semibold text-brand transition hover:bg-brand hover:text-white"
+                                    :aria-expanded = "isBillingGroupExpanded( group.groupId ) ? 'true' : 'false'">
+                                <span>
+                                    Upcoming monthly: {{ formatTokenAmount( billingPreviewForGroup( group )?.dueTokens ?? 0 ) }} tokens
+                                </span>
+                                <i class = "fas"
+                                   :class = "isBillingGroupExpanded( group.groupId ) ? 'fa-chevron-up' : 'fa-chevron-down'"
+                                   aria-hidden = "true"></i>
+                            </button>
+                            <span v-if = "billingPreviewForGroup( group )?.usersAtRiskCount > 0"
+                                  class = "inline-flex rounded-full border border-red-500/70 bg-red-50 px-3 py-1 text-xs font-semibold text-red-700">
+                                {{ billingPreviewForGroup( group ).usersAtRiskCount }} users at risk
+                            </span>
+                        </div>
+
+                        <div v-if = "isBillingGroupExpanded( group.groupId )"
+                             class = "mt-3 rounded-lg border border-black/10 bg-white/70 p-3 text-sm text-black">
+                            <template v-if = "billingPreviewForGroup( group )">
+                                <div class = "grid gap-2 sm:grid-cols-2">
+                                    <div>Projected projects: <span class = "font-bold">{{ billingPreviewForGroup( group ).projectCount }}</span></div>
+                                    <div>Projected users: <span class = "font-bold">{{ billingPreviewForGroup( group ).userCount }}</span></div>
+                                    <div>Max missed months: <span class = "font-bold">{{ billingPreviewForGroup( group ).maxMissedMonths }}</span></div>
+                                    <div>Projected due: <span class = "font-bold">{{ formatTokenAmount( billingPreviewForGroup( group ).dueTokens ) }}</span> tokens</div>
+                                </div>
+
+                                <div v-if = "billingPreviewForGroup( group ).users.length > 0"
+                                     class = "mt-3 space-y-2">
+                                    <div v-for = "user in billingPreviewForGroup( group ).users"
+                                         :key = "'billing-user-' + group.groupId + '-' + user.userSub"
+                                         class = "rounded-md border border-black/10 bg-black/[0.02] p-2">
+                                        <div class = "flex flex-wrap items-center justify-between gap-2">
+                                            <div class = "font-semibold">{{ formatBillingPreviewUser( user ) }}</div>
+                                            <div class = "font-bold">{{ formatTokenAmount( user.dueTokens ) }} tokens</div>
+                                        </div>
+                                        <div class = "mt-1 text-xs text-black/60">
+                                            {{ user.projectCount }} projects, {{ user.missedMonths }} missed months
+                                            <span v-if = "user.wouldDeleteOnNextMiss" class = "font-semibold text-red-600">
+                                                | would be deleted on next miss
+                                            </span>
+                                        </div>
+                                        <div v-if = "user.bucketUsage.length > 0"
+                                             class = "mt-2 flex flex-wrap gap-1">
+                                            <span v-for = "bucket in user.bucketUsage"
+                                                  :key = "'billing-bucket-' + group.groupId + '-' + user.userSub + '-' + bucket.bucket"
+                                                  class = "inline-flex rounded-full border border-black/10 bg-white px-2 py-0.5 text-[11px] text-black/65">
+                                                {{ formatBillingBucketUsage( bucket ) }}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </template>
+                            <div v-else class = "text-black/65">
+                                No billing preview is available for this group.
+                            </div>
+                        </div>
                         <div>Members:</div>
 
                         <ul class = "ml-8">
@@ -289,7 +493,9 @@
         </div>
     </div>
 
-    <div v-show = "activeTokenTab === 'shared'" role = "tabpanel">
+    <div v-show = "activeTokenTab === 'shared'"
+         role = "tabpanel"
+         class = "min-h-0 flex-1 overflow-y-auto overscroll-contain pb-6 pr-1">
         <h3 class = "text-lg font-bold ml-0 mb-4">Compute token groups shared with you</h3>
         <div>
 
@@ -359,7 +565,97 @@ const expandedHistoryEventIDs = ref(new Set())
 const ownedHistoryGroups = ref([])
 const ownedHistoryGroupsLoading = ref(false)
 const ownedHistoryGroupsError = ref("")
+
+const createEmptyPersonalBillingPreview = () => {
+    return {
+        userSub: "",
+        identityID: "",
+        tokenBalance: 0,
+        activeBillingGroupID: null,
+        activeBillingGroupIDs: [],
+        billedToPersonal: false,
+        projectCount: 0,
+        dueTokens: 0,
+        missedMonths: 0,
+        wouldDeleteOnNextMiss: false,
+        bucketUsage: []
+    }
+}
+
+const billingPreview = ref({
+    version: "owned-token-group-billing-preview-v1",
+    monthKey: "",
+    personal: createEmptyPersonalBillingPreview(),
+    groups: [],
+    warnings: []
+})
+const billingPreviewLoading = ref(false)
+const billingPreviewError = ref("")
+const billingPreviewExpanded = ref(false)
+const expandedPreviewBillingGroupIDs = ref(new Set())
+const expandedBillingGroupIDs = ref(new Set())
+const missedMonthsPreview = ref(null)
+const missedMonthsLoading = ref(false)
+const missedMonthsError = ref("")
 const HISTORY_PAGE_SIZE = 50
+
+const billingPreviewGroups = computed(() => {
+    return Array.isArray( billingPreview.value?.groups ) ? billingPreview.value.groups : []
+})
+
+const personalBillingPreview = computed(() => {
+    return billingPreview.value?.personal ?? createEmptyPersonalBillingPreview()
+})
+
+const billingPreviewWarnings = computed(() => {
+    return Array.isArray( billingPreview.value?.warnings ) ? billingPreview.value.warnings : []
+})
+
+const billingPreviewGroupByID = computed(() => {
+    const entries = billingPreviewGroups.value
+        .map(( group ) => [
+            String( group?.groupID ?? "" ).trim(),
+            group
+        ])
+        .filter(( entry ) => entry[0].length > 0 )
+
+    return new Map( entries )
+})
+
+const totalGroupBillingDueTokens = computed(() => {
+    return billingPreviewGroups.value.reduce(( total, group ) => {
+        return total + ( Number( group?.dueTokens ?? 0 ) || 0 )
+    }, 0 )
+})
+
+const totalBillingDueTokens = computed(() => {
+    return totalGroupBillingDueTokens.value + ( Number( personalBillingPreview.value?.dueTokens ?? 0 ) || 0 )
+})
+
+const hasBillingPreviewLineItems = computed(() => {
+    const personal = personalBillingPreview.value
+    return billingPreviewGroups.value.length > 0 ||
+        ( Number( personal?.projectCount ?? 0 ) || 0 ) > 0 ||
+        ( Number( personal?.dueTokens ?? 0 ) || 0 ) > 0
+})
+
+const billingPreviewMonthLabel = computed(() => {
+    const monthKey = String( billingPreview.value?.monthKey ?? "" ).trim()
+    const match = monthKey.match(/^(\d{4})-(\d{2})$/)
+    if( match === null ){
+        return "the coming month"
+    }
+
+    const parsed = new Date( Number( match[1] ), Number( match[2] ) - 1, 1 )
+    if( Number.isFinite( parsed.getTime() ) === false ){
+        return monthKey
+    }
+
+    return parsed.toLocaleDateString( undefined, {
+        year: "numeric",
+        month: "long"
+    })
+})
 
 const ownedGroups = computed(() => {
 	return tokenGroups.value.filter( group => { return group.owned })
@@ -378,6 +674,37 @@ const tokenGroupNameByID = computed(() => {
     }).filter(( entry ) => entry[0].length > 0 )
 
     return new Map( entries )
+})
+
+const activeBillingGroupLabels = computed(() => {
+    const activeGroupIDs = Array.isArray( personalBillingPreview.value?.activeBillingGroupIDs )
+        ? personalBillingPreview.value.activeBillingGroupIDs
+        : []
+    const legacyGroupID = String( personalBillingPreview.value?.activeBillingGroupID ?? "" ).trim()
+    const groupIDs = [ ...activeGroupIDs, legacyGroupID ]
+        .map(( groupID ) => String( groupID ?? "" ).trim() )
+        .filter(( groupID ) => groupID.length > 0 )
+
+    return [ ...new Set( groupIDs ) ].map(( groupID ) => {
+        return tokenGroupNameByID.value.get( groupID ) ?? groupID
+    })
+})
+
+const activeBillingGroupSummary = computed(() => {
+    const labels = activeBillingGroupLabels.value
+    if( labels.length === 0 ){
+        return ""
+    }
+
+    if( labels.length === 1 ){
+        return labels[0]
+    }
+
+    if( labels.length === 2 ){
+        return `${labels[0]} and ${labels[1]}`
+    }
+
+    return `${labels.slice( 0, -1 ).join( ", " )}, and ${labels[labels.length - 1]}`
 })
 
 const availableHistoryGroups = computed(() => {
@@ -465,6 +792,91 @@ const formatTokenDelta = ( value ) => {
     }
 
     return String( numeric )
+}
+
+const formatTokenAmount = ( value ) => {
+    const numeric = Number( value )
+    if( Number.isFinite( numeric ) === false ){
+        return "0"
+    }
+
+    return Number.isInteger( numeric )
+        ? String( numeric )
+        : numeric.toFixed( 2 ).replace(/\.?0+$/, "" )
+}
+
+const formatBillingPreviewUser = ( user ) => {
+    const givenName = String( user?.given_name ?? "" ).trim()
+    const familyName = String( user?.family_name ?? "" ).trim()
+    const email = String( user?.email ?? "" ).trim()
+    const identityID = String( user?.identityID ?? "" ).trim()
+    const userSub = String( user?.userSub ?? "" ).trim()
+    const name = [ givenName, familyName ].filter(( value ) => value.length > 0 ).join( " " )
+
+    if( name.length > 0 && email.length > 0 ){
+        return `${name} - ${email}`
+    }
+
+    return name || email || identityID || userSub || "Unknown user"
+}
+
+const formatBillingBucketUsage = ( bucket ) => {
+    const name = String( bucket?.name ?? bucket?.bucket ?? "" ).trim() || "unknown"
+    const projectCount = Number( bucket?.projectCount ?? 0 ) || 0
+    const monthlyProjectTokenCost = Number( bucket?.monthlyProjectTokenCost ?? 0 ) || 0
+    const tokensDue = Number( bucket?.tokensDue ?? 0 ) || 0
+    const monthlyCostText = monthlyProjectTokenCost > 0
+        ? ` at ${formatTokenAmount( monthlyProjectTokenCost )} tokens/project`
+        : ""
+
+    return `${name}: ${projectCount} projects${monthlyCostText}, ${formatTokenAmount( tokensDue )} tokens`
+}
+
+const billingPreviewForGroup = ( group ) => {
+    const groupID = String( group?.groupId ?? group?.groupID ?? "" ).trim()
+    if( groupID.length === 0 ){
+        return null
+    }
+
+    return billingPreviewGroupByID.value.get( groupID ) ?? null
+}
+
+const isPreviewBillingGroupExpanded = ( groupID ) => {
+    return expandedPreviewBillingGroupIDs.value.has( String( groupID ?? "" ).trim() )
+}
+
+const togglePreviewBillingGroupExpanded = ( groupID ) => {
+    const normalizedGroupID = String( groupID ?? "" ).trim()
+    if( normalizedGroupID.length === 0 ){
+        return
+    }
+
+    const next = new Set( expandedPreviewBillingGroupIDs.value )
+    if( next.has( normalizedGroupID ) ){
+        next.delete( normalizedGroupID )
+    } else {
+        next.add( normalizedGroupID )
+    }
+    expandedPreviewBillingGroupIDs.value = next
+}
+
+const isBillingGroupExpanded = ( groupID ) => {
+    return expandedBillingGroupIDs.value.has( String( groupID ?? "" ).trim() )
+}
+
+const toggleBillingGroupExpanded = ( groupID ) => {
+    const normalizedGroupID = String( groupID ?? "" ).trim()
+    if( normalizedGroupID.length === 0 ){
+        return
+    }
+
+    const next = new Set( expandedBillingGroupIDs.value )
+    if( next.has( normalizedGroupID ) ){
+        next.delete( normalizedGroupID )
+    } else {
+        next.add( normalizedGroupID )
+    }
+    expandedBillingGroupIDs.value = next
 }
 
 const formatHistoryActor = ( event ) => {
@@ -588,6 +1000,68 @@ const mapHistoryError = ( error, scope ) => {
     }
 
     return "Failed to load token history."
+}
+
+const mapBillingPreviewError = ( error, fallbackMessage = "Failed to load billing preview." ) => {
+
+    const status = Number.parseInt( String( error?.status ?? "" ), 10 )
+    const detail = String( error?.detail ?? error?.message ?? "" ).trim()
+
+    if( status === 400 ){
+        return detail.length > 0 ? detail : "Invalid billing preview request."
+    }
+
+    if( status === 401 ){
+        return "You are not authenticated. Please sign in again."
+    }
+
+    if( detail.length > 0 ){
+        return detail
+    }
+
+    return fallbackMessage
+}
+
+const loadBillingPreview = async () => {
+
+    billingPreviewLoading.value = true
+    billingPreviewError.value = ""
+    missedMonthsError.value = ""
+
+    try{
+        const response = await tokens.getOwnedGroupsBillingPreview()
+        if( import.meta.env.DEV ){
+            console.log( "Owned token group billing estimate response:", response )
+        }
+        billingPreview.value = {
+            version: "owned-token-group-billing-preview-v1",
+            monthKey: String( response?.monthKey ?? "" ),
+            personal: response?.personal ?? createEmptyPersonalBillingPreview(),
+            groups: Array.isArray( response?.groups ) ? response.groups : [],
+            warnings: Array.isArray( response?.warnings ) ? response.warnings : []
+        }
+    } catch( error ){
+        billingPreview.value = {
+            version: "owned-token-group-billing-preview-v1",
+            monthKey: "",
+            personal: createEmptyPersonalBillingPreview(),
+            groups: [],
+            warnings: []
+        }
+        billingPreviewError.value = mapBillingPreviewError( error )
+    } finally {
+        billingPreviewLoading.value = false
+    }
+
+    missedMonthsLoading.value = true
+    try{
+        missedMonthsPreview.value = await tokens.getBillingMissedMonths()
+    } catch( error ){
+        missedMonthsPreview.value = null
+        missedMonthsError.value = mapBillingPreviewError( error, "Failed to load missed billing month status." )
+    } finally {
+        missedMonthsLoading.value = false
+    }
 }
 
 const loadOwnedHistoryGroupsSummary = async () => {
@@ -718,6 +1192,7 @@ const updateTokenSource = async () => {
     console.log("Token source updated.")
 
     await utils.wait( 1000 )
+    await loadBillingPreview()
     updatingTokenSource.value = false
 }
 
@@ -731,6 +1206,7 @@ const updateGroups = async () => {
 	tokenGroups.value = await tokens.listGroupsAndMembers();
 	tokenGroups.value = tokenGroups.value.filter( g => g.owner != null);
     await loadOwnedHistoryGroupsSummary()
+    await loadBillingPreview()
 }
 
 const createTokenGroup = async() => {
@@ -786,6 +1262,7 @@ onMounted( async () => {
     balance.value = await tokens.balance("")
 	tokenGroups.value = await tokens.listGroupsAndMembers();
 	tokenGroups.value = tokenGroups.value.filter( g => g.owner != null);
+    await loadBillingPreview()
     await loadOwnedHistoryGroupsSummary()
 
     await loadHistory( true )
