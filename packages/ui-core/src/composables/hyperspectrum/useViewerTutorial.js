@@ -54,6 +54,11 @@ export function useViewerTutorial( options ){
 	const projectMenuDropdown = options.projectMenuDropdown
 	const setHeatmapInteractionMode = options.setHeatmapInteractionMode
 	const renderCurrentMatrix = options.renderCurrentMatrix
+	const openSpectralCalibrationSidebar = typeof options.openSpectralCalibrationSidebar === "function"
+		? options.openSpectralCalibrationSidebar
+		: async () => {}
+	const spectralCalibrationPanelOpen = options.spectralCalibrationPanelOpen ?? { value: false }
+	const spectralCalibrationSidebarOpen = options.spectralCalibrationSidebarOpen ?? { value: false }
 	const isKnownDisplayMode = typeof options.isKnownDisplayMode === "function"
 		? options.isKnownDisplayMode
 		: () => false
@@ -65,6 +70,8 @@ export function useViewerTutorial( options ){
 	const viewerTutorialRunToken = ref(0)
 	const viewerTutorialOriginalDisplayMode = ref("")
 	const viewerTutorialOriginalInteractionMode = ref("")
+	const viewerTutorialOriginalSpectralCalibrationPanelOpen = ref(false)
+	const viewerTutorialOriginalSpectralCalibrationSidebarOpen = ref(false)
 	const tutorialDisplaySelectOpen = ref(false)
 	const tutorialDisplayOptionsOpen = ref(false)
 	const tutorialProjectMenuOpen = ref(false)
@@ -99,7 +106,7 @@ export function useViewerTutorial( options ){
 	}
 
 	const viewerTutorialSteps = computed(() => {
-		return [
+		const steps = [
 			{
 				id: "viewer-layout",
 				kind: "highlight",
@@ -157,6 +164,28 @@ export function useViewerTutorial( options ){
 				placement: "bottom"
 			},
 			{
+				id: "spectral-calibration-sidebar",
+				kind: "highlight",
+				title: "Spectral calibration",
+				body: "Open Calibration from the Project menu to inspect or apply spectral-axis calibration profiles. Saved profiles are previewed immediately, and owned projects can save the selected profile as the project-specific calibration.",
+				target: "spectral-calibration-sidebar-block",
+				placement: "right"
+			}
+		]
+
+		if( project.value?.shared !== true ){
+			steps.push({
+				id: "spectral-calibration-panel",
+				kind: "highlight",
+				title: "Calibration point editor",
+				body: "Use the editor to click spectrum traces or loadings, enter true spectral-axis locations, choose polynomial order terms, preview the correction, and save the calibration profile with a name and description.",
+				target: "spectral-calibration-panel",
+				placement: "left"
+			})
+		}
+
+		steps.push(
+			{
 				id: "raman-inference-sidebar",
 				kind: "highlight",
 				title: "Raman inference controls",
@@ -180,7 +209,9 @@ export function useViewerTutorial( options ){
 				target: "",
 				placement: "center"
 			}
-		]
+		)
+
+		return steps
 	})
 
 	const activeViewerTutorialStep = computed(() => {
@@ -351,6 +382,14 @@ export function useViewerTutorial( options ){
 		if( viewerTutorialOriginalInteractionMode.value.length > 0 ){
 			setHeatmapInteractionMode( viewerTutorialOriginalInteractionMode.value )
 		}
+
+		if( viewerTutorialOriginalSpectralCalibrationPanelOpen.value === false ){
+			spectralCalibrationPanelOpen.value = false
+		}
+
+		if( viewerTutorialOriginalSpectralCalibrationSidebarOpen.value === false ){
+			spectralCalibrationSidebarOpen.value = false
+		}
 	}
 
 	const enterViewerTutorialStep = async ( step ) => {
@@ -386,6 +425,24 @@ export function useViewerTutorial( options ){
 			await waitForDelay( 24 )
 			tutorialProjectMenuOpen.value = true
 			projectMenuDropdown.value?.open?.()
+			return
+		}
+
+		if( step.id === "spectral-calibration-sidebar" ){
+			await openSpectralCalibrationSidebar()
+			spectralCalibrationPanelOpen.value = false
+			await nextTick()
+			await waitForDelay( 24 )
+			await focusTutorialTarget( step.target )
+			return
+		}
+
+		if( step.id === "spectral-calibration-panel" ){
+			await openSpectralCalibrationSidebar()
+			spectralCalibrationPanelOpen.value = true
+			await nextTick()
+			await waitForDelay( 24 )
+			await focusTutorialTarget( step.target )
 			return
 		}
 
@@ -433,6 +490,8 @@ export function useViewerTutorial( options ){
 		viewerTutorialPromptVisible.value = false
 		viewerTutorialOriginalDisplayMode.value = activePlot.value
 		viewerTutorialOriginalInteractionMode.value = heatmapInteractionMode.value
+		viewerTutorialOriginalSpectralCalibrationPanelOpen.value = spectralCalibrationPanelOpen.value === true
+		viewerTutorialOriginalSpectralCalibrationSidebarOpen.value = spectralCalibrationSidebarOpen.value === true
 		viewerTutorialVisible.value = true
 		viewerTutorialStepIndex.value = 0
 		await activateViewerTutorialStep( 0 )
@@ -446,6 +505,8 @@ export function useViewerTutorial( options ){
 
 		viewerTutorialOriginalDisplayMode.value = activePlot.value
 		viewerTutorialOriginalInteractionMode.value = heatmapInteractionMode.value
+		viewerTutorialOriginalSpectralCalibrationPanelOpen.value = spectralCalibrationPanelOpen.value === true
+		viewerTutorialOriginalSpectralCalibrationSidebarOpen.value = spectralCalibrationSidebarOpen.value === true
 		viewerTutorialVisible.value = true
 		viewerTutorialStepIndex.value = 0
 		await activateViewerTutorialStep( 0 )
@@ -514,6 +575,8 @@ export function useViewerTutorial( options ){
 		activeViewerTutorialTargetElement.value = null
 		viewerTutorialOriginalDisplayMode.value = ""
 		viewerTutorialOriginalInteractionMode.value = ""
+		viewerTutorialOriginalSpectralCalibrationPanelOpen.value = false
+		viewerTutorialOriginalSpectralCalibrationSidebarOpen.value = false
 		closeTutorialTransientUi()
 	}
 

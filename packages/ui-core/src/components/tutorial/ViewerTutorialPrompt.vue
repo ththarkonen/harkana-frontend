@@ -1,13 +1,12 @@
 <template>
 <Modal ref = "modal"
-	   :title = "'Welcome to the viewer'"
+	   :title = "title"
 	   overlay-class = "fixed inset-0 z-[10020] flex items-center justify-center bg-black/50"
 	   panel-class = "w-[22rem] max-w-[calc(100vw-1rem)]"
 	   :showClose = "false">
 	<template v-slot:main>
 		<div class = "pb-4 text-sm leading-relaxed text-white/85">
-			This tutorial walks through the main viewer workflow, including false-color visualizations,
-			heatmap interaction, spectra panels, and Raman inference.
+			{{ body }}
 		</div>
 	</template>
 
@@ -35,7 +34,12 @@ import { nextTick, ref, watch } from "vue"
 import Modal from "../modals/Modal.vue"
 
 const props = defineProps({
-	visible: { type: Boolean, default: false }
+	visible: { type: Boolean, default: false },
+	title: { type: String, default: "Welcome to the viewer" },
+	body: {
+		type: String,
+		default: "This tutorial walks through the main viewer workflow, including false-color visualizations, heatmap interaction, spectra panels, and Raman inference."
+	}
 })
 
 const emit = defineEmits([ "start", "skip" ])

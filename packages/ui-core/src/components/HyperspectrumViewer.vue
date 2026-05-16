@@ -1139,6 +1139,7 @@
 					  :spectral-calibration-profile-name = "activeSpectralCalibrationProfileLabel"
 					  @save = "saveXyzSettings"></XyzSettingsModal>
 	<CalibrationPanel v-model = "spectralCalibrationPanelOpen"
+					  data-tutorial = "spectral-calibration-panel"
 					  :project = "project"
 					  :anchor-element = "spectralCalibrationSidebarSection"
 					  :points = "spectralCalibrationDraft.points"
@@ -1166,6 +1167,7 @@
 	<ProjectChatWindow v-model = "projectChatOpen"
 					   :project = "project"></ProjectChatWindow>
 	<ViewerTutorialPrompt :visible = "viewerTutorialPromptVisible"
+						  body = "This tutorial walks through the main hyperspectral workflow, including false-color visualizations, heatmap interaction, spectra panels, spectral calibration, and Raman inference."
 						  @start = "startViewerTutorial"
 						  @skip = "skipViewerTutorialPrompt"></ViewerTutorialPrompt>
 	<ViewerTutorialOverlay :visible = "viewerTutorialVisible"
@@ -1977,6 +1979,9 @@ const {
 	projectMenuDropdown,
 	setHeatmapInteractionMode: ( mode ) => setHeatmapInteractionMode( mode ),
 	renderCurrentMatrix: () => renderCurrentMatrix(),
+	openSpectralCalibrationSidebar: () => openSpectralCalibrationSidebar(),
+	spectralCalibrationPanelOpen,
+	spectralCalibrationSidebarOpen,
 	isKnownDisplayMode: ( value ) => DISPLAY_MODE_OPTIONS.has( value )
 })
 
@@ -5359,6 +5364,11 @@ const isSpectralCalibrationClickableTrace = ( trace ) => {
 	return trace.x.length > 0 && trace.y.length > 0
 }
 
+const hasSpectralCalibrationLineTarget = ( graphElement ) => {
+	const traces = Array.isArray( graphElement?.data ) ? graphElement.data : []
+	return traces.some(( trace ) => isSpectralCalibrationClickableTrace( trace ))
+}
+
 const resolveSpectralCalibrationSelection = ( eventData ) => {
 	const candidatePoints = Array.isArray( eventData?.points ) ? eventData.points : []
 	for( const selectedPoint of candidatePoints ){
@@ -5632,7 +5642,7 @@ const syncSpectralCalibrationReferenceLines = async () => {
 	const lines = spectralCalibrationReferenceLines.value
 	const operations = graphElements
 		.filter(( graphElement ) => graphElement !== null )
-		.map(( graphElement ) => spectralCalibrationEditingActive.value
+		.map(( graphElement ) => spectralCalibrationEditingActive.value && hasSpectralCalibrationLineTarget( graphElement )
 			? plot.showCalibrationLines( lines, graphElement, settings.value )
 			: plot.deleteMarker( graphElement ))
 
