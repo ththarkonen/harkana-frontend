@@ -1,6 +1,7 @@
 <template>
 <!-- Outer frame -->
-<div class="bg-brand min-h-screen p-[2px] overflow-hidden">
+<div class="bg-brand min-h-screen p-[2px] overflow-hidden"
+	 data-tutorial = "spectrum-viewer-layout">
 
 	<!-- Mobile overlay -->
 	<div v-if = "sidebarOpen" @click = "sidebarOpen = false" class = "fixed inset-0 bg-black/40 z-30 md:hidden"></div>
@@ -23,7 +24,8 @@
 				{{ sidebarEstimateErrorText }}
 			</div>
 
-			<div class = "mt-2 rounded-lg border-2 border-gray bg-gray-800 p-2 shadow-md shadow-black">
+			<div class = "mt-2 rounded-lg border-2 border-gray bg-gray-800 p-2 shadow-md shadow-black"
+				 data-tutorial = "spectrum-display-section">
 				<div class = "flex items-center justify-between gap-1">
 					<div class = "flex min-w-0 items-center gap-1">
 						<span class = "inline-flex h-5 w-5 items-center justify-center text-white" aria-hidden = "true">
@@ -32,11 +34,15 @@
 						<h3 class = "whitespace-nowrap font-semibold text-white">Display</h3>
 					</div>
 
-					<BaseDropdown :show-chevron = "false"
+					<BaseDropdown ref = "displayOptionsDropdown"
+								  :open = "tutorialDisplayOptionsOpenBinding"
+								  @update:open = "handleTutorialDisplayOptionsOpenUpdate"
+								  :show-chevron = "false"
 								  :close-on-select = "true"
 								  :teleport-to-body = "true"
 								  trigger-class = "inline-flex h-8 w-8 items-center justify-center rounded-md text-white transition-colors hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-brand"
-								  menu-class = "fixed z-[45] min-w-[16rem] w-max max-w-[50vw] origin-top-left rounded-md bg-dark-gray shadow-lg ring-1 ring-black/30">
+								  :menu-class = "displayOptionsMenuClass"
+								  data-tutorial = "spectrum-display-options">
 						<template v-slot:trigger>
 							<span class = "sr-only">Display options</span>
 							<i class = "fas fa-ellipsis-v" aria-hidden = "true" title = "Display options"></i>
@@ -132,7 +138,8 @@
 				</div>
 			</div>
 
-			<div class = "mt-4 rounded-lg border-2 border-gray bg-gray-800 p-2 shadow-md shadow-black">
+			<div class = "mt-4 rounded-lg border-2 border-gray bg-gray-800 p-2 shadow-md shadow-black"
+				 data-tutorial = "spectrum-comparison-section">
 				<div class = "flex items-center justify-between gap-1 mb-2">
 					<div class = "flex min-w-0 items-center gap-1">
 						<span class = "inline-flex h-5 w-5 items-center justify-center text-white" aria-hidden = "true">
@@ -304,7 +311,8 @@
 
 			<div v-if = "!project.shared && calibrating"
 				 ref = "calibrationSidebarSection"
-				 class = "mt-4 rounded-lg border-2 border-gray bg-gray-800 p-2 shadow-md shadow-black">
+				 class = "mt-4 rounded-lg border-2 border-gray bg-gray-800 p-2 shadow-md shadow-black"
+				 data-tutorial = "spectrum-calibration-sidebar-block">
 				<div class = "flex items-center justify-between gap-1">
 					<div class = "flex min-w-0 items-center gap-1">
 						<span class = "inline-flex h-5 w-5 items-center justify-center text-white" aria-hidden = "true">
@@ -340,11 +348,15 @@
 		<NavigationBar>
 			<template v-slot:left-items>
 				<button @click = "sidebarOpen = true" class = "md:hidden mr-4 px-3 py-2 rounded bg-slate-100">☰</button>
-				<BaseDropdown :teleport-to-body = "true"
+				<div data-tutorial = "spectrum-project-menu">
+				<BaseDropdown ref = "projectMenuDropdown"
+							  :open = "tutorialProjectMenuOpenBinding"
+							  @update:open = "handleTutorialProjectMenuOpenUpdate"
+							  :teleport-to-body = "true"
 							  portal-placement = "bottom-start"
 							  :portal-offset-x = "0"
 							  :portal-offset-y = "8"
-							  menu-class = "fixed z-[45] min-w-[14rem] w-max max-w-[50vw] max-h-[min(32rem,calc(100vh-4rem))] overflow-y-auto origin-top-left rounded-md bg-dark-gray shadow-lg ring-1 ring-black/30">
+							  :menu-class = "projectMenuClass">
 					<template v-slot:trigger>
 						<span class = "font-medium">Project</span>
 					</template>
@@ -396,7 +408,14 @@
 					<BaseDropdownItem @select = "openProjectMenu">
 						Main menu
 					</BaseDropdownItem>
+
+					<hr class = "h-0.5 bg-gray border-0 my-1">
+
+					<BaseDropdownItem @select = "restartTutorial">
+						Tutorial
+					</BaseDropdownItem>
 				</BaseDropdown>
+				</div>
 				<ProjectNameInput ref = "projectNameInput" :project = "project"></ProjectNameInput>
 			</template>
 			<template v-slot:right-items>
@@ -407,7 +426,8 @@
 
 		<!-- Main Content -->
 			<main class="relative z-0 bg-dark-gray rounded-lg overflow-hidden shadow-sm p-0">
-				<div class = "flex h-full min-h-0 flex-col gap-2 p-2">
+				<div class = "flex h-full min-h-0 flex-col gap-2 p-2"
+					 data-tutorial = "spectrum-panes">
 					<div v-if = "splitSpectrumLegendEntries.length > 0"
 						 class = "shrink-0 overflow-hidden rounded-lg bg-white">
 						<div class = "flex flex-wrap items-center gap-1.5 border-b border-gray/20 px-2 py-1.5">
@@ -530,6 +550,7 @@
 	<ShareModal ref = "shareModal" :project = "project"></ShareModal>
 	<ZenodoModal ref = "zenodoModal" :project = "project"></ZenodoModal>
 	<CalibrationPanel v-model = "calibrationPanelOpen"
+					  data-tutorial = "spectrum-calibration-panel"
 					  :project = "project"
 					  :anchor-element = "calibrationSidebarSection"
 					  :points = "calibration.points"
@@ -555,6 +576,25 @@
 								 @save = "saveCalibrationProfile"></CalibrationProfileSaveModal>
 	<ProjectChatWindow v-model = "projectChatOpen"
 					   :project = "project"></ProjectChatWindow>
+	<ViewerTutorialPrompt :visible = "tutorialPromptVisible"
+						  title = "Welcome to the spectrum viewer"
+						  body = "This tutorial walks through the spectrum project workflow, including display layouts, comparisons, calibration profiles, project actions, and downloads."
+						  @start = "startTutorial"
+						  @skip = "skipTutorialPrompt"></ViewerTutorialPrompt>
+	<ViewerTutorialOverlay :visible = "tutorialVisible"
+						   :step-id = "activeTutorialStep?.id ?? ''"
+						   :title = "activeTutorialStep?.title ?? ''"
+						   :body = "activeTutorialStep?.body ?? ''"
+						   :step-number = "tutorialStepIndex + 1"
+						   :step-count = "tutorialStepCount"
+						   :can-go-back = "tutorialStepIndex > 0"
+						   :is-final = "isFinalTutorialStep"
+						   :preferred-placement = "activeTutorialStep?.placement ?? 'center'"
+						   :target-element = "activeTutorialTargetElement"
+						   :spotlight-enabled = "activeTutorialStep?.kind !== 'centered'"
+						   @next = "advanceTutorial"
+						   @back = "rewindTutorial"
+						   @skip = "skipActiveTutorial"></ViewerTutorialOverlay>
 </div>
 </template>
 
@@ -599,12 +639,17 @@ import ZenodoModal  from './modals/ZenodoModal.vue'
 import CalibrationPanel from './modals/CalibrationPanel.vue'
 import CalibrationProfileSaveModal from './modals/CalibrationProfileSaveModal.vue'
 import ProjectChatWindow from './chat/ProjectChatWindow.vue'
+import ViewerTutorialPrompt from './tutorial/ViewerTutorialPrompt.vue'
+import ViewerTutorialOverlay from './tutorial/ViewerTutorialOverlay.vue'
+import { useSpectrumProjectTutorial } from '../composables/spectrum/useSpectrumProjectTutorial.js'
 
 const metadataModal = ref(null)
 const shareModal = ref(null)
 const zenodoModal = ref(null)
 const projectNameInput = ref(null)
 const calibrationProfileSaveModal = ref(null)
+const displayOptionsDropdown = ref(null)
+const projectMenuDropdown = ref(null)
 
 const projectID = route.params.id
 const comparisonProjectIDs = ref([])
@@ -2221,6 +2266,57 @@ const toggleCalibration = () => {
 	void startCalibration()
 }
 
+const {
+	tutorialPromptVisible,
+	tutorialVisible,
+	tutorialStepIndex,
+	activeTutorialTargetElement,
+	activeTutorialStep,
+	tutorialSteps,
+	tutorialProjectMenuOpenBinding,
+	tutorialDisplayOptionsOpenBinding,
+	projectMenuClass,
+	displayOptionsMenuClass,
+	handleTutorialProjectMenuOpenUpdate,
+	handleTutorialDisplayOptionsOpenUpdate,
+	maybeOfferTutorialPrompt,
+	startTutorial,
+	restartTutorial,
+	skipTutorialPrompt,
+	skipActiveTutorial,
+	advanceTutorial,
+	rewindTutorial,
+	resetTutorialState
+} = useSpectrumProjectTutorial({
+	nextTick,
+	project,
+	dataType,
+	projectMenuDropdown,
+	displayOptionsDropdown,
+	calibrating,
+	calibrationPanelOpen,
+	startCalibration: () => startCalibration(),
+	cancelCalibration: () => cancelCalibration()
+})
+
+const resolvedTutorialSteps = computed(() => {
+	if( Array.isArray( tutorialSteps?.value ) ){
+		return tutorialSteps.value
+	}
+
+	if( Array.isArray( tutorialSteps ) ){
+		return tutorialSteps
+	}
+
+	return []
+})
+
+const tutorialStepCount = computed(() => resolvedTutorialSteps.value.length )
+
+const isFinalTutorialStep = computed(() => {
+	return tutorialStepIndex.value >= ( resolvedTutorialSteps.value.length - 1 )
+})
+
 const isSelectedComparisonProjectID = ( comparisonID ) => {
 	const normalizedComparisonID = String( comparisonID ?? "" ).trim()
 	return normalizedComparisonID.length > 0 &&
@@ -3419,6 +3515,8 @@ onMounted( async () => {
 			void pollEstimateJobStatus()
 		}
 
+		maybeOfferTutorialPrompt()
+
     } catch( error ){
 		console.log( error )
         navigation.route("Main menu", {})
@@ -3431,6 +3529,7 @@ onBeforeUnmount(() => {
 	clearEstimatePollTimeout()
 	detachCalibrationPlotClickListeners()
 	stopCalibrationPulse()
+	resetTutorialState()
 	stopSpectraPaneResize()
 	disconnectSpectraPaneResizeObserver()
 	window.removeEventListener( "resize", handleWindowResize )
