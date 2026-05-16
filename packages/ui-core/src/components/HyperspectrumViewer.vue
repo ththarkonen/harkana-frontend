@@ -872,7 +872,11 @@
 				   class = "mt-2 text-xs leading-snug text-amber-200">
 					Unsaved calibration selection. Save before running Raman inference.
 				</p>
-				<p v-else-if = "spectralCalibrationSelectedProfileID.length > 0"
+				<p v-if = "spectralCalibrationAssignmentDisabledReason.length > 0 && spectralCalibrationSelectionDirty"
+				   class = "mt-2 text-xs leading-snug text-red-300">
+					{{ spectralCalibrationAssignmentDisabledReason }}
+				</p>
+				<p v-if = "spectralCalibrationSelectionDirty === false && spectralCalibrationSelectedProfileID.length > 0"
 				   class = "mt-2 text-xs leading-snug text-white/70">
 					Applied on top of the raw Z axis values.
 				</p>
@@ -1138,6 +1142,9 @@
 					  :spectral-calibration-active = "spectralCalibrationSelectedProfileID.length > 0"
 					  :spectral-calibration-profile-name = "activeSpectralCalibrationProfileLabel"
 					  @save = "saveXyzSettings"></XyzSettingsModal>
+	<SpectralAxisOverwriteModal ref = "spectralAxisOverwriteModal"
+								:saving = "spectralCalibrationAssignmentSaving"
+								@confirm = "confirmSpectralCalibrationAxisOverwrite"></SpectralAxisOverwriteModal>
 	<CalibrationPanel v-model = "spectralCalibrationPanelOpen"
 					  data-tutorial = "spectral-calibration-panel"
 					  :project = "project"
@@ -1259,6 +1266,7 @@ import ProjectChatWindow from './chat/ProjectChatWindow.vue'
 import HeatmapRendererPane from './plot/HeatmapRendererPane.vue'
 import CalibrationPanel from './modals/CalibrationPanel.vue'
 import CalibrationProfileSaveModal from './modals/CalibrationProfileSaveModal.vue'
+import SpectralAxisOverwriteModal from './modals/SpectralAxisOverwriteModal.vue'
 import { createHyperspectrumDisplayRegistry } from './plot/hyperspectrum/displayRegistry.js'
 import DualRangeSlider from './general/DualRangeSlider.vue'
 import FloatingLabelSelect from './general/FloatingLabelSelect.vue'
@@ -1305,6 +1313,7 @@ const gpuInferenceOutcomeModal = ref(null)
 const downloadPreparingModal = ref(null)
 const xyzSettingsModal = ref(null)
 const spectralCalibrationProfileSaveModal = ref(null)
+const spectralAxisOverwriteModal = ref(null)
 const displayInfoTrigger = ref(null)
 const displayOptionsDropdown = ref(null)
 const projectMenuDropdown = ref(null)
@@ -1346,6 +1355,7 @@ const spectralCalibrationPulsePhase = ref(0)
 const spectralCalibrationDraftPointCounter = ref(0)
 const spectralCalibrationError = ref("")
 const spectralCalibrationSidebarOpen = ref(false)
+const pendingSpectralCalibrationAssignment = shallowRef(null)
 const spectralCalibrationDraft = ref({
 	x: 0,
 	polynomialOrder: 0,
@@ -2487,7 +2497,8 @@ const canSaveSpectralCalibrationProfile = computed(() => {
 		spectralCalibrationProfilesSupported.value &&
 		spectralCalibrationProfileSaving.value === false &&
 		spectralCalibrationHasSavablePoints.value &&
-		spectralCalibrationPreviewIsCurrent.value
+		spectralCalibrationPreviewIsCurrent.value &&
+		currentSpectralCalibrationSourceAxis() !== null
 })
 
 const spectralCalibrationProfileSaveDisabledReason = computed(() => {
@@ -2499,6 +2510,9 @@ const spectralCalibrationProfileSaveDisabledReason = computed(() => {
 	}
 	if( spectralCalibrationHasSavablePoints.value === false ){
 		return "Select enough valid points to fit the calibration."
+	}
+	if( currentSpectralCalibrationSourceAxis() === null ){
+		return "Raw spectral axis values are not loaded."
 	}
 
 	return ""
@@ -2543,7 +2557,9 @@ const canAssignSpectralCalibrationProfile = computed(() => {
 	return project.value?.shared !== true &&
 		spectralCalibrationProfilesSupported.value &&
 		spectralCalibrationAssignmentSaving.value === false &&
-		spectralCalibrationSelectionDirty.value
+		savingXyz.value === false &&
+		spectralCalibrationSelectionDirty.value &&
+		spectralCalibrationAssignmentDisabledReason.value.length === 0
 })
 
 const activeSpectralCalibrationModel = computed(() => {
@@ -2567,6 +2583,106 @@ const rawSpectralAxisValues = () => {
 	const rawValues = Array.isArray( xyzAxes.value?.z ) ? xyzAxes.value.z : []
 	return rawValues.map(( value, index ) => numericAxisValue( value, index ))
 }
+
+const normalizeSpectralCalibrationSourceAxis = ( sourceAxis = null ) => {
+	const values = Array.isArray( sourceAxis?.values )
+		? sourceAxis.values
+			.map(( value ) => Number( value ))
+			.filter(( value ) => Number.isFinite( value ))
+		: []
+
+	if( values.length === 0 ){
+		return null
+	}
+
+	return {
+		axisKey: "z",
+		values,
+		unit: String( sourceAxis?.unit ?? "index" ).trim() || "index",
+		valueCount: values.length
+	}
+}
+
+const currentSpectralCalibrationSourceAxis = () => {
+	const values = rawSpectralAxisValues()
+	if( values.length === 0 ){
+		return null
+	}
+
+	return {
+		axisKey: "z",
+		values,
+		unit: String( xyzAxes.value?.zUnit ?? "index" ).trim() || "index",
+		valueCount: values.length
+	}
+}
+
+const summarizeSpectralCalibrationSourceAxis = ( sourceAxis = null ) => {
+	const normalizedAxis = normalizeSpectralCalibrationSourceAxis( sourceAxis )
+	if( normalizedAxis === null ){
+		return {
+			valueCount: 0,
+			firstValue: null,
+			lastValue: null,
+			unit: "index"
+		}
+	}
+
+	return {
+		valueCount: normalizedAxis.valueCount,
+		firstValue: normalizedAxis.values[0],
+		lastValue: normalizedAxis.values[ normalizedAxis.values.length - 1 ],
+		unit: normalizedAxis.unit
+	}
+}
+
+const spectralCalibrationSourceAxisRangeMatches = ( leftAxis = null, rightAxis = null ) => {
+	const left = normalizeSpectralCalibrationSourceAxis( leftAxis )
+	const right = normalizeSpectralCalibrationSourceAxis( rightAxis )
+	if( left === null || right === null ){
+		return false
+	}
+
+	const leftFirst = Number( left.values[0] )
+	const leftLast = Number( left.values[ left.values.length - 1 ] )
+	const rightFirst = Number( right.values[0] )
+	const rightLast = Number( right.values[ right.values.length - 1 ] )
+
+	return Math.abs( leftFirst - rightFirst ) <= 1e-9 &&
+		Math.abs( leftLast - rightLast ) <= 1e-9
+}
+
+const spectralCalibrationAssignmentDisabledReason = computed(() => {
+	if( spectralCalibrationProfilesSupported.value === false ){
+		return "Calibration profiles are not available."
+	}
+
+	if( spectralCalibrationProfilesLoading.value ){
+		return "The selected calibration profile is still loading."
+	}
+
+	const selectedProfileID = String( spectralCalibrationSelectedProfileID.value ?? "" ).trim()
+	if( selectedProfileID.length === 0 ){
+		return ""
+	}
+
+	const profile = activeSpectralCalibrationProfile.value
+	if( profile === null ){
+		return "Load the selected calibration profile before assigning it."
+	}
+
+	const profileSourceAxis = normalizeSpectralCalibrationSourceAxis( profile?.sourceAxis )
+	if( profileSourceAxis === null ){
+		return "This calibration profile cannot be assigned because it does not include the source spectral axis."
+	}
+
+	const currentSourceAxis = currentSpectralCalibrationSourceAxis()
+	if( currentSourceAxis === null ){
+		return "Raw spectral axis values are not loaded."
+	}
+
+	return ""
+})
 
 const effectiveSpectralAxisValues = () => {
 	const rawValues = rawSpectralAxisValues()
@@ -4694,6 +4810,14 @@ const normalizeAxisValuesForSave = ( values, fallbackValues = [] ) => {
 	return normalized
 }
 
+const persistXyzAxes = async ( updatedAxes ) => {
+	await results.set( project.value, "xyz", updatedAxes )
+	await hyperspectrumCache.setXyz( project.value, updatedAxes, cacheOptions )
+
+	xyzAxes.value = updatedAxes
+	layerInput.value = normalizeLayerInput( layerInput.value )
+}
+
 const saveXyzSettings = async ( payload ) => {
 
 	if( canEditXyz.value === false ) return
@@ -4724,11 +4848,7 @@ const saveXyzSettings = async ( payload ) => {
 	savingXyz.value = true
 
 	try{
-		await results.set( project.value, "xyz", updatedAxes )
-		await hyperspectrumCache.setXyz( project.value, updatedAxes, cacheOptions )
-
-		xyzAxes.value = updatedAxes
-		layerInput.value = normalizeLayerInput( layerInput.value )
+		await persistXyzAxes( updatedAxes )
 
 		if( graph.value !== null && currentMatrix() !== null ){
 			await renderCurrentMatrix()
@@ -4759,6 +4879,7 @@ const applySpectralCalibrationAssignment = ( assignmentProfile = null, options =
 
 const buildSpectralCalibrationProfilePayload = ( calibrationModel = spectralCalibrationDraftModel.value, metadata = {} ) => {
 	const normalizedModel = normalizeSpectralCalibrationProfileModel( calibrationModel )
+	const sourceAxis = currentSpectralCalibrationSourceAxis()
 	const points = Array.isArray( normalizedModel?.points ) ? normalizedModel.points.map(( point ) => ({
 		id: String( point?.id ?? "" ),
 		sourceX: Number( point?.sourceX ?? 0 ),
@@ -4767,7 +4888,7 @@ const buildSpectralCalibrationProfilePayload = ( calibrationModel = spectralCali
 	const polynomialOrder = Number( normalizedModel?.polynomialOrder ?? 0 )
 	const includedOrders = Array.isArray( normalizedModel?.includedOrders ) ? normalizedModel.includedOrders : [ 0 ]
 
-	return {
+	const payload = {
 		version: "calibration-profile-write-v2",
 		profileKind: "axis-calibration",
 		axisRole: HYPERSPECTRAL_CALIBRATION_AXIS_ROLE,
@@ -4785,6 +4906,86 @@ const buildSpectralCalibrationProfilePayload = ( calibrationModel = spectralCali
 			points
 		}
 	}
+
+	if( sourceAxis !== null ){
+		payload.sourceAxis = sourceAxis
+	}
+
+	return payload
+}
+
+const loadFullSpectralCalibrationProfile = async ( profileID ) => {
+	const normalizedProfileID = String( profileID ?? "" ).trim()
+	if( normalizedProfileID.length === 0 ){
+		return null
+	}
+
+	const profile = await datalib.getCalibrationProfile(
+		normalizedProfileID,
+		measurementDataType,
+		HYPERSPECTRAL_CALIBRATION_AXIS_ROLE
+	)
+	spectralCalibrationProfilesSupported.value = true
+	spectralCalibrationSelectedProfile.value = profile
+	return profile
+}
+
+const overwriteRawSpectralAxisFromProfile = async ( profileSourceAxis ) => {
+	const normalizedSourceAxis = normalizeSpectralCalibrationSourceAxis( profileSourceAxis )
+	if( normalizedSourceAxis === null ){
+		throw new Error( "Calibration profile source spectral axis is missing." )
+	}
+
+	const existingAxes = xyzAxes.value ?? await loadXyz( "high" )
+	if( existingAxes === null || typeof existingAxes !== "object" ){
+		throw new Error( "Raw spectral axis values are not loaded." )
+	}
+
+	const updatedAxes = {
+		...existingAxes,
+		z: [ ...normalizedSourceAxis.values ],
+		zUnit: normalizedSourceAxis.unit
+	}
+
+	await persistXyzAxes( updatedAxes )
+}
+
+const saveSpectralCalibrationAssignment = async ( selectedProfileID, selectedProfile = null ) => {
+	const normalizedProfileID = String( selectedProfileID ?? "" ).trim()
+	const assignment = await datalib.setProjectCalibration(
+		project.value,
+		normalizedProfileID.length > 0 ? normalizedProfileID : null,
+		measurementDataType,
+		HYPERSPECTRAL_CALIBRATION_AXIS_ROLE
+	)
+	const assignedProfileID = String( assignment?.profileID ?? normalizedProfileID ).trim()
+	const assignedProfile = assignment?.profile ??
+		( assignedProfileID.length > 0 && String( selectedProfile?.profileID ?? "" ).trim() === assignedProfileID
+			? selectedProfile
+			: null )
+
+	applySpectralCalibrationAssignment( assignedProfile, {
+		profileID: assignedProfileID
+	})
+	if( spectralCalibrationProfilesSupported.value ){
+		await refreshSpectralCalibrationProfiles()
+	}
+	await renderSpectralCalibrationChange()
+	return true
+}
+
+const openSpectralAxisOverwriteConfirmation = async ( profile, profileSourceAxis, currentSourceAxis ) => {
+	pendingSpectralCalibrationAssignment.value = {
+		profile,
+		profileSourceAxis,
+		currentSourceAxis
+	}
+
+	await spectralAxisOverwriteModal.value?.open?.({
+		profileName: String( profile?.friendlyName ?? profile?.profileID ?? "Selected calibration profile" ).trim(),
+		currentAxis: summarizeSpectralCalibrationSourceAxis( currentSourceAxis ),
+		profileAxis: summarizeSpectralCalibrationSourceAxis( profileSourceAxis )
+	})
 }
 
 const refreshSpectralCalibrationProfiles = async () => {
@@ -4990,25 +5191,30 @@ const assignSpectralCalibrationProfileToProject = async () => {
 
 	try{
 		const selectedProfileID = String( spectralCalibrationSelectedProfileID.value ?? "" ).trim()
-		const assignment = await datalib.setProjectCalibration(
-			project.value,
-			selectedProfileID.length > 0 ? selectedProfileID : null,
-			measurementDataType,
-			HYPERSPECTRAL_CALIBRATION_AXIS_ROLE
-		)
-		const assignedProfileID = String( assignment?.profileID ?? selectedProfileID ).trim()
-		const assignedProfile = assignment?.profile ??
-			( assignedProfileID.length > 0 && String( spectralCalibrationSelectedProfile.value?.profileID ?? "" ).trim() === assignedProfileID
-				? spectralCalibrationSelectedProfile.value
-				: null )
-		applySpectralCalibrationAssignment( assignedProfile, {
-			profileID: assignedProfileID
-		})
-		if( spectralCalibrationProfilesSupported.value ){
-			await refreshSpectralCalibrationProfiles()
+		if( selectedProfileID.length === 0 ){
+			return await saveSpectralCalibrationAssignment( null, null )
 		}
-		await renderSpectralCalibrationChange()
-		return true
+
+		const selectedProfile = await loadFullSpectralCalibrationProfile( selectedProfileID )
+		const profileSourceAxis = normalizeSpectralCalibrationSourceAxis( selectedProfile?.sourceAxis )
+		const currentSourceAxis = currentSpectralCalibrationSourceAxis()
+
+		if( profileSourceAxis === null ){
+			spectralCalibrationError.value = "This calibration profile cannot be assigned because it does not include the source spectral axis."
+			return false
+		}
+
+		if( currentSourceAxis === null ){
+			spectralCalibrationError.value = "Raw spectral axis values are not loaded."
+			return false
+		}
+
+		if( spectralCalibrationSourceAxisRangeMatches( profileSourceAxis, currentSourceAxis ) === false ){
+			await openSpectralAxisOverwriteConfirmation( selectedProfile, profileSourceAxis, currentSourceAxis )
+			return false
+		}
+
+		return await saveSpectralCalibrationAssignment( selectedProfileID, selectedProfile )
 	} catch( error ){
 		if( isMissingCalibrationProfileApiError( error ) ){
 			spectralCalibrationProfilesSupported.value = false
@@ -5018,6 +5224,43 @@ const assignSpectralCalibrationProfileToProject = async () => {
 		spectralCalibrationError.value = String( error?.detail ?? error?.message ?? "Failed to save calibration assignment." ).trim()
 		console.log( error )
 		return false
+	} finally {
+		spectralCalibrationAssignmentSaving.value = false
+	}
+}
+
+const confirmSpectralCalibrationAxisOverwrite = async () => {
+	if( spectralCalibrationAssignmentSaving.value ){
+		return
+	}
+
+	const pendingAssignment = pendingSpectralCalibrationAssignment.value
+	const profile = pendingAssignment?.profile ?? null
+	const profileID = String( profile?.profileID ?? "" ).trim()
+	const profileSourceAxis = pendingAssignment?.profileSourceAxis ?? null
+	if( profile === null || profileID.length === 0 ){
+		spectralCalibrationError.value = "No pending calibration profile assignment was found."
+		spectralAxisOverwriteModal.value?.close?.()
+		pendingSpectralCalibrationAssignment.value = null
+		return
+	}
+
+	spectralCalibrationAssignmentSaving.value = true
+	spectralCalibrationError.value = ""
+
+	try{
+		await overwriteRawSpectralAxisFromProfile( profileSourceAxis )
+		await saveSpectralCalibrationAssignment( profileID, profile )
+		pendingSpectralCalibrationAssignment.value = null
+		spectralAxisOverwriteModal.value?.close?.()
+	} catch( error ){
+		if( isMissingCalibrationProfileApiError( error ) ){
+			spectralCalibrationProfilesSupported.value = false
+			return
+		}
+
+		spectralCalibrationError.value = String( error?.detail ?? error?.message ?? "Failed to overwrite the raw spectral axis and save calibration assignment." ).trim()
+		console.log( error )
 	} finally {
 		spectralCalibrationAssignmentSaving.value = false
 	}

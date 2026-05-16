@@ -12,6 +12,21 @@ export type CalibrationPoint = {
     targetX: number
 }
 
+export type CalibrationSourceAxis = {
+    axisKey: "z"
+    values: number[]
+    unit: string
+    valueCount: number
+}
+
+export type CalibrationSourceAxisSummary = {
+    axisKey: "z"
+    valueCount: number
+    firstValue: number
+    lastValue: number
+    unit: string
+}
+
 export type CalibrationProfile = {
     version: "calibration-profile-v1" | "calibration-profile-v2"
     profileID: string
@@ -26,6 +41,7 @@ export type CalibrationProfile = {
     includedOrders: number[]
     points: CalibrationPoint[]
     model?: CalibrationProfileModel
+    sourceAxis?: CalibrationSourceAxis
     shared?: boolean
     ownerDisplayName?: string
     ownerEmail?: string
@@ -47,6 +63,7 @@ export type CalibrationProfileSummary = {
     includedOrders: number[]
     pointCount: number
     assignedProjectCount: number
+    sourceAxisSummary?: CalibrationSourceAxisSummary
     collaboratorCount?: number
     shared?: boolean
     ownerDisplayName?: string
@@ -81,6 +98,7 @@ export type CalibrationProfileWriteRequest = {
     includedOrders: number[]
     points: CalibrationPoint[]
     model?: CalibrationProfileModel
+    sourceAxis?: CalibrationSourceAxis
 }
 
 export type CalibrationProfileModel = {
