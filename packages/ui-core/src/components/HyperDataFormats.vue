@@ -60,6 +60,17 @@
                     <h3 class="m-0 text-lg font-bold text-black">{{ selectedLabel }}</h3>
                 </div>
 
+                <div v-if="selected !== 'Output'"
+                     class="mb-6 rounded-lg border border-brand/60 bg-brand/5 p-4 text-sm leading-relaxed text-black/75">
+                    <p class="m-0">
+                        During upload, the platform shows the dataset dimensions and available axes so the analysis
+                        can be configured before it starts. Users can choose the horizontal and vertical image axes,
+                        include depth, channel, or time axes when they are useful for analysis, and select a specific
+                        slice for dimensions that should stay fixed. For standard TIFF image stacks, the image pages
+                        define the layer dimension, so additional axis assignment is typically unnecessary.
+                    </p>
+                </div>
+
                 <div v-if="selected === 'OIR'" class="data-format-content">
                     <p>
                         <strong>OIR</strong> is a proprietary <em>binary microscopy image format</em> used by
@@ -91,27 +102,26 @@
                         subsequent work into formats that are substantially easier to inspect, exchange, and process.
                     </p>
 
-                    <h4 class="text-lg font-semibold mt-6 mb-3">Dimensional structure</h4>
+                    <h4 class="text-lg font-semibold mt-6 mb-3">Upload inspection and axis selection</h4>
                     <p>
-                        OIR acquisitions are interpreted in
-                        <code class="bg-gray-100 px-1 rounded">TCZYX</code> axis order:
+                        OIR files are checked before analysis. The upload dialog reports the detected axes, shape,
+                        physical pixel sizes, channel labels, and warnings. The analysis roles are chosen from the
+                        detected axes during upload.
                     </p>
                     <ul>
-                        <li><strong>T</strong> = time points</li>
-                        <li><strong>C</strong> = channels</li>
-                        <li><strong>Z</strong> = depth planes</li>
-                        <li><strong>Y</strong> = image height</li>
-                        <li><strong>X</strong> = image width</li>
+                        <li><strong>X and Y:</strong> Required spatial axes selected by the user during upload.</li>
+                        <li><strong>Z, C, and T:</strong> Optional roles that can be assigned when the source contains depth, channel, or time axes.</li>
+                        <li><strong>Fixed indices:</strong> Any unassigned source axis with size greater than one must be fixed to a single index.</li>
+                        <li><strong>Layer choice:</strong> The upload dialog may recommend a layer axis, usually channel or depth, to guide the selection.</li>
                     </ul>
 
                     <p>
-                        For numerical analysis, the non-spatial axes are consolidated into a single layer axis:
+                        The resulting analysis artifacts use the platform's standard hyperspectral representation:
                     </p>
-                    <pre class="bg-gray-900 text-gray-100 rounded p-4 text-sm overflow-x-auto whitespace-pre-wrap">L = T * C * Z
-output hypercube shape = [L, Y, X]</pre>
+                    <pre class="bg-gray-900 text-gray-100 rounded p-4 text-sm overflow-x-auto whitespace-pre-wrap">output hypercube shape = [layer, y, x]</pre>
                     <p>
-                        Consequently, the exported hypercube is always three-dimensional, even when the source OIR
-                        acquisition contains multiple channels, time points, or Z slices.
+                        The layer axis is derived from the user-confirmed axis mapping and fixed-index choices rather
+                        than from a hard-coded flattening rule.
                     </p>
 
                     <ul>
@@ -122,9 +132,9 @@ output hypercube shape = [L, Y, X]</pre>
                             <code class="bg-gray-100 px-1 rounded">1.0</code>.
                         </li>
                         <li>
-                            <strong>Axis vectors:</strong> X, Y, and Z axis vectors are derived from physical pixel
-                            sizes when such calibration metadata is available. If not, the backend falls back to
-                            integer index coordinates.
+                            <strong>Axis vectors:</strong> X, Y, and the output layer axis are derived from the
+                            source metadata and the user-confirmed axis mapping when calibration metadata is
+                            available. If not, the platform falls back to integer index coordinates.
                         </li>
                         <li>
                             <strong>Units:</strong> Physical units are preserved when available. If the OIR metadata
@@ -133,7 +143,7 @@ output hypercube shape = [L, Y, X]</pre>
                         </li>
                         <li>
                             <strong>Channel naming:</strong> Channel names are preserved when available. Otherwise the
-                            backend generates placeholder names such as
+                            platform generates placeholder names such as
                             <code class="bg-gray-100 px-1 rounded">channel_000</code>.
                         </li>
                         <li>
@@ -147,15 +157,14 @@ output hypercube shape = [L, Y, X]</pre>
                     <p>
                         <strong>TIFF</strong> is a widely used <em>raster image container format</em> for
                         scientific imaging, microscopy, and image exchange. Within this platform, TIFF files are
-                        supported as raw input for the hyperspectral workflow when the acquisition is available as a
-                        <code class="bg-gray-100 px-1 rounded">.tif</code> or
-                        <code class="bg-gray-100 px-1 rounded">.tiff</code> image stack.
+                        supported as raw input for the hyperspectral workflow when the file is a standard image or
+                        image stack. If the uploaded TIFF contains OME metadata, the platform uses the OME-TIFF
+                        workflow instead.
                     </p>
                     <p>
-                        Although TIFF is broadly supported, files can vary substantially in dimensional organization,
-                        metadata richness, and axis annotations depending on how they were written. The platform
-                        therefore normalizes supported TIFF inputs into a standardized downstream artifact structure
-                        intended for visualization, quantitative analysis, and reuse.
+                        Although TIFF is broadly supported, files can vary substantially in dimensional organization
+                        depending on how they were written. The platform converts supported TIFF inputs into the same
+                        hyperspectral project structure used for the other supported formats.
                     </p>
                     <ul>
                         <li>
@@ -168,40 +177,28 @@ output hypercube shape = [L, Y, X]</pre>
                             image source from which standardized downstream artifacts are derived.
                         </li>
                         <li>
-                            <strong>Metadata handling:</strong> When available, OME-TIFF metadata and ImageJ metadata
-                            are preserved in the parsed metadata payload for downstream inspection.
+                            <strong>Metadata handling:</strong> Inspection records TIFF series metadata, data type,
+                            ImageJ metadata presence, OME XML presence, and available pixel-size metadata. Files with
+                            OME metadata are handled by the OME-TIFF workflow.
                         </li>
                         <li>
-                            <strong>Series handling:</strong> If the TIFF contains multiple image series, the backend
-                            currently reads the first series only.
+                            <strong>Series handling:</strong> If the TIFF contains multiple separate image series or
+                            stacks, the platform currently uses the first series only and shows a warning.
                         </li>
                     </ul>
 
-                    <h4 class="text-lg font-semibold mt-6 mb-3">Dimensional structure</h4>
+                    <h4 class="text-lg font-semibold mt-6 mb-3">Stack handling</h4>
                     <p>
-                        TIFF does not enforce one universal axis convention, so the backend infers spatial dimensions
-                        from axis metadata when available. If valid axis labels include
-                        <code class="bg-gray-100 px-1 rounded">Y</code> and
-                        <code class="bg-gray-100 px-1 rounded">X</code>, those axes are used as spatial image axes.
-                        If axis metadata is missing or ambiguous, the backend falls back to interpreting the last two
-                        dimensions as
-                        <code class="bg-gray-100 px-1 rounded">Y</code> and
-                        <code class="bg-gray-100 px-1 rounded">X</code>.
+                        Standard TIFF files do not usually require manual axis selection in the upload dialog. The
+                        image width and height are used as the spatial axes, and image pages are used as layers.
                     </p>
-                    <p>
-                        For numerical analysis, all non-spatial dimensions are consolidated into a single layer axis.
-                        Internally, the normalized representation is treated as
-                        <code class="bg-gray-100 px-1 rounded">TCZYX</code>, while TIFF inputs are effectively mapped into:
-                    </p>
-                    <pre class="bg-gray-900 text-gray-100 rounded p-4 text-sm overflow-x-auto whitespace-pre-wrap">L = product of all non-spatial dimensions
-output hypercube shape = [L, Y, X]</pre>
-                    <p>Examples:</p>
                     <ul>
-                        <li>A 2D TIFF becomes a single-layer cube with shape <code class="bg-gray-100 px-1 rounded">[1, Y, X]</code>.</li>
-                        <li>A multi-page or multidimensional TIFF becomes a cube where every non-spatial slice is flattened into the layer axis.</li>
+                        <li><strong>Single 2D TIFF:</strong> The image becomes one layer.</li>
+                        <li><strong>Multi-page TIFF stack:</strong> Pages in the first series become layers.</li>
+                        <li><strong>Multiple image series/stacks in one TIFF:</strong> Only the first series is used. To analyze every stack, upload each stack as a separate file when possible.</li>
                     </ul>
 
-                    <h4 class="text-lg font-semibold mt-6 mb-3">Additional backend expectations and behavior</h4>
+                    <h4 class="text-lg font-semibold mt-6 mb-3">Additional requirements and behavior</h4>
                     <ul>
                         <li>
                             <strong>Minimum dimensionality:</strong> The TIFF input must have at least two dimensions.
@@ -215,7 +212,7 @@ output hypercube shape = [L, Y, X]</pre>
                         </li>
                         <li>
                             <strong>Axis vectors:</strong> X and Y axis vectors are derived from physical calibration
-                            metadata when possible. If calibration metadata is unavailable, the backend falls back to
+                            metadata when possible. If calibration metadata is unavailable, the platform falls back to
                             integer index coordinates.
                         </li>
                         <li>
@@ -224,9 +221,8 @@ output hypercube shape = [L, Y, X]</pre>
                             into micrometers.
                         </li>
                         <li>
-                            <strong>Z calibration:</strong> The TIFF reader does not currently recover a physical Z
-                            spacing, so the third axis defaults to index-based coordinates unless other downstream
-                            logic overrides it.
+                            <strong>Layer calibration:</strong> The plain TIFF layer axis represents the image page
+                            dimension and defaults to index-based coordinates.
                         </li>
                         <li>
                             <strong>Units:</strong> If usable physical calibration is available, X and Y units are
@@ -253,6 +249,86 @@ output hypercube shape = [L, Y, X]</pre>
                     <a href="/examples/data/example_data.tif" download class="text-brand underline hover:opacity-80">
                         Download example TIFF file (example_data.tif)
                     </a>
+                </div>
+
+                <div v-else-if="selected === 'OME-TIFF'" class="data-format-content">
+                    <p>
+                        <strong>OME-TIFF</strong> is a TIFF-based microscopy format that stores OME metadata together
+                        with image planes. It is useful when the acquisition contains explicit dimensional metadata,
+                        physical pixel sizes, and channel labels. In the upload flow, OME-TIFF is selected from the
+                        upload menu. A TIFF file with OME metadata is handled with this workflow; a standard TIFF
+                        without OME metadata is handled with the standard TIFF workflow.
+                    </p>
+
+                    <ul>
+                        <li>
+                            <strong>File extensions:</strong>
+                            <code class="bg-gray-100 px-1 rounded">.ome.tif</code>,
+                            <code class="bg-gray-100 px-1 rounded">.ome.tiff</code>,
+                            <code class="bg-gray-100 px-1 rounded">.tif</code>, or
+                            <code class="bg-gray-100 px-1 rounded">.tiff</code>.
+                        </li>
+                        <li>
+                            <strong>Inspection metadata:</strong> OME schema, OME dimension order, series index,
+                            image-description tag information, physical sizes, physical units, and channel labels are
+                            reported when available.
+                        </li>
+                        <li>
+                            <strong>Warnings:</strong> Inspection warnings are shown directly in the upload modal and
+                            should be reviewed before analysis is started.
+                        </li>
+                    </ul>
+
+                    <h4 class="text-lg font-semibold mt-6 mb-3">Upload inspection and axis selection</h4>
+                    <p>
+                        OME-TIFF inspection reports the detected axis order, shape, per-axis sizes and units, and the
+                        axes that can be used as layer axes. The user selects which source axes represent
+                        <code class="bg-gray-100 px-1 rounded">x</code> and
+                        <code class="bg-gray-100 px-1 rounded">y</code>, and may assign
+                        <code class="bg-gray-100 px-1 rounded">z</code>,
+                        <code class="bg-gray-100 px-1 rounded">c</code>, and
+                        <code class="bg-gray-100 px-1 rounded">t</code> when those roles are relevant.
+                    </p>
+                    <p>
+                        Any source axis with size greater than one that is not assigned to an analysis role must be
+                        fixed to a single index. This makes the dimensional reduction explicit and reproducible.
+                    </p>
+                    <pre class="bg-gray-900 text-gray-100 rounded p-4 text-sm overflow-x-auto whitespace-pre-wrap">source axes -> user-confirmed x/y/z/c/t roles + fixed indices
+output hypercube shape = [layer, y, x]</pre>
+                </div>
+
+                <div v-else-if="selected === 'OME-Zarr'" class="data-format-content">
+                    <p>
+                        <strong>OME-Zarr</strong> is a chunked, directory-based microscopy format designed for
+                        scalable multidimensional image data. It stores image arrays and metadata in a Zarr hierarchy,
+                        commonly with multiscale pyramids for efficient browsing and analysis.
+                    </p>
+
+                    <ul>
+                        <li>
+                            <strong>Upload selection:</strong> OME-Zarr uploads use a directory picker. Select the
+                            root OME-Zarr folder rather than an individual file inside the dataset.
+                        </li>
+                        <li>
+                            <strong>Metadata:</strong> OME-Zarr version, Zarr format, dataset path,
+                            multiscales count, and metadata paths are reported when available.
+                        </li>
+                    </ul>
+
+                    <h4 class="text-lg font-semibold mt-6 mb-3">Upload inspection and axis selection</h4>
+                    <p>
+                        OME-Zarr inspection reports the source axis order, shape, per-axis sizes and units, candidate
+                        layer axes, and a recommended layer axis when one can be inferred. The upload modal uses those
+                        inspected axes directly; it does not infer axis roles from the folder name or file extension.
+                    </p>
+                    <ul>
+                        <li><strong>X and Y:</strong> Required spatial axes selected by the user.</li>
+                        <li><strong>Z, C, and T:</strong> Optional roles selected when the dataset contains depth, channel, or time axes.</li>
+                        <li><strong>Fixed indices:</strong> Unassigned axes with size greater than one must be fixed to one index.</li>
+                        <li><strong>Reusable settings:</strong> For batch uploads, the same axis settings can be reused for subsequent datasets only when inspected dimensions match exactly.</li>
+                    </ul>
+                    <pre class="bg-gray-900 text-gray-100 rounded p-4 text-sm overflow-x-auto whitespace-pre-wrap">OME-Zarr axes -> user-confirmed analysis roles
+output hypercube shape = [layer, y, x]</pre>
                 </div>
 
                 <div v-else class="data-format-content">
@@ -402,7 +478,7 @@ const sidebarStyle = computed(() => {
         : { left: 'calc(-16rem - 2px)' }
 })
 
-const sections = ['OIR', 'TIFF']
+const sections = ['OIR', 'TIFF', 'OME-TIFF', 'OME-Zarr']
 const selected = ref(
     sections.includes(String(route.query.section ?? ''))
         ? String(route.query.section)

@@ -23,7 +23,8 @@
         <br><br>
 
 		<span v-if = "isHyperspectrum">
-			Hyperspectral uploads support the existing file-based workflow together with OME-Zarr datasets and OME-TIFF files.
+			Hyperspectral uploads support OIR, TIFF, OME-TIFF, and OME-Zarr sources.
+			During upload, inspected axes are shown so that spatial axes and optional depth/channel/time axes can be confirmed before analysis starts.
 			<br><br>
 		</span>
 

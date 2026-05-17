@@ -121,7 +121,7 @@
                 </div>
 
                 <div v-else class = "rounded-lg border border-brand bg-white p-4 text-sm text-black/80">
-                    No axis mapping is required for this TIFF source. Analysis uses the normalized TIFF axes from inspection.
+                    This TIFF file can be analyzed without additional axis choices. Image pages are used as layers.
                 </div>
 
                 <div v-if = "requiresAxisMapping && fixedAxisInputs.length > 0" class = "space-y-3">

@@ -10,91 +10,106 @@
         </p>
     </div>
 
-    <div class = "max-w-6xl mx-auto space-y-12">
+    <div class = "max-w-6xl mx-auto grid md:grid-cols-2 lg:grid-cols-4 gap-8 text-center">
 
-        <div class = "grid md:grid-cols-3 gap-8 text-center">
-
-            <!-- Card 1 -->
-            <div class = "flex flex-col h-full p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition bg-white">
-                <div class = "flex justify-center mb-4">
-                    <CogIcon class = "w-12 h-12 text-brand"/>
-                </div>
-
-                <h3 class = "text-xl font-semibold mb-2">
-                    Automatic Correction
-                </h3>
-
-                <p class = "text-gray-600">
-                    Automatic correction and denoising of data.
-                </p>
+        <div class = "flex flex-col h-full p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition bg-white">
+            <div class = "flex justify-center mb-4">
+                <CogIcon class = "w-12 h-12 text-brand"/>
             </div>
 
-            <!-- Card 2 -->
-            <div class = "flex flex-col h-full p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition bg-white">
-                <div class = "flex justify-center mb-4">
-                    <UsersIcon class = "w-12 h-12 text-brand"/>
-                </div>
+            <h3 class = "text-xl font-semibold mb-2">
+                Automatic Correction
+            </h3>
 
-                <h3 class = "text-xl font-semibold mb-2">
-                    Sharing & Collaboration
-                </h3>
-
-                <p class = "text-gray-600">
-                    Easily share datasets and results with your team or collaborators.
-                </p>
-            </div>
-
-            <!-- Card 3 -->
-            <div class = "flex flex-col h-full p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition bg-white">
-                <div class = "flex justify-center mb-4">
-                    <ArrowUpTrayIcon class = "w-12 h-12 text-brand"/>
-                </div>
-
-                <h3 class = "text-xl font-semibold mb-2">
-                    Digital Object Identifiers
-                </h3>
-
-                <p class = "text-gray-600">
-                    Publish your data, metadata, and results to Zenodo and obtain a DOI instantly.
-                </p>
-            </div>
-            
+            <p class = "text-gray-600">
+                Automatic correction and denoising of data.
+            </p>
         </div>
 
-        <!-- Bottom Row: Cards 4–5, centered -->
-        <div class = "grid md:grid-cols-2 gap-8 text-center justify-center">
-
-            <!-- Card 4 -->
-            <div class = "flex flex-col h-full p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition bg-white">
-                <div class = "flex justify-center mb-4 max-w-6xl mx-auto">
-                    <CpuChipIcon class = "w-12 h-12 text-brand"/>
-                </div>
-
-                <h3 class = "text-xl font-semibold mb-2">
-                    Free Starter Tokens
-                </h3>
-
-                <p class = "text-gray-600">
-                    New users receive free compute tokens at signup, and shared token pools let teams analyze data without individual setup.
-                </p>
+        <div class = "flex flex-col h-full p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition bg-white">
+            <div class = "flex justify-center mb-4">
+                <AdjustmentsHorizontalIcon class = "w-12 h-12 text-brand"/>
             </div>
 
-            <!-- Card 5 -->
-            <div class = "flex flex-col h-full p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition bg-white">
-                <div class = "flex justify-center mb-4">
-                    <ShieldCheckIcon class = "w-12 h-12 text-brand"/>
-                </div>
+            <h3 class = "text-xl font-semibold mb-2">
+                Spectral Axis Calibration
+            </h3>
 
-                <h3 class = "text-xl font-semibold mb-2">
-                    No Credit Card Required
-                </h3>
-
-                <p class = "text-gray-600">
-                    Start with your free tokens immediately, with no payment details needed.
-                </p>
-            </div>
-
+            <p class = "text-gray-600">
+                Create, preview, save, and reuse calibration profiles to align spectral axes across projects and collaborators.
+            </p>
         </div>
+
+        <div class = "flex flex-col h-full p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition bg-white">
+            <div class = "flex justify-center mb-4">
+                <ChartBarIcon class = "w-12 h-12 text-brand"/>
+            </div>
+
+            <h3 class = "text-xl font-semibold mb-2">
+                Hyperspectral Analysis Methods
+            </h3>
+
+            <p class = "text-gray-600">
+                Explore datasets with UMAP, PCA, RPCA, layer and Z-blend visualizations, and pixel-wise Raman spectrum estimation.
+            </p>
+        </div>
+
+        <div class = "flex flex-col h-full p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition bg-white">
+            <div class = "flex justify-center mb-4">
+                <UsersIcon class = "w-12 h-12 text-brand"/>
+            </div>
+
+            <h3 class = "text-xl font-semibold mb-2">
+                Sharing & Collaboration
+            </h3>
+
+            <p class = "text-gray-600">
+                Easily share datasets and results with your team or collaborators.
+            </p>
+        </div>
+
+        <div class = "flex flex-col h-full p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition bg-white">
+            <div class = "flex justify-center mb-4">
+                <ArrowUpTrayIcon class = "w-12 h-12 text-brand"/>
+            </div>
+
+            <h3 class = "text-xl font-semibold mb-2">
+                Digital Object Identifiers
+            </h3>
+
+            <p class = "text-gray-600">
+                Publish your data, metadata, and results to Zenodo and obtain a DOI instantly.
+            </p>
+        </div>
+
+        <div class = "flex flex-col h-full p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition bg-white">
+            <div class = "flex justify-center mb-4 max-w-6xl mx-auto">
+                <CpuChipIcon class = "w-12 h-12 text-brand"/>
+            </div>
+
+            <h3 class = "text-xl font-semibold mb-2">
+                Free Starter Tokens
+            </h3>
+
+            <p class = "text-gray-600">
+                New users receive free compute tokens at signup, and shared token pools let teams analyze data without individual setup.
+            </p>
+        </div>
+
+        <div class = "flex flex-col h-full p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition bg-white">
+            <div class = "flex justify-center mb-4">
+                <ShieldCheckIcon class = "w-12 h-12 text-brand"/>
+            </div>
+
+            <h3 class = "text-xl font-semibold mb-2">
+                No Credit Card Required
+            </h3>
+
+            <p class = "text-gray-600">
+                Start with your free tokens immediately, with no payment details needed.
+            </p>
+        </div>
+
     </div>
 </section>
 </template>
@@ -105,6 +120,14 @@ import { defineAsyncComponent } from 'vue'
 
 const CogIcon = defineAsyncComponent(() =>
     import('@heroicons/vue/24/outline/CogIcon')
+)
+
+const AdjustmentsHorizontalIcon = defineAsyncComponent(() =>
+    import('@heroicons/vue/24/outline/AdjustmentsHorizontalIcon')
+)
+
+const ChartBarIcon = defineAsyncComponent(() =>
+    import('@heroicons/vue/24/outline/ChartBarIcon')
 )
 
 const UsersIcon = defineAsyncComponent(() =>

@@ -54,6 +54,11 @@
                     class = "block whitespace-nowrap text-black rounded-sm px-4 py-2 hover:bg-brand hover:text-white transition">
                     Raman scattering
                 </a>
+
+                <a  :href = "hcarsToolUrl" target = "_blank" rel = "noopener noreferrer"
+                    class = "block whitespace-nowrap text-black rounded-sm px-4 py-2 hover:bg-brand hover:text-white transition">
+                    Hyperspectral CARS
+                </a>
                 
             </div>
         </div>
@@ -86,6 +91,13 @@
                 class = "inline-flex justify-center bg-brand text-white font-semibold rounded-lg px-4 py-2 hover:bg-brand-dark transition">
                 Start free Raman analysis
             </a>
+            <a
+                :href = "hcarsToolUrl"
+                target = "_blank"
+                rel = "noopener noreferrer"
+                class = "inline-flex justify-center bg-brand text-white font-semibold rounded-lg px-4 py-2 hover:bg-brand-dark transition">
+                Start free HyperCARS analysis
+            </a>
         </div>
 
         <!-- Mobile Tools Dropdown -->
@@ -116,6 +128,10 @@
                     class = "block text-gray-300 hover:text-brand py-2">
                     Raman scattering
                 </a>
+                <a  :href = "hcarsToolUrl" target = "_blank" rel = "noopener noreferrer"
+                    class = "block text-gray-300 hover:text-brand py-2">
+                    Hyperspectral CARS
+                </a>
             </div>
         </div>
 
@@ -141,6 +157,7 @@ import { ref } from 'vue'
 
 const carsToolUrl = 'https://cars.harkana.com'
 const ramanToolUrl = 'https://raman.harkana.com'
+const hcarsToolUrl = 'https://hcars.harkana.com'
 
 const dropdownOpen = ref(false)
 const mobileMenuOpen = ref(false)
