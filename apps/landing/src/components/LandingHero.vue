@@ -23,6 +23,10 @@
             Streamline your spectroscopy workflow: automatic correction, collaborative data sharing, and DOI generation for reproducible research.
         </p>
 
+        <p class = "text-sm sm:text-base md:text-lg text-gray-300">
+            Single-spectrum and hyperspectral workflows are supported, including OIR, TIFF, OME-TIFF, and OME-Zarr inputs.
+        </p>
+
         <div class = "space-y-4">
             <div class = "flex flex-col sm:flex-row gap-4 justify-center">
                 <a :href = "carsToolUrl" target = "_blank" rel = "noopener noreferrer"
@@ -33,11 +37,23 @@
                     class = "bg-brand font-bold text-white px-6 py-3 rounded-lg shadow hover:bg-brand-dark transition">
                     Start free Raman analysis
                 </a>
+                <a :href = "hcarsToolUrl" target = "_blank" rel = "noopener noreferrer"
+                    class = "bg-brand font-bold text-white px-6 py-3 rounded-lg shadow hover:bg-brand-dark transition">
+                    Start free HyperCARS analysis
+                </a>
             </div>
 
             <p class = "text-sm sm:text-base text-gray-300">
                 New users can sign up and run first analyses for free. No credit card required.
             </p>
+
+            <div class = "flex flex-wrap justify-center gap-2 text-xs sm:text-sm font-semibold text-white">
+                <span class = "rounded-full border border-white/20 bg-white/10 px-3 py-1">OIR</span>
+                <span class = "rounded-full border border-white/20 bg-white/10 px-3 py-1">TIFF</span>
+                <span class = "rounded-full border border-white/20 bg-white/10 px-3 py-1">OME-TIFF</span>
+                <span class = "rounded-full border border-white/20 bg-white/10 px-3 py-1">OME-Zarr</span>
+                <span class = "rounded-full border border-white/20 bg-white/10 px-3 py-1">Spectral axis calibration</span>
+            </div>
 
             <div class = "flex flex-wrap gap-3 justify-center">
                 <router-link to = "/#examples" class="bg-white/10 font-semibold text-white px-4 py-2 rounded-lg hover:bg-white/20 transition">
@@ -64,6 +80,7 @@ const videoLoaded = ref(false)
 
 const carsToolUrl = 'https://cars.harkana.com'
 const ramanToolUrl = 'https://raman.harkana.com'
+const hcarsToolUrl = 'https://hcars.harkana.com'
 
 onMounted(() => {
 

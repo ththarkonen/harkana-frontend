@@ -74,6 +74,13 @@
 						class = "border border-brand text-brand font-semibold px-5 py-3 rounded-lg hover:bg-brand hover:text-white transition">
 						Start free Raman analysis
 					</a>
+					<a
+						:href = "hcarsToolUrl"
+						target = "_blank"
+						rel = "noopener noreferrer"
+						class = "border border-brand text-brand font-semibold px-5 py-3 rounded-lg hover:bg-brand hover:text-white transition">
+						Start free HyperCARS analysis
+					</a>
 				</div>
 			</div>
 
@@ -89,6 +96,7 @@ const currentIndex = ref(0)
 
 const carsToolUrl = 'https://cars.harkana.com'
 const ramanToolUrl = 'https://raman.harkana.com'
+const hcarsToolUrl = 'https://hcars.harkana.com'
 
 const slides = [
 	{
@@ -99,12 +107,12 @@ const slides = [
 	{
 		image: '/images/data-upload.png',
 		title: 'Uploading data',
-		text: 'The user can upload datasets in compatible data formats.'
+		text: 'Upload single-spectrum files or hyperspectral OIR, TIFF, OME-TIFF, and OME-Zarr datasets.'
 	},
 	{
 		image: '/images/upload-progress.png',
 		title: 'Automatic correction',
-		text: 'Upon selection, the uploaded datasets are validated and the automatic correction is performed in the cloud.'
+		text: 'Uploaded datasets are validated and processed in the cloud, with axis-aware setup available for hyperspectral analyses.'
 	},
 	{
 		image: '/images/project-example.png',
@@ -114,7 +122,7 @@ const slides = [
 	{
 		image: '/images/result-view.png',
 		title: 'Project view',
-		text: 'Clicking a project opens a project view showing the uploaded data, corrected spectrum, and additional functionality.'
+		text: 'Clicking a project opens the uploaded data, corrected spectra, UMAP and PCA visualizations, pixel-wise Raman spectrum estimation, calibration tools, collaboration, metadata, and DOI export.'
 	}
 ]
 
