@@ -5,6 +5,7 @@ This repository contains the frontend codebase for the **HARKANA** web applicati
 - https://harkana.com
 - https://raman.harkana.com
 - https://cars.harkana.com
+- https://hcars.harkana.com
 
 The applications provide interactive user interfaces for visualization and correction workflows in Raman and coherent anti-Stokes Raman scattering (CARS) spectroscopy. The uncertainty-aware correction methods exposed through the platform are grounded in the following peer-reviewed work:
 
