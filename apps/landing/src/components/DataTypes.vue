@@ -28,26 +28,19 @@
                     Raw and preprocessed CARS spectra in various formats for analysis and correction.
                 </p>
 
-                <div class = "mt-4 flex flex-wrap justify-center gap-2 text-xs font-semibold text-brand">
-                    <span v-for = "chip in spectralFormatChips"
-                          :key = "chip.label"
-                          class = "group relative rounded-full bg-brand/10 px-2 py-1">
-                        {{ chip.label }}
-                        <span class = "pointer-events-none absolute bottom-[calc(100%+0.5rem)] left-1/2 z-20 hidden w-52 -translate-x-1/2 rounded-lg bg-gray-700 px-2 py-2 text-xs font-medium leading-snug text-white shadow-lg group-hover:block">
-                            {{ chip.description }}
-                        </span>
-                    </span>
+                <div class = "mt-4 flex flex-wrap justify-center gap-2 text-xs font-semibold">
+                    <FeatureChip v-for = "chip in spectralFormatChips"
+                                 :key = "chip.label"
+                                 :label = "chip.label"
+                                 :description = "chip.description"
+                                 tone = "brand" />
                 </div>
 
-                <div class = "mt-3 flex flex-wrap justify-center gap-2 text-xs font-semibold text-gray-700">
-                    <span v-for = "chip in spectralMethodChips"
-                          :key = "chip.label"
-                          class = "group relative rounded-full bg-gray-100 px-2 py-1">
-                        {{ chip.label }}
-                        <span class = "pointer-events-none absolute bottom-[calc(100%+0.5rem)] left-1/2 z-20 hidden w-52 -translate-x-1/2 rounded-lg bg-gray-700 px-2 py-2 text-xs font-medium leading-snug text-white shadow-lg group-hover:block">
-                            {{ chip.description }}
-                        </span>
-                    </span>
+                <div class = "mt-3 flex flex-wrap justify-center gap-2 text-xs font-semibold">
+                    <FeatureChip v-for = "chip in spectralMethodChips"
+                                 :key = "chip.label"
+                                 :label = "chip.label"
+                                 :description = "chip.description" />
                 </div>
 
                 <div class = "mt-4 md:flex-1"></div>
@@ -75,26 +68,19 @@
                     Raw and preprocessed Raman spectra in various formats for analysis and correction.
                 </p>
 
-                <div class = "mt-4 flex flex-wrap justify-center gap-2 text-xs font-semibold text-brand">
-                    <span v-for = "chip in spectralFormatChips"
-                          :key = "chip.label"
-                          class = "group relative rounded-full bg-brand/10 px-2 py-1">
-                        {{ chip.label }}
-                        <span class = "pointer-events-none absolute bottom-[calc(100%+0.5rem)] left-1/2 z-20 hidden w-52 -translate-x-1/2 rounded-lg bg-gray-700 px-2 py-2 text-xs font-medium leading-snug text-white shadow-lg group-hover:block">
-                            {{ chip.description }}
-                        </span>
-                    </span>
+                <div class = "mt-4 flex flex-wrap justify-center gap-2 text-xs font-semibold">
+                    <FeatureChip v-for = "chip in spectralFormatChips"
+                                 :key = "chip.label"
+                                 :label = "chip.label"
+                                 :description = "chip.description"
+                                 tone = "brand" />
                 </div>
 
-                <div class = "mt-3 flex flex-wrap justify-center gap-2 text-xs font-semibold text-gray-700">
-                    <span v-for = "chip in spectralMethodChips"
-                          :key = "chip.label"
-                          class = "group relative rounded-full bg-gray-100 px-2 py-1">
-                        {{ chip.label }}
-                        <span class = "pointer-events-none absolute bottom-[calc(100%+0.5rem)] left-1/2 z-20 hidden w-52 -translate-x-1/2 rounded-lg bg-gray-700 px-2 py-2 text-xs font-medium leading-snug text-white shadow-lg group-hover:block">
-                            {{ chip.description }}
-                        </span>
-                    </span>
+                <div class = "mt-3 flex flex-wrap justify-center gap-2 text-xs font-semibold">
+                    <FeatureChip v-for = "chip in spectralMethodChips"
+                                 :key = "chip.label"
+                                 :label = "chip.label"
+                                 :description = "chip.description" />
                 </div>
 
                 <div class = "mt-4 md:flex-1"></div>
@@ -119,25 +105,22 @@
                 </h3>
 
                 <p class = "text-gray-600">
-                    Analyze hyperspectral microscopy datasets with axis-aware upload, UMAP and PCA visualizations, ROI analysis, and pixel-wise Raman spectrum estimation.
+                    Analyze hyperspectral microscopy datasets with axis-aware upload, UMAP and PCA visualizations, ROI analysis, and Raman spectrum estimation.
                 </p>
 
-                <div class = "mt-4 flex flex-wrap justify-center gap-2 text-xs font-semibold text-brand">
-                    <span class = "rounded-full bg-brand/10 px-2 py-1">OIR</span>
-                    <span class = "rounded-full bg-brand/10 px-2 py-1">TIFF</span>
-                    <span class = "rounded-full bg-brand/10 px-2 py-1">OME-TIFF</span>
-                    <span class = "rounded-full bg-brand/10 px-2 py-1">OME-Zarr</span>
+                <div class = "mt-4 flex flex-wrap justify-center gap-2 text-xs font-semibold">
+                    <FeatureChip v-for = "chip in hyperspectralFormatChips"
+                                 :key = "chip.label"
+                                 :label = "chip.label"
+                                 :description = "chip.description"
+                                 tone = "brand" />
                 </div>
 
-                <div class = "mt-3 flex flex-wrap justify-center gap-2 text-xs font-semibold text-gray-700">
-                    <span v-for = "chip in hyperspectralMethodChips"
-                          :key = "chip.label"
-                          class = "group relative rounded-full bg-gray-100 px-2 py-1">
-                        {{ chip.label }}
-                        <span class = "pointer-events-none absolute bottom-[calc(100%+0.5rem)] left-1/2 z-20 hidden w-52 -translate-x-1/2 rounded-lg bg-gray-700 px-2 py-2 text-xs font-medium leading-snug text-white shadow-lg group-hover:block">
-                            {{ chip.description }}
-                        </span>
-                    </span>
+                <div class = "mt-3 flex flex-wrap justify-center gap-2 text-xs font-semibold">
+                    <FeatureChip v-for = "chip in hyperspectralMethodChips"
+                                 :key = "chip.label"
+                                 :label = "chip.label"
+                                 :description = "chip.description" />
                 </div>
 
                 <div class = "mt-4 md:flex-1"></div>
@@ -156,6 +139,7 @@
 <script setup>
 
 import { defineAsyncComponent } from 'vue'
+import FeatureChip from './FeatureChip.vue'
 
 const carsToolUrl = 'https://cars.harkana.com'
 const ramanToolUrl = 'https://raman.harkana.com'
@@ -188,6 +172,25 @@ const spectralMethodChips = [
     {
         label: 'Spectral axis calibration',
         description: 'Spectral axis alignment using reusable calibration profiles'
+    }
+]
+
+const hyperspectralFormatChips = [
+    {
+        label: 'OIR',
+        description: 'Olympus Image Resource hyperspectral microscopy data'
+    },
+    {
+        label: 'TIFF',
+        description: 'Standard TIFF image stacks analyzed as layers'
+    },
+    {
+        label: 'OME-TIFF',
+        description: 'OME-TIFF microscopy datasets with embedded axis metadata'
+    },
+    {
+        label: 'OME-Zarr',
+        description: 'OME-Zarr multiscale microscopy datasets'
     }
 ]
 

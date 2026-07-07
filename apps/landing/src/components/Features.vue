@@ -6,107 +6,25 @@
             Features
         </h2>
         <p class = "text-base sm:text-lg text-gray-600 mt-3 max-w-3xl mx-auto">
-            Every new account includes free starter compute tokens, so you can run analyses before buying additional bundles.
+            A research-oriented environment for single-spectrum and hyperspectral spectroscopy workflows.
         </p>
     </div>
 
-    <div class = "max-w-6xl mx-auto grid md:grid-cols-2 lg:grid-cols-4 gap-8 text-center">
+    <div class = "max-w-6xl mx-auto grid md:grid-cols-2 lg:grid-cols-3 gap-8 text-center">
 
-        <div class = "flex flex-col h-full p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition bg-white">
+        <div v-for = "feature in featureCards"
+             :key = "feature.title"
+             class = "flex flex-col h-full p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition bg-white">
             <div class = "flex justify-center mb-4">
-                <CogIcon class = "w-12 h-12 text-brand"/>
+                <component :is = "feature.icon" class = "w-12 h-12 text-brand"/>
             </div>
 
             <h3 class = "text-xl font-semibold mb-2">
-                Automatic Correction
+                {{ feature.title }}
             </h3>
 
             <p class = "text-gray-600">
-                Automatic correction and denoising of data.
-            </p>
-        </div>
-
-        <div class = "flex flex-col h-full p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition bg-white">
-            <div class = "flex justify-center mb-4">
-                <AdjustmentsHorizontalIcon class = "w-12 h-12 text-brand"/>
-            </div>
-
-            <h3 class = "text-xl font-semibold mb-2">
-                Spectral Axis Calibration
-            </h3>
-
-            <p class = "text-gray-600">
-                Create, preview, save, and reuse calibration profiles to align spectral axes across projects and collaborators.
-            </p>
-        </div>
-
-        <div class = "flex flex-col h-full p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition bg-white">
-            <div class = "flex justify-center mb-4">
-                <ChartBarIcon class = "w-12 h-12 text-brand"/>
-            </div>
-
-            <h3 class = "text-xl font-semibold mb-2">
-                Hyperspectral Analysis Methods
-            </h3>
-
-            <p class = "text-gray-600">
-                Explore datasets with UMAP, PCA, RPCA, layer and Z-blend visualizations, and pixel-wise Raman spectrum estimation.
-            </p>
-        </div>
-
-        <div class = "flex flex-col h-full p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition bg-white">
-            <div class = "flex justify-center mb-4">
-                <UsersIcon class = "w-12 h-12 text-brand"/>
-            </div>
-
-            <h3 class = "text-xl font-semibold mb-2">
-                Sharing & Collaboration
-            </h3>
-
-            <p class = "text-gray-600">
-                Easily share datasets and results with your team or collaborators.
-            </p>
-        </div>
-
-        <div class = "flex flex-col h-full p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition bg-white">
-            <div class = "flex justify-center mb-4">
-                <ArrowUpTrayIcon class = "w-12 h-12 text-brand"/>
-            </div>
-
-            <h3 class = "text-xl font-semibold mb-2">
-                Digital Object Identifiers
-            </h3>
-
-            <p class = "text-gray-600">
-                Publish your data, metadata, and results to Zenodo and obtain a DOI instantly.
-            </p>
-        </div>
-
-        <div class = "flex flex-col h-full p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition bg-white">
-            <div class = "flex justify-center mb-4 max-w-6xl mx-auto">
-                <CpuChipIcon class = "w-12 h-12 text-brand"/>
-            </div>
-
-            <h3 class = "text-xl font-semibold mb-2">
-                Free Starter Tokens
-            </h3>
-
-            <p class = "text-gray-600">
-                New users receive free compute tokens at signup, and shared token pools let teams analyze data without individual setup.
-            </p>
-        </div>
-
-        <div class = "flex flex-col h-full p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition bg-white">
-            <div class = "flex justify-center mb-4">
-                <ShieldCheckIcon class = "w-12 h-12 text-brand"/>
-            </div>
-
-            <h3 class = "text-xl font-semibold mb-2">
-                No Credit Card Required
-            </h3>
-
-            <p class = "text-gray-600">
-                Start with your free tokens immediately, with no payment details needed.
+                {{ feature.description }}
             </p>
         </div>
 
@@ -122,16 +40,16 @@ const CogIcon = defineAsyncComponent(() =>
     import('@heroicons/vue/24/outline/CogIcon')
 )
 
-const AdjustmentsHorizontalIcon = defineAsyncComponent(() =>
-    import('@heroicons/vue/24/outline/AdjustmentsHorizontalIcon')
-)
-
 const ChartBarIcon = defineAsyncComponent(() =>
     import('@heroicons/vue/24/outline/ChartBarIcon')
 )
 
-const UsersIcon = defineAsyncComponent(() =>
-    import('@heroicons/vue/24/outline/UsersIcon')
+const AdjustmentsHorizontalIcon = defineAsyncComponent(() =>
+    import('@heroicons/vue/24/outline/AdjustmentsHorizontalIcon')
+)
+
+const CursorArrowRaysIcon = defineAsyncComponent(() =>
+    import('@heroicons/vue/24/outline/CursorArrowRaysIcon')
 )
 
 const ArrowUpTrayIcon = defineAsyncComponent(() =>
@@ -142,8 +60,37 @@ const CpuChipIcon = defineAsyncComponent(() =>
     import('@heroicons/vue/24/outline/CpuChipIcon')
 )
 
-const ShieldCheckIcon = defineAsyncComponent(() =>
-    import('@heroicons/vue/24/outline/ShieldCheckIcon')
-)
+const featureCards = [
+    {
+        title: 'Spectral Correction and Estimation',
+        description: 'Automatic correction, denoising, and Raman spectrum estimation for CARS and Raman spectra.',
+        icon: CogIcon
+    },
+    {
+        title: 'Hyperspectral Visualization',
+        description: 'Explore hyperspectral datasets with MIP, HSV-mapped MIP, UMAP, PCA, RPCA, layer, and Z-blend views.',
+        icon: ChartBarIcon
+    },
+    {
+        title: 'Spectral Axis Calibration',
+        description: 'Create, preview, save, share, and reuse calibration profiles to align spectral axes across projects.',
+        icon: AdjustmentsHorizontalIcon
+    },
+    {
+        title: 'Pixel and ROI Spectra',
+        description: 'Inspect spectra from selected pixels and regions of interest, then compare measured and estimated responses.',
+        icon: CursorArrowRaysIcon
+    },
+    {
+        title: 'Collaboration and DOI Export',
+        description: 'Share datasets and results with collaborators, curate metadata, and publish datasets to Zenodo with DOI export.',
+        icon: ArrowUpTrayIcon
+    },
+    {
+        title: 'Compute Tokens and Team Billing',
+        description: 'Use starter compute tokens, shared group token pools, and monthly billing previews for team workflows.',
+        icon: CpuChipIcon
+    }
+]
 
 </script>

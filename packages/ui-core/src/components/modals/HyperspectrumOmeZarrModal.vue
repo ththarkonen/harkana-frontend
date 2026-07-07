@@ -9,6 +9,10 @@
                 {{ modalDescription }}
             </p>
 
+            <div class = "rounded-lg border border-gray-600 bg-gray-800/70 px-3 py-2 text-sm text-white">
+                A successful hyperspectral upload analysis job costs {{ uploadAnalysisTokenCostText }}.
+            </div>
+
             <div v-if = "datasetCount > 1" class = "rounded-lg border border-brand bg-white p-4">
                 <p class = "text-xs font-semibold uppercase tracking-wide text-black">
                     Dataset progress
@@ -189,6 +193,10 @@ import { computed, reactive, ref, watch } from "vue"
 
 import Modal from "./Modal.vue"
 import Spinner from "../general/Spinner.vue"
+import {
+    HYPERSPECTRUM_UPLOAD_ANALYSIS_TOKEN_COST,
+    formatTokenCost
+} from "../../constants/tokenCosts.js"
 
 type InspectAxis = {
     index: number
@@ -234,6 +242,7 @@ const emit = defineEmits([ "submit", "cancel", "update:reuseMatchingDimensions" 
 
 const modal = ref<any>( null )
 const validationError = ref( "" )
+const uploadAnalysisTokenCostText = formatTokenCost( HYPERSPECTRUM_UPLOAD_ANALYSIS_TOKEN_COST )
 
 const axisMapping = reactive<Record<string, string>>({
     x: "",
