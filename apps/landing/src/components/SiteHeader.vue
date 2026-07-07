@@ -64,6 +64,7 @@
         </div>
 
         <router-link to="/#examples" class="text-xl hover:text-brand">Examples</router-link>
+        <router-link to="/#example-workflow" class="text-xl hover:text-brand">Workflow</router-link>
         <router-link to="/#features" class="text-xl hover:text-brand">Features</router-link>
         <router-link to="/pricing" class="text-xl hover:text-brand">Pricing</router-link>
         <router-link to="/terms" class="text-xl hover:text-brand">Terms & Privacy</router-link>
@@ -137,6 +138,9 @@
 
         <router-link to = "/#examples" @click = "mobileMenuOpen = false" class = "block text-lg hover:text-brand py-2">
             Examples
+        </router-link>
+        <router-link to = "/#example-workflow" @click = "mobileMenuOpen = false" class = "block text-lg hover:text-brand py-2">
+            Workflow
         </router-link>
         <router-link to = "/#features" @click = "mobileMenuOpen = false" class = "block text-lg hover:text-brand py-2">
             Features

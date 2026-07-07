@@ -48,11 +48,11 @@
             </p>
 
             <div class = "flex flex-wrap justify-center gap-2 text-xs sm:text-sm font-semibold text-white">
-                <span class = "rounded-full border border-white/20 bg-white/10 px-3 py-1">OIR</span>
-                <span class = "rounded-full border border-white/20 bg-white/10 px-3 py-1">TIFF</span>
-                <span class = "rounded-full border border-white/20 bg-white/10 px-3 py-1">OME-TIFF</span>
-                <span class = "rounded-full border border-white/20 bg-white/10 px-3 py-1">OME-Zarr</span>
-                <span class = "rounded-full border border-white/20 bg-white/10 px-3 py-1">Spectral axis calibration</span>
+                <FeatureChip v-for = "chip in heroChips"
+                             :key = "chip.label"
+                             :label = "chip.label"
+                             :description = "chip.description"
+                             tone = "hero" />
             </div>
 
             <div class = "flex flex-wrap gap-3 justify-center">
@@ -76,11 +76,36 @@
 <script setup>
 
 import { ref, onMounted} from 'vue'
+import FeatureChip from './FeatureChip.vue'
+
 const videoLoaded = ref(false)
 
 const carsToolUrl = 'https://cars.harkana.com'
 const ramanToolUrl = 'https://raman.harkana.com'
 const hcarsToolUrl = 'https://hcars.harkana.com'
+
+const heroChips = [
+    {
+        label: 'OIR',
+        description: 'Olympus Image Resource hyperspectral microscopy data'
+    },
+    {
+        label: 'TIFF',
+        description: 'Standard TIFF image stacks analyzed as layers'
+    },
+    {
+        label: 'OME-TIFF',
+        description: 'OME-TIFF microscopy datasets with embedded axis metadata'
+    },
+    {
+        label: 'OME-Zarr',
+        description: 'OME-Zarr multiscale microscopy datasets'
+    },
+    {
+        label: 'Spectral axis calibration',
+        description: 'Reusable calibration profiles for horizontal-axis alignment'
+    }
+]
 
 onMounted(() => {
 

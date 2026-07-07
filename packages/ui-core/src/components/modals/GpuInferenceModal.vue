@@ -20,7 +20,7 @@
 		<div v-if = "!isReady && !inferenceInProgress" class = "mt-3 mb-4 rounded border border-gray-600 bg-gray-800/70 px-3 py-2 text-sm text-white">
 			<p><strong>Active token source:</strong> {{ tokenGroupName }}</p>
 			<p><strong>Current token balance:</strong> {{ tokenBalanceText }}</p>
-			<p class = "text-white/80 mt-2">A successful inference run costs 100 tokens.</p>
+			<p class = "text-white/80 mt-2">A successful inference run costs {{ ramanEstimationTokenCostText }}.</p>
 		</div>
 
 		<div v-if = "errorMessage.length > 0" class = "mt-4 rounded border border-red-500/70 bg-red-500/10 px-3 py-2 text-sm text-red-200">
@@ -61,7 +61,7 @@
 			 class = "mt-3 mb-4 rounded border border-gray-600 bg-gray-800/70 px-3 py-3 text-sm text-white">
 			<p><strong>Active token source:</strong> {{ tokenGroupName }}</p>
 			<p><strong>Current token balance:</strong> {{ tokenBalanceText }}</p>
-			<p class = "text-white/80 mt-2">A successful inference run costs 100 tokens. Previous inference results are deleted on a rerun.</p>
+			<p class = "text-white/80 mt-2">A successful inference run costs {{ ramanEstimationTokenCostText }}. Previous inference results are deleted on a rerun.</p>
 
 			<button @click = "runInference"
 					:disabled = "running || statusLoading || hasProjectID === false"
@@ -88,6 +88,10 @@
 
 import { computed, ref } from "vue"
 import { hyperspectra, settings, tokens } from "@harkana/tools"
+import {
+	HYPERSPECTRUM_RAMAN_ESTIMATION_TOKEN_COST,
+	formatTokenCost
+} from "../../constants/tokenCosts.js"
 
 import Modal from "./Modal.vue"
 import Spinner from "../general/Spinner.vue"
@@ -118,6 +122,7 @@ const submission = ref(null)
 const jobStatus = ref(null)
 
 const NON_TERMINAL_STATUSES = new Set([ "SUBMITTED", "STARTED" ])
+const ramanEstimationTokenCostText = formatTokenCost( HYPERSPECTRUM_RAMAN_ESTIMATION_TOKEN_COST )
 
 const hasProjectID = computed(() => {
 	const projectID = String( props.project?.id ?? "" ).trim()

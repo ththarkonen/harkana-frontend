@@ -4,6 +4,7 @@
     <SiteHeader/>
 
 	<LandingHero/>
+	<SupportedInputs/>
     <ExampleCorrections/>
 	<Features/>
 	<ExampleWorkflow/>
@@ -19,6 +20,7 @@ import SiteHeader from '@/components/SiteHeader.vue'
 import SiteFooter from '@/components/SiteFooter.vue'
 
 import LandingHero from '@/components/LandingHero.vue'
+import SupportedInputs from '@/components/SupportedInputs.vue'
 import ExampleCorrections from '@/components/ExampleCorrections.vue'
 import Features from '@/components/Features.vue'
 import ExampleWorkflow from '@/components/ExampleWorkflow.vue'
