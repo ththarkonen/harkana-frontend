@@ -14,6 +14,9 @@
                 <BaseDropdownItem :disabled = "isUploadLocked" @select = "openOirPicker">
                     Upload OIR
                 </BaseDropdownItem>
+                <BaseDropdownItem :disabled = "isUploadLocked" @select = "openIgorPicker">
+                    Upload Igor
+                </BaseDropdownItem>
                 <BaseDropdownItem :disabled = "isUploadLocked" @select = "openTiffPicker">
                     Upload TIFF
                 </BaseDropdownItem>
@@ -53,6 +56,15 @@
                accept = ".oir"
                :disabled = "isUploadLocked"
                @change = "handleOirUpload"
+               @click = "resetInputValue"/>
+
+        <input ref = "igorInput"
+               type = "file"
+               hidden
+               multiple
+               accept = ".ibw,.pxp,.pxt"
+               :disabled = "isUploadLocked"
+               @change = "handleIgorUpload"
                @click = "resetInputValue"/>
 
         <input ref = "omeZarrInput"
@@ -143,10 +155,15 @@
             :datasetIteration = "sourceDatasetIteration"
             :datasetCount = "sourceDatasetCount"
             :reuseMatchingDimensions = "sourceReuseMatchingDimensions"
+            :waveInspecting = "sourceWaveInspecting"
+            :waveInspectionError = "sourceWaveInspectionError"
+            :waveSelectionConfirmed = "sourceIgorWaveSelectionConfirmed"
             :uploadPercentage = "uploadPercentage"
             :uploadState = "uploadState"
             :validationState = "validationState"
             @submit = "submitSourceAnalysis"
+            @wave-change = "handleSourceWaveChange"
+            @wave-confirm = "confirmSourceWaveSelection"
             @update:reuseMatchingDimensions = "updateSourceReuseMatchingDimensions"
             @cancel = "cancelSourceAnalysis"/>
     </div>
@@ -172,6 +189,7 @@ const progressModal = ref<any>( null )
 const sourceAnalysisModal = ref<any>( null )
 const tiffInput = ref<HTMLInputElement | null>( null )
 const oirInput = ref<HTMLInputElement | null>( null )
+const igorInput = ref<HTMLInputElement | null>( null )
 const omeZarrInput = ref<HTMLInputElement | null>( null )
 const omeTiffInput = ref<HTMLInputElement | null>( null )
 
@@ -188,7 +206,7 @@ const activeFile = ref<{ name: string } | null>( null )
 const currentIteration = ref( 0 )
 const nFiles = ref( 0 )
 
-const inspectedSourceType = ref<"oir" | "ome-zarr" | "ome-tiff" | "tiff">( "ome-zarr" )
+const inspectedSourceType = ref<"oir" | "ome-zarr" | "ome-tiff" | "tiff" | "igor">( "ome-zarr" )
 const sourcePreparedProject = ref<any>( null )
 const sourceAnalysisGroupID = ref( "" )
 const sourceDatasetQueue = ref<any[]>( [] )
@@ -200,6 +218,9 @@ const sourceReuseMatchingDimensions = ref( false )
 const sourceReusableSelections = ref<Record<string, { axisMapping: Record<string, string>, fixedIndices?: Record<string, number> }>>( {} )
 const sourceSubmitting = ref( false )
 const sourceSubmissionError = ref( "" )
+const sourceWaveInspecting = ref( false )
+const sourceWaveInspectionError = ref( "" )
+const sourceIgorWaveSelectionConfirmed = ref( true )
 const uploadLock = ref( false )
 
 const isSpectrumUpload = computed(() => {
@@ -222,7 +243,8 @@ const sourceTypeLabels: Record<string, string> = {
     oir: "OIR",
     "ome-zarr": "OME-Zarr",
     "ome-tiff": "OME-TIFF",
-    tiff: "TIFF"
+    tiff: "TIFF",
+    igor: "Igor"
 }
 
 const inspectedSourceTypeLabel = computed(() => {
@@ -284,6 +306,9 @@ const resetSourceAnalysisState = () => {
     sourceReusableSelections.value = {}
     sourceSubmitting.value = false
     sourceSubmissionError.value = ""
+    sourceWaveInspecting.value = false
+    sourceWaveInspectionError.value = ""
+    sourceIgorWaveSelectionConfirmed.value = true
 }
 
 const resetInputValue = ( event: Event ) => {
@@ -307,6 +332,14 @@ const openOirPicker = () => {
     }
 
     oirInput.value?.click()
+}
+
+const openIgorPicker = () => {
+    if( isUploadLocked.value ){
+        return
+    }
+
+    igorInput.value?.click()
 }
 
 const openOmeZarrPicker = () => {
@@ -360,18 +393,33 @@ const buildInspectDimensionsSignature = ( inspectResponse: any ) => {
         layerAxisOptions: Array.isArray( dimensions?.layerAxisOptions ) ? dimensions.layerAxisOptions : [],
         recommendedLayerAxis: dimensions?.recommendedLayerAxis === null
             ? null
-            : String( dimensions?.recommendedLayerAxis ?? "" )
+            : String( dimensions?.recommendedLayerAxis ?? "" ),
+        sourceFormat: String( inspectResponse?.source?.format ?? "" ).trim(),
+        selectedWavePath: String( inspectResponse?.metadata?.selectedWavePath ?? "" ).trim()
     })
 }
 
 const normalizeInspectedSourceFormat = ( inspectResponse: any ) => {
     const format = String( inspectResponse?.source?.format ?? "" ).trim().toLowerCase()
 
-    if( format === "oir" || format === "ome-zarr" || format === "ome-tiff" || format === "tiff" ){
+    if( format === "oir" || format === "ome-zarr" || format === "ome-tiff" || format === "tiff" || format === "igor" ){
         return format
     }
 
     return ""
+}
+
+const igorRequiresExplicitWaveSelection = ( inspectResponse: any ) => {
+    const format = String( inspectResponse?.source?.format ?? "" ).trim().toLowerCase()
+    if( format !== "igor" ){
+        return false
+    }
+
+    const waveOptions = Array.isArray( inspectResponse?.metadata?.waveOptions )
+        ? inspectResponse.metadata.waveOptions
+        : []
+
+    return waveOptions.length > 1
 }
 
 const cloneAnalysisPayload = ( payload: { axisMapping: Record<string, string>, fixedIndices?: Record<string, number> } ) => {
@@ -439,6 +487,9 @@ const prepareNextSourceDataset = async () => {
     sourceInspectResponse.value = null
     sourceSubmissionError.value = ""
     sourcePreparing.value = true
+    sourceWaveInspecting.value = false
+    sourceWaveInspectionError.value = ""
+    sourceIgorWaveSelectionConfirmed.value = true
     uploadState.value = "progress"
     validationState.value = "progress"
     nFiles.value = Array.isArray( dataset?.files ) ? dataset.files.length : 1
@@ -449,6 +500,8 @@ const prepareNextSourceDataset = async () => {
 
         if( inspectedSourceType.value === "oir" ){
             preparedProject = await projectlib.prepareHyperspectrumOirDataset( dataset, uploadProgressCallbacks() )
+        } else if( inspectedSourceType.value === "igor" ){
+            preparedProject = await projectlib.prepareHyperspectrumIgorDataset( dataset, uploadProgressCallbacks() )
         } else if( inspectedSourceType.value === "ome-tiff" || inspectedSourceType.value === "tiff" ){
             preparedProject = await projectlib.prepareHyperspectrumTiffDataset( dataset, uploadProgressCallbacks() )
         } else {
@@ -463,12 +516,14 @@ const prepareNextSourceDataset = async () => {
         sourceInspectResponse.value = preparedProject.inspectResponse
         const inspectedFormat = normalizeInspectedSourceFormat( preparedProject.inspectResponse )
         if( inspectedFormat.length > 0 ){
-            inspectedSourceType.value = inspectedFormat as "oir" | "ome-zarr" | "ome-tiff" | "tiff"
+            inspectedSourceType.value = inspectedFormat as "oir" | "ome-zarr" | "ome-tiff" | "tiff" | "igor"
         }
+        sourceIgorWaveSelectionConfirmed.value = igorRequiresExplicitWaveSelection( preparedProject.inspectResponse ) === false
         sourcePreparing.value = false
 
         const dimensionsSignature = buildInspectDimensionsSignature( preparedProject.inspectResponse )
         if(
+            sourceIgorWaveSelectionConfirmed.value === true &&
             sourceReuseMatchingDimensions.value === true &&
             typeof sourceReusableSelections.value[ dimensionsSignature ] === "object"
         ){
@@ -497,6 +552,12 @@ const submitCurrentSourceAnalysis = async (
 
         if( inspectedSourceType.value === "oir" ){
             result = await projectlib.launchHyperspectrumOirAnalysis(
+                sourcePreparedProject.value,
+                sourceAnalysisGroupID.value,
+                payload
+            )
+        } else if( inspectedSourceType.value === "igor" ){
+            result = await projectlib.launchHyperspectrumIgorAnalysis(
                 sourcePreparedProject.value,
                 sourceAnalysisGroupID.value,
                 payload
@@ -566,7 +627,7 @@ const submitCurrentSourceAnalysis = async (
 }
 
 const startInspectableSourceUploadBatch = async (
-    sourceType: "oir" | "ome-zarr" | "ome-tiff" | "tiff",
+    sourceType: "oir" | "ome-zarr" | "ome-tiff" | "tiff" | "igor",
     files: FileList
 ) => {
 
@@ -579,6 +640,8 @@ const startInspectableSourceUploadBatch = async (
     try {
         if( sourceType === "oir" ){
             sourceDatasetQueue.value = projectlib.listHyperspectrumOirDatasets( files )
+        } else if( sourceType === "igor" ){
+            sourceDatasetQueue.value = projectlib.listHyperspectrumIgorDatasets( files )
         } else if( sourceType === "ome-tiff" || sourceType === "tiff" ){
             sourceDatasetQueue.value = projectlib.listHyperspectrumTiffDatasets( files )
         } else {
@@ -686,6 +749,18 @@ const handleOirUpload = async ( event: Event ) => {
     await startInspectableSourceUploadBatch( "oir", files )
 }
 
+const handleIgorUpload = async ( event: Event ) => {
+
+    if( isUploadLocked.value ){
+        return
+    }
+
+    const files = ( event.target as HTMLInputElement ).files
+    if( !files || !files.length ) return
+
+    await startInspectableSourceUploadBatch( "igor", files )
+}
+
 const handleInspectableOmeZarrUpload = async ( event: Event ) => {
 
     if( isUploadLocked.value ){
@@ -720,6 +795,41 @@ const handleInspectableTiffUpload = async ( event: Event ) => {
     if( !files || !files.length ) return
 
     await startInspectableSourceUploadBatch( "tiff", files )
+}
+
+const handleSourceWaveChange = async ( wavePath: string ) => {
+
+    const normalizedWavePath = String( wavePath ?? "" ).trim()
+    if( sourcePreparedProject.value === null || normalizedWavePath.length === 0 ){
+        return
+    }
+
+    sourceWaveInspecting.value = true
+    sourceWaveInspectionError.value = ""
+    sourceSubmissionError.value = ""
+    sourceIgorWaveSelectionConfirmed.value = false
+
+    try {
+        const inspectResponse = await projectlib.inspectPreparedHyperspectrumSource(
+            sourcePreparedProject.value,
+            { wavePath: normalizedWavePath }
+        )
+
+        sourcePreparedProject.value = {
+            ...sourcePreparedProject.value,
+            inspectResponse
+        }
+        sourceInspectResponse.value = inspectResponse
+        sourceIgorWaveSelectionConfirmed.value = true
+    } catch (error: any) {
+        sourceWaveInspectionError.value = error?.message || String( error )
+    } finally {
+        sourceWaveInspecting.value = false
+    }
+}
+
+const confirmSourceWaveSelection = () => {
+    sourceIgorWaveSelectionConfirmed.value = true
 }
 
 const submitSourceAnalysis = async ( payload: { axisMapping?: Record<string, string>, fixedIndices?: Record<string, number> } ) => {

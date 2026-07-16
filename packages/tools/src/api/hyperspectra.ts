@@ -39,7 +39,7 @@ type InspectLayerAxisOption = {
     size: number
 }
 
-type HyperspectrumSourceFormat = "oir" | "ome-zarr" | "ome-tiff" | "tiff"
+type HyperspectrumSourceFormat = "oir" | "ome-zarr" | "ome-tiff" | "tiff" | "igor"
 
 type InspectSource = {
     format: HyperspectrumSourceFormat
@@ -196,7 +196,45 @@ type TiffInspectResponse = {
     warnings: string[]
 }
 
-type HyperspectrumSourceInspectResponse = OirInspectResponse | OmeZarrInspectResponse | OmeTiffInspectResponse | TiffInspectResponse
+type IgorWaveOption = {
+    path: string
+    name: string
+    shape: number[]
+    dtype: string
+    dimensionScales: Array<number | null>
+    dimensionOffsets: Array<number | null>
+    dimensionUnits: Array<string | null>
+}
+
+type IgorInspectResponse = {
+    version: "hyperspectrum-source-inspect-v1"
+    projectID: string
+    dataType: "hypercars" | "hyperraman"
+    source: InspectSource & {
+        format: "igor"
+        kind: "s3-object"
+        extension: "ibw" | "pxp" | "pxt"
+    }
+    dimensions: InspectDimensions
+    metadata: {
+        sourceAxisOrder: string
+        sourceShape: number[]
+        normalizedAxisOrder: "TCZYX"
+        dtype: string
+        estimatedNbytes: number
+        selectedWavePath: string
+        selectedWaveName: string
+        defaultWavePath: string
+        numericWaveCount: number
+        waveOptions: IgorWaveOption[]
+        dimensionScales: Array<number | null>
+        dimensionOffsets: Array<number | null>
+        dimensionUnits: Array<string | null>
+    }
+    warnings: string[]
+}
+
+type HyperspectrumSourceInspectResponse = OirInspectResponse | OmeZarrInspectResponse | OmeTiffInspectResponse | TiffInspectResponse | IgorInspectResponse
 
 type HyperspectrumSourceAnalysisRequest = {
     projectID: string
@@ -216,6 +254,15 @@ type HyperspectrumTiffAnalysisRequest = {
     projectID: string
     dataType?: "hypercars" | "hyperraman"
     inputS3Uri?: string
+}
+
+type HyperspectrumIgorAnalysisRequest = {
+    projectID: string
+    inputS3Uri: string
+    wavePath: string
+    sourceAxisOrder: string
+    axisMapping: Partial<Record<"x" | "y" | "z" | "c" | "t", string>>
+    fixedIndices: Record<string, number>
 }
 
 type ParseJobResponse = {
@@ -390,6 +437,9 @@ var inspectSource = async (
     options: {
         inputS3Uri?: string
         dataType?: string
+        wavePath?: string
+        waveName?: string
+        sourceAxisOrder?: string
     } = {}
 ) => {
 
@@ -406,6 +456,21 @@ var inspectSource = async (
     const inputS3Uri = String( options?.inputS3Uri ?? "" ).trim()
     if( inputS3Uri.length > 0 ){
         parameters.inputS3Uri = inputS3Uri
+    }
+
+    const wavePath = String( options?.wavePath ?? "" ).trim()
+    if( wavePath.length > 0 ){
+        parameters.wavePath = wavePath
+    }
+
+    const waveName = String( options?.waveName ?? "" ).trim()
+    if( waveName.length > 0 ){
+        parameters.waveName = waveName
+    }
+
+    const sourceAxisOrder = String( options?.sourceAxisOrder ?? "" ).trim()
+    if( sourceAxisOrder.length > 0 ){
+        parameters.sourceAxisOrder = sourceAxisOrder
     }
 
     if( projectReference.isShared || projectReference.projectKey.length > 0 ){
@@ -581,6 +646,93 @@ var launchTiffAnalysis = async (
     }
 
     const base = (import.meta as any).env.VITE_BASE_URL + "/hyperspectrum/tiff/analysis"
+    const url = base + "?" + buildQueryString( parameters )
+
+    return await apiFetch<ParseJobResponse>( url, {
+        method: "POST",
+        body: JSON.stringify( body )
+    })
+}
+
+var launchIgorAnalysis = async (
+    project: any,
+    groupID: string = "",
+    payload: Partial<HyperspectrumIgorAnalysisRequest> = {},
+    dataType: string = ""
+) => {
+
+    const projectReference = resolveProjectReference( project )
+    if( projectReference.projectID.length === 0 ){
+        throw new Error( "Missing projectID for hyperspectrum Igor analysis request." )
+    }
+
+    if( projectReference.isShared ){
+        throw new Error( "Hyperspectrum Igor analysis launch is not available for shared projects." )
+    }
+
+    const normalizedDataType = resolveHyperspectrumDataType( dataType )
+    const axisMapping = typeof payload?.axisMapping === "object" && payload?.axisMapping !== null
+        ? payload.axisMapping
+        : null
+
+    if( axisMapping === null ){
+        throw new Error( "Hyperspectrum Igor analysis axisMapping is required." )
+    }
+
+    const inputS3Uri = String( payload?.inputS3Uri ?? "" ).trim()
+    if( inputS3Uri.length === 0 ){
+        throw new Error( "Hyperspectrum Igor analysis inputS3Uri is required." )
+    }
+
+    const wavePath = String( payload?.wavePath ?? "" ).trim()
+    if( wavePath.length === 0 ){
+        throw new Error( "Hyperspectrum Igor analysis wavePath is required." )
+    }
+
+    const sourceAxisOrder = String( payload?.sourceAxisOrder ?? "" ).trim()
+    if( sourceAxisOrder.length === 0 ){
+        throw new Error( "Hyperspectrum Igor analysis sourceAxisOrder is required." )
+    }
+
+    const parameters: Record<string, string> = {
+        projectID: projectReference.projectID,
+        dataType: normalizedDataType,
+        groupID: groupID ?? ""
+    }
+
+    const body: HyperspectrumIgorAnalysisRequest = {
+        projectID: projectReference.projectID,
+        inputS3Uri,
+        wavePath,
+        sourceAxisOrder,
+        axisMapping: {
+            x: String( axisMapping?.x ?? "" ).trim(),
+            y: String( axisMapping?.y ?? "" ).trim()
+        },
+        fixedIndices: {}
+    }
+
+    const optionalRoles = [ "z", "c", "t" ]
+    for( const role of optionalRoles ){
+        const axisName = String( axisMapping?.[ role as keyof typeof axisMapping ] ?? "" ).trim()
+        if( axisName.length > 0 ){
+            body.axisMapping[ role as "z" | "c" | "t" ] = axisName
+        }
+    }
+
+    const fixedIndicesInput = payload?.fixedIndices
+    if( fixedIndicesInput && typeof fixedIndicesInput === "object" ){
+        for( const [ axisName, rawValue ] of Object.entries( fixedIndicesInput ) ){
+            const normalizedAxisName = String( axisName ?? "" ).trim()
+            const numericValue = Number.parseInt( String( rawValue ), 10 )
+            if( normalizedAxisName.length === 0 || Number.isInteger( numericValue ) === false ){
+                continue
+            }
+            body.fixedIndices[ normalizedAxisName ] = numericValue
+        }
+    }
+
+    const base = (import.meta as any).env.VITE_BASE_URL + "/hyperspectrum/igor/analysis"
     const url = base + "?" + buildQueryString( parameters )
 
     return await apiFetch<ParseJobResponse>( url, {
@@ -1006,6 +1158,7 @@ export default {
     launchTiffAnalysis,
     launchOmeZarrAnalysis,
     launchOmeTiffAnalysis,
+    launchIgorAnalysis,
     spectrum,
     meanSpectrum,
     status,
