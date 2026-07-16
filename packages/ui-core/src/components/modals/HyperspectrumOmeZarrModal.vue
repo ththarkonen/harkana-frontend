@@ -59,6 +59,43 @@
                     </div>
                 </div>
 
+                <div v-if = "isIgorSource" class = "rounded-lg border border-brand bg-white p-4">
+                    <label for = "igor-wave-path"
+                           class = "block text-xs font-semibold uppercase tracking-wide text-black">
+                        Igor wave
+                    </label>
+                    <select id = "igor-wave-path"
+                            :value = "selectedWavePath"
+                            :disabled = "submitting || waveInspecting || waveOptions.length <= 1"
+                            class = "mt-2 w-full rounded-lg border border-brand bg-white px-3 py-2 text-sm text-black transition focus:outline-none focus:ring-2 focus:ring-brand"
+                            @change = "updateSelectedWave">
+                        <option v-for = "option in waveOptions"
+                                :key = "option.path"
+                                :value = "option.path"
+                                class = "text-black">
+                            {{ formatWaveOption( option ) }}
+                        </option>
+                    </select>
+
+                    <div v-if = "waveInspecting" class = "mt-3 flex items-center gap-2 text-xs text-black/70">
+                        <Spinner class = "h-4 w-4 text-brand"></Spinner>
+                        <span>Inspecting selected wave...</span>
+                    </div>
+                    <div v-if = "waveInspectionError.length > 0" class = "mt-3 rounded border border-red-500/70 bg-red-500/10 px-3 py-2 text-xs text-red-700">
+                        {{ waveInspectionError }}
+                    </div>
+                    <div v-if = "requiresExplicitWaveSelection && waveSelectionConfirmed === false" class = "mt-3 rounded border border-amber-500/70 bg-amber-500/10 px-3 py-2 text-xs text-amber-800">
+                        Multiple numeric Igor waves are available. Select or confirm the wave before starting analysis.
+                    </div>
+                    <button v-if = "requiresExplicitWaveSelection && waveSelectionConfirmed === false"
+                            type = "button"
+                            :disabled = "submitting || waveInspecting || selectedWavePath.length === 0"
+                            class = "mt-3 rounded bg-brand px-3 py-2 text-xs font-semibold text-white transition hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-50"
+                            @click = "confirmSelectedWave">
+                        Use selected wave
+                    </button>
+                </div>
+
                 <div class = "grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div class = "rounded-lg border border-brand bg-white p-3">
                         <p class = "text-xs font-semibold uppercase tracking-wide text-black">
@@ -176,10 +213,10 @@
             </button>
             <button v-if = "hasInspectResponse"
                     @click = "submitSelection"
-                    :disabled = "submitting"
+                    :disabled = "submitting || canSubmit === false"
                     class = "flex w-full items-center justify-center gap-2 rounded bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-50">
                 <Spinner v-if = "submitting" class = "h-4 w-4 text-white"></Spinner>
-                <span>{{ submitting ? "Starting analysis..." : "Start analysis" }}</span>
+                <span>{{ submitting ? "Starting analysis..." : startButtonLabel }}</span>
             </button>
         </div>
         </template>
@@ -206,6 +243,16 @@ type InspectAxis = {
     size: number
 }
 
+type IgorWaveOption = {
+    path: string
+    name: string
+    shape: number[]
+    dtype: string
+    dimensionScales?: Array<number | null>
+    dimensionOffsets?: Array<number | null>
+    dimensionUnits?: Array<string | null>
+}
+
 type InspectResponse = {
     source?: {
         name?: string
@@ -216,6 +263,12 @@ type InspectResponse = {
         shape?: number[]
         axes?: InspectAxis[]
         recommendedLayerAxis?: string | null
+    }
+    metadata?: {
+        selectedWavePath?: string
+        selectedWaveName?: string
+        sourceAxisOrder?: string
+        waveOptions?: IgorWaveOption[]
     }
     warnings?: string[]
 }
@@ -235,10 +288,13 @@ const props = defineProps({
     reuseMatchingDimensions: { type: Boolean, default: false },
     uploadPercentage: { type: String, default: "0%" },
     uploadState: { type: String, default: "idle" },
-    validationState: { type: String, default: "idle" }
+    validationState: { type: String, default: "idle" },
+    waveInspecting: { type: Boolean, default: false },
+    waveInspectionError: { type: String, default: "" },
+    waveSelectionConfirmed: { type: Boolean, default: true }
 })
 
-const emit = defineEmits([ "submit", "cancel", "update:reuseMatchingDimensions" ])
+const emit = defineEmits([ "submit", "cancel", "update:reuseMatchingDimensions", "wave-change", "wave-confirm" ])
 
 const modal = ref<any>( null )
 const validationError = ref( "" )
@@ -270,6 +326,10 @@ const inspectedSourceFormat = computed(() => {
     return String( response.value?.source?.format ?? "" ).trim().toLowerCase()
 })
 
+const isIgorSource = computed(() => {
+    return inspectedSourceFormat.value === "igor"
+})
+
 const requiresAxisMapping = computed(() => {
     return inspectedSourceFormat.value !== "tiff"
 })
@@ -292,6 +352,44 @@ const hasInspectResponse = computed(() => {
 
 const showReuseCheckbox = computed(() => {
     return requiresAxisMapping.value && props.datasetCount > 1 && props.datasetIteration < props.datasetCount
+})
+
+const waveOptions = computed<IgorWaveOption[]>(() => {
+    return Array.isArray( response.value?.metadata?.waveOptions )
+        ? response.value.metadata.waveOptions
+        : []
+})
+
+const selectedWavePath = computed(() => {
+    return normalizeAxisName( response.value?.metadata?.selectedWavePath )
+})
+
+const requiresExplicitWaveSelection = computed(() => {
+    return isIgorSource.value && waveOptions.value.length > 1
+})
+
+const canSubmit = computed(() => {
+    if( props.waveInspecting ){
+        return false
+    }
+
+    if( requiresExplicitWaveSelection.value && props.waveSelectionConfirmed === false ){
+        return false
+    }
+
+    return true
+})
+
+const startButtonLabel = computed(() => {
+    if( props.waveInspecting ){
+        return "Inspecting wave..."
+    }
+
+    if( requiresExplicitWaveSelection.value && props.waveSelectionConfirmed === false ){
+        return "Select wave to continue"
+    }
+
+    return "Start analysis"
 })
 
 const preparationStatusText = computed(() => {
@@ -376,11 +474,15 @@ function normalizeAxisName( value: unknown ){
 function axisSymbol( axis: InspectAxis ){
 
     const axisOrder = String( response.value?.dimensions?.axisOrder ?? "" )
-    if( axis.index < 0 || axis.index >= axisOrder.length ){
+    const axisSymbols = axisOrder.includes( "," )
+        ? axisOrder.split( "," ).map(( value ) => value.trim() )
+        : axisOrder.split( "" )
+
+    if( axis.index < 0 || axis.index >= axisSymbols.length ){
         return ""
     }
 
-    return String( axisOrder[ axis.index ] ?? "" ).toLowerCase()
+    return String( axisSymbols[ axis.index ] ?? "" ).toLowerCase()
 }
 
 function isAxisUnavailable( roleKey: string, axisName: string ){
@@ -426,6 +528,15 @@ function pickAxisForRole( role: string, used: Set<string> ){
             return used.has( axis.name ) === false && normalizeAxisName( axis.name ).toLowerCase() === lowerRecommendedLayerAxis
         })
         if( recommendedMatch ) return recommendedMatch.name
+    }
+
+    if( lowerRole === "c" ){
+        const spectralAxisAliases = [ "lambda", "wavelength", "wavenumber", "frequency", "energy", "spectral" ]
+        const spectralNameMatch = axes.value.find(( axis ) => {
+            const axisName = normalizeAxisName( axis.name ).toLowerCase()
+            return used.has( axis.name ) === false && spectralAxisAliases.some(( alias ) => axisName.includes( alias ))
+        })
+        if( spectralNameMatch ) return spectralNameMatch.name
     }
 
     if( lowerRole === "x" || lowerRole === "y" ){
@@ -503,6 +614,18 @@ function formatAxisOption( axis: InspectAxis ){
     return axis.name + " (" + formatAxisMetadata( axis ) + ")"
 }
 
+function formatWaveOption( option: IgorWaveOption ){
+
+    const name = normalizeAxisName( option?.name ) || "Unnamed wave"
+    const path = normalizeAxisName( option?.path )
+    const shape = Array.isArray( option?.shape ) && option.shape.length > 0
+        ? option.shape.join( " x " )
+        : "unknown shape"
+    const dtype = normalizeAxisName( option?.dtype ) || "unknown dtype"
+
+    return name + " · " + path + " · " + shape + " · " + dtype
+}
+
 function validateSelection(){
 
     validationError.value = ""
@@ -557,7 +680,7 @@ function validateSelection(){
 
 function submitSelection(){
 
-    if( props.submitting ){
+    if( props.submitting || canSubmit.value === false ){
         return
     }
 
@@ -567,6 +690,24 @@ function submitSelection(){
     }
 
     emit( "submit", payload )
+}
+
+function updateSelectedWave( event: Event ){
+    const target = event.target as HTMLSelectElement | null
+    const wavePath = normalizeAxisName( target?.value )
+    if( wavePath.length === 0 || wavePath === selectedWavePath.value ){
+        return
+    }
+
+    emit( "wave-change", wavePath )
+}
+
+function confirmSelectedWave(){
+    if( selectedWavePath.value.length === 0 || props.waveInspecting ){
+        return
+    }
+
+    emit( "wave-confirm", selectedWavePath.value )
 }
 
 function updateReuseMatchingDimensions( event: Event ){

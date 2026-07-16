@@ -28,6 +28,7 @@ var sanitizeProjectName = function( value ){
 		.replace(/\.ome\.tiff?$/i, "")
 		.replace(/\.tiff?$/i, "")
 		.replace(/\.zarr$/i, "")
+		.replace(/\.(ibw|pxp|pxt)$/i, "")
 		.replace(/[^a-zA-Z0-9]/g, "_")
 		.replace(/^_+|_+$/g, "")
 
@@ -505,6 +506,91 @@ var prepareHyperspectrumTiffDataset = async function( tiffDataset, progress ){
 	return await prepareHyperspectrumOmeTiffDataset( tiffDataset, progress )
 }
 
+var resolveIgorDatasets = function( fileList ){
+
+	const files = Array.from( fileList ?? [] )
+	if( files.length === 0 ){
+		throw new Error( "No Igor files were selected." )
+	}
+
+	const datasets = files
+		.filter(( file ) => {
+			const fileName = String( file?.name ?? "" ).trim().toLowerCase()
+			return fileName.endsWith( ".ibw" ) || fileName.endsWith( ".pxp" ) || fileName.endsWith( ".pxt" )
+		})
+		.map(( file ) => {
+			const fileName = String( file?.name ?? "" ).trim()
+			return {
+				file,
+				projectName: sanitizeProjectName( fileName ),
+				rawFileName: fileName
+			}
+		})
+		.sort(( left, right ) => String( left?.rawFileName ?? "" ).localeCompare( String( right?.rawFileName ?? "" )))
+
+	if( datasets.length === 0 ){
+		throw new Error( "Select one or more .ibw, .pxp, or .pxt Igor files." )
+	}
+
+	return datasets
+}
+
+var listHyperspectrumIgorDatasets = function( fileList ){
+	return resolveIgorDatasets( fileList )
+}
+
+var prepareHyperspectrumIgorDataset = async function( igorDataset, progress ){
+
+	const projectContext = await createHyperspectrumProjectContext(
+		igorDataset.projectName,
+		igorDataset.rawFileName
+	)
+
+	try {
+		await uploadSingleFileHyperspectrumSource( projectContext.project, igorDataset, progress )
+		progress.upload("success");
+	} catch (error) {
+		progress.upload("error");
+		await remove( projectContext.project );
+		return error
+	}
+
+	const inputS3Uri = buildPrivateS3Uri( projectContext.project, igorDataset.rawFileName )
+
+	try {
+		const inspectResponse = await hyperspectra.inspectSource( projectContext.project, {
+			inputS3Uri
+		})
+		progress.validate("success");
+
+		return {
+			...projectContext,
+			inputS3Uri,
+			inspectResponse,
+			rawFileName: igorDataset.rawFileName
+		}
+	} catch (error) {
+		progress.validate("error");
+		await remove( projectContext.project );
+		return error
+	}
+}
+
+var inspectPreparedHyperspectrumSource = async function( preparedProject, options = {} ){
+
+	const inputS3Uri = String(
+		options?.inputS3Uri
+		?? preparedProject?.inspectResponse?.source?.s3Uri
+		?? preparedProject?.inputS3Uri
+		?? ""
+	).trim()
+
+	return await hyperspectra.inspectSource( preparedProject.project, {
+		...options,
+		inputS3Uri
+	})
+}
+
 var launchHyperspectrumOmeZarrAnalysis = async function( preparedProject, tokenGroupID, analysisRequest ){
 
 	try {
@@ -586,6 +672,40 @@ var launchHyperspectrumTiffAnalysis = async function( preparedProject, tokenGrou
 					analysisRequest?.inputS3Uri
 					?? preparedProject?.inspectResponse?.source?.s3Uri
 					?? preparedProject?.inputS3Uri
+					?? ""
+				).trim()
+			}
+		)
+
+		return await persistHyperspectrumProject( preparedProject, response )
+	} catch (error) {
+		return error
+	}
+}
+
+var launchHyperspectrumIgorAnalysis = async function( preparedProject, tokenGroupID, analysisRequest ){
+
+	try {
+		const metadata = preparedProject?.inspectResponse?.metadata ?? {}
+		const response = await hyperspectra.launchIgorAnalysis(
+			preparedProject.project,
+			tokenGroupID,
+			{
+				...analysisRequest,
+				inputS3Uri: String(
+					analysisRequest?.inputS3Uri
+					?? preparedProject?.inspectResponse?.source?.s3Uri
+					?? preparedProject?.inputS3Uri
+					?? ""
+				).trim(),
+				wavePath: String(
+					analysisRequest?.wavePath
+					?? metadata?.selectedWavePath
+					?? ""
+				).trim(),
+				sourceAxisOrder: String(
+					analysisRequest?.sourceAxisOrder
+					?? metadata?.sourceAxisOrder
 					?? ""
 				).trim()
 			}
@@ -991,6 +1111,10 @@ export default {
 	listHyperspectrumOmeTiffDatasets,
 	prepareHyperspectrumOmeTiffDataset,
 	launchHyperspectrumOmeTiffAnalysis,
+	listHyperspectrumIgorDatasets,
+	prepareHyperspectrumIgorDataset,
+	inspectPreparedHyperspectrumSource,
+	launchHyperspectrumIgorAnalysis,
 	remove,
 	list,
 	listProcessing,
