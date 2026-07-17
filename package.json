@@ -5,5 +5,10 @@
   "workspaces": [
     "apps/*",
     "packages/*"
-  ]
+  ],
+  "pnpm": {
+    "overrides": {
+      "yaml": "2.9.0"
+    }
+  }
 }
