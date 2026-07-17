@@ -5,7 +5,7 @@
     ".": "./tokens.js"
   },
   "devDependencies": {
-    "aws-amplify": "^5.3.29",
-    "axios": "^1.15.0"
+    "aws-amplify": "^5.3.38",
+    "axios": "^1.18.1"
   }
 }

@@ -6,7 +6,6 @@
   },
   "exports": {
     ".": "./src/index.js",
-
     "./MainMenu": "./src/components/MainMenu.vue",
     "./ProjectViewer": "./src/components/ProjectViewer.vue",
     "./Settings": "./src/components/Settings.vue",
@@ -28,7 +27,7 @@
     "katex": "^0.16.27"
   },
   "devDependencies": {
-    "aws-amplify": "^5.3.29",
+    "aws-amplify": "^5.3.38",
     "json-editor-vue": "^0.18.1",
     "lodash": "^4.18.1",
     "qrcode": "^1.5.4",
