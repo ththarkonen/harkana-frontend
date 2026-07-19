@@ -100,23 +100,45 @@
         </div>
     </div>
 
+    <div class = "mt-12 max-w-2xl border-t border-red-500/20 pt-6">
+        <h3 class = "m-0 text-lg font-bold text-red-800">Delete account</h3>
+        <p class = "mt-2 text-sm leading-6 text-black/65">
+            Permanently and irreversibly delete your account, projects, uploaded files, and saved settings.
+        </p>
+
+        <button @click = "openAccountDeletionModal"
+                :disabled = "deletingAccount"
+                class = "mt-3 inline-flex items-center justify-center rounded-full border border-red-500/50 bg-red-50 px-4 py-2 text-xs font-semibold text-red-800 transition hover:bg-red-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-50">
+            Delete account
+        </button>
+    </div>
+
+    <AccountDeletionConfirmModal ref = "accountDeletionModal"
+                                 :loading = "deletingAccount"
+                                 :error-message = "accountDeletionError"
+                                 @confirm = "startAccountDeletion"></AccountDeletionConfirmModal>
+
 </div>
 </template>
 
 <script setup>
 
 import { ref, onMounted} from "vue"
+import { useRouter } from "vue-router"
 import QRCode from "qrcode"
 
 import { Amplify } from 'aws-amplify'
 import awsconfig from '@/aws-exports.js'
 
-import { utils } from "@harkana/tools"
+import { account, utils } from "@harkana/tools"
 
 Amplify.configure( awsconfig )
 const Auth = Amplify.Auth
 
 import SettingsButton from "../settings/SettingsButton.vue"
+import AccountDeletionConfirmModal from "../modals/AccountDeletionConfirmModal.vue"
+
+const router = useRouter()
 
 const givenName = ref("")
 const familyName = ref("")
@@ -138,6 +160,35 @@ const secret = ref('')
 
 const showError = ref(false)
 const errorMessage = ref("")
+const accountDeletionModal = ref( null )
+const deletingAccount = ref( false )
+const accountDeletionError = ref( "" )
+
+const openAccountDeletionModal = () => {
+    accountDeletionError.value = ""
+    accountDeletionModal.value?.open?.()
+}
+
+const startAccountDeletion = async () => {
+    if( deletingAccount.value ){
+        return
+    }
+
+    deletingAccount.value = true
+    accountDeletionError.value = ""
+
+    try{
+        const response = await account.startDeletion()
+        account.saveAccountDeletionSession( response )
+        accountDeletionModal.value?.close?.()
+        await router.replace({ name: "Account deletion" })
+    } catch( error ){
+        console.error( error )
+        accountDeletionError.value = String( error?.detail ?? error?.message ?? "Failed to start account deletion." ).trim()
+    } finally {
+        deletingAccount.value = false
+    }
+}
 
 const updateName = async () => {
 	

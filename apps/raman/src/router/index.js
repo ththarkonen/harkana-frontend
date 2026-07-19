@@ -5,6 +5,7 @@ const ProjectViewer = () => import("@harkana/ui-core/ProjectViewer");
 const Settings = () => import("@harkana/ui-core/Settings");
 const DataFormats = () => import("@harkana/ui-core/DataFormats");
 const CheckoutSuccess = () => import("@harkana/ui-core/CheckoutSuccess");
+const AccountDeletionStatus = () => import("@harkana/ui-core/AccountDeletionStatus");
 
 const routes = [
 	{ path: "/", name: "Main menu", component: MainMenu },
@@ -12,6 +13,7 @@ const routes = [
 	{ path: "/settings", name: "Settings", component: Settings},
 	{ path: "/formats", name: "Data formats", component: DataFormats},
 	{ path: "/checkout-success", name: "Checkout success", component: CheckoutSuccess },
+	{ path: "/account/deletion", name: "Account deletion", component: AccountDeletionStatus, meta: { accountDeletion: true }},
 ];
 
 const router = createRouter({

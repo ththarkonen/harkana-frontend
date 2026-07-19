@@ -5,5 +5,6 @@ export { default as Settings } from './components/Settings.vue'
 export { default as DataFormats } from "./components/DataFormats.vue"
 export { default as HyperDataFormats } from "./components/HyperDataFormats.vue"
 export { default as CheckoutSuccess } from "./components/CheckoutSuccess.vue"
+export { default as AccountDeletionStatus } from "./components/AccountDeletionStatus.vue"
 export { default as SignIn } from "./components/SignIn.vue"
 export { default as Application } from "./components/Application.vue"
