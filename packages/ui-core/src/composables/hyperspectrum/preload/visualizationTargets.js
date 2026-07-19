@@ -54,6 +54,7 @@ export function createVisualizationTargetPreloader( options ){
 	const loadUmap = options.loadUmap
 	const loadLayer = options.loadLayer
 	const loadZBlendSource = options.loadZBlendSource
+	const loadCustomIndexMatrix = options.loadCustomIndexMatrix
 	const loadPcaClassificationMip = options.loadPcaClassificationMip
 	const loadPcaMip = options.loadPcaMip
 	const loadPcaClassification = options.loadPcaClassification
@@ -141,6 +142,13 @@ export function createVisualizationTargetPreloader( options ){
 			}
 
 			await loadZBlendSource( false, priority )
+			return
+		}
+
+		if( target === "custom_index" ){
+			if( typeof loadCustomIndexMatrix === "function" ){
+				await loadCustomIndexMatrix( priority )
+			}
 			return
 		}
 
@@ -318,6 +326,12 @@ export function createVisualizationTargetPreloader( options ){
 				}
 			}
 			return await loadZBlendSource( false, priority )
+		}
+
+		if( target === "custom_index" ){
+			return typeof loadCustomIndexMatrix === "function"
+				? await loadCustomIndexMatrix( priority )
+				: null
 		}
 
 		if( target === "layer_window" ){

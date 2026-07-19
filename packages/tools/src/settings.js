@@ -41,7 +41,8 @@ var get = async function(){
 
 var getDefaultSettings = async function() {
 
-    const isHyperspectrum = import.meta.env.VITE_DATA_TYPE === "hypercars"
+    const dataType = String( import.meta.env.VITE_DATA_TYPE ?? "" ).trim().toLowerCase()
+    const isHyperspectrum = dataType === "hypercars" || dataType === "hyperraman"
     const defaultSpectrumColor = "#1f77b4"
     const defaultComparisonPalette = [
         "#ff7f0e",
@@ -106,7 +107,8 @@ var getDefaultSettings = async function() {
         },
         colormaps: {
             mip: "Viridis",
-            layer: "Viridis"
+            layer: "Viridis",
+            customIndex: "Viridis"
         },
         hyperspectrumColors: {
             queriedSpectrum: "#1f77b4",
@@ -168,6 +170,12 @@ var getDefaultSettings = async function() {
             intervalOpacity: 0.25,
             overlayOpacity: 0.25
         },
+        hyperspectrumCustomIndex: {
+            symbols: {
+                data: "D",
+                estimate: "E"
+            }
+        },
         hyperspectrumDefaults: {
             displayMode: "umap",
             heatmapInteraction: "select",
@@ -183,6 +191,7 @@ var getDefaultSettings = async function() {
             mip_hsv: true,
             umap: true,
             z_blend: false,
+            custom_index: false,
             layer_window: true,
             pca: false,
             pca_mip: false,

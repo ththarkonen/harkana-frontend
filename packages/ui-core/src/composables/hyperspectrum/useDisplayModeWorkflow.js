@@ -12,6 +12,7 @@ export function useDisplayModeWorkflow( options ){
 	const loadMipHsv = options.loadMipHsv
 	const loadUmap = options.loadUmap
 	const ensureZBlendVisualizationMatrix = options.ensureZBlendVisualizationMatrix
+	const ensureCustomIndexMatrix = options.ensureCustomIndexMatrix
 	const renderZBlendHeatmapOnly = options.renderZBlendHeatmapOnly
 	const applyLayerInput = options.applyLayerInput
 	const resetActivePcaComponents = options.resetActivePcaComponents
@@ -54,6 +55,14 @@ export function useDisplayModeWorkflow( options ){
 				await ensureZBlendVisualizationMatrix( "high" )
 				await renderCurrentMatrix()
 				await renderZBlendHeatmapOnly()
+				return
+			}
+
+			if( plotMode === "custom_index" ){
+				if( typeof ensureCustomIndexMatrix === "function" ){
+					await ensureCustomIndexMatrix( "high" )
+				}
+				await renderCurrentMatrix()
 				return
 			}
 

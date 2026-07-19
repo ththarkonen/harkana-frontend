@@ -272,6 +272,53 @@ type ParseJobResponse = {
     submittedAt: string
 }
 
+type CustomIndexScope = "owned" | "shared"
+
+type CustomIndexSourceKind = "data" | "estimate"
+
+type CustomIndexOperand = {
+    symbol: "D" | "E"
+    sourceKind: CustomIndexSourceKind
+    layerNumber: number
+    layerIndex: number
+    axisValue: number | null
+    axisUnit: string | null
+}
+
+type CustomIndexFormulaModel = {
+    version: "custom-index-formula-v1"
+    expression: string
+    operands: CustomIndexOperand[]
+    outputLabel: string
+    outputUnit: string | null
+}
+
+type CustomIndexProfileWriteRequest = {
+    version: "custom-index-profile-write-v1"
+    profileKind: "hyperspectral-custom-index"
+    dataType: "hypercars" | "hyperraman"
+    friendlyName: string
+    description: string
+    sourceProjectID: string
+    model: CustomIndexFormulaModel
+}
+
+type CustomIndexPreviewRequest = {
+    version: "custom-index-preview-request-v1"
+    projectID: string
+    projectKey?: string
+    dataType: "hypercars" | "hyperraman"
+    model: CustomIndexFormulaModel
+}
+
+type ProjectCustomIndexAssignmentWriteRequest = {
+    version: "project-custom-index-assignment-write-v1"
+    entries: Array<{
+        profileID: string
+        order: number
+    }>
+}
+
 var resolveProjectReference = ( project: any ) => {
 
     const shareInfo = project?.shareInfo ?? {}
@@ -860,6 +907,357 @@ var status = async ( projectOrJobID: any ) => {
     return await apiFetch<{ status: string }>( url )
 }
 
+var listCustomIndexProfiles = async ({
+    dataType = "",
+    scope = "owned"
+}: {
+    dataType?: string
+    scope?: CustomIndexScope
+} = {}) => {
+
+    const parameters: Record<string, string> = {
+        dataType: resolveHyperspectrumDataType( dataType ),
+        scope: scope === "shared" ? "shared" : "owned"
+    }
+
+    const base = (import.meta as any).env.VITE_BASE_URL + "/hyperspectrum/custom-index/profiles"
+    const url = base + "?" + buildQueryString( parameters )
+
+    return await apiFetch<any>( url )
+}
+
+var getCustomIndexProfile = async (
+    profileID: string,
+    dataType: string = ""
+) => {
+
+    const normalizedProfileID = String( profileID ?? "" ).trim()
+    if( normalizedProfileID.length === 0 ){
+        throw new Error( "Custom index profile id is required." )
+    }
+
+    const parameters: Record<string, string> = {
+        profileID: normalizedProfileID,
+        dataType: resolveHyperspectrumDataType( dataType )
+    }
+
+    const base = (import.meta as any).env.VITE_BASE_URL + "/hyperspectrum/custom-index/profile"
+    const url = base + "?" + buildQueryString( parameters )
+
+    return await apiFetch<any>( url )
+}
+
+var createCustomIndexProfile = async (
+    payload: Partial<CustomIndexProfileWriteRequest> = {},
+    dataType: string = ""
+) => {
+
+    const normalizedDataType = resolveHyperspectrumDataType( dataType || payload?.dataType )
+    const body: CustomIndexProfileWriteRequest = {
+        version: "custom-index-profile-write-v1",
+        profileKind: "hyperspectral-custom-index",
+        dataType: normalizedDataType,
+        friendlyName: String( payload?.friendlyName ?? "" ).trim(),
+        description: String( payload?.description ?? "" ).trim(),
+        sourceProjectID: String( payload?.sourceProjectID ?? "" ).trim(),
+        model: payload?.model as CustomIndexFormulaModel
+    }
+
+    if( body.friendlyName.length === 0 ){
+        throw new Error( "Custom index profile name is required." )
+    }
+    if( body.sourceProjectID.length === 0 ){
+        throw new Error( "Custom index source project id is required." )
+    }
+    if( body.model === null || typeof body.model !== "object" ){
+        throw new Error( "Custom index formula model is required." )
+    }
+
+    const parameters: Record<string, string> = {
+        dataType: normalizedDataType
+    }
+
+    const base = (import.meta as any).env.VITE_BASE_URL + "/hyperspectrum/custom-index/profile"
+    const url = base + "?" + buildQueryString( parameters )
+
+    return await apiFetch<any>( url, {
+        method: "POST",
+        body: JSON.stringify( body )
+    })
+}
+
+var updateCustomIndexProfile = async (
+    profileID: string,
+    payload: Partial<CustomIndexProfileWriteRequest> = {},
+    dataType: string = ""
+) => {
+
+    const normalizedProfileID = String( profileID ?? "" ).trim()
+    if( normalizedProfileID.length === 0 ){
+        throw new Error( "Custom index profile id is required." )
+    }
+
+    const normalizedDataType = resolveHyperspectrumDataType( dataType || payload?.dataType )
+    const body: CustomIndexProfileWriteRequest = {
+        version: "custom-index-profile-write-v1",
+        profileKind: "hyperspectral-custom-index",
+        dataType: normalizedDataType,
+        friendlyName: String( payload?.friendlyName ?? "" ).trim(),
+        description: String( payload?.description ?? "" ).trim(),
+        sourceProjectID: String( payload?.sourceProjectID ?? "" ).trim(),
+        model: payload?.model as CustomIndexFormulaModel
+    }
+
+    const parameters: Record<string, string> = {
+        profileID: normalizedProfileID,
+        dataType: normalizedDataType
+    }
+
+    const base = (import.meta as any).env.VITE_BASE_URL + "/hyperspectrum/custom-index/profile"
+    const url = base + "?" + buildQueryString( parameters )
+
+    return await apiFetch<any>( url, {
+        method: "PUT",
+        body: JSON.stringify( body )
+    })
+}
+
+var deleteCustomIndexProfile = async (
+    profileID: string,
+    dataType: string = ""
+) => {
+
+    const normalizedProfileID = String( profileID ?? "" ).trim()
+    if( normalizedProfileID.length === 0 ){
+        throw new Error( "Custom index profile id is required." )
+    }
+
+    const parameters: Record<string, string> = {
+        profileID: normalizedProfileID,
+        dataType: resolveHyperspectrumDataType( dataType )
+    }
+
+    const base = (import.meta as any).env.VITE_BASE_URL + "/hyperspectrum/custom-index/profile"
+    const url = base + "?" + buildQueryString( parameters )
+
+    return await apiFetch<any>( url, { method: "DELETE" })
+}
+
+var listCustomIndexProfileCollaborators = async (
+    profileID: string,
+    dataType: string = ""
+) => {
+
+    const normalizedProfileID = String( profileID ?? "" ).trim()
+    if( normalizedProfileID.length === 0 ){
+        throw new Error( "Custom index profile id is required." )
+    }
+
+    const parameters: Record<string, string> = {
+        profileID: normalizedProfileID,
+        dataType: resolveHyperspectrumDataType( dataType )
+    }
+
+    const base = (import.meta as any).env.VITE_BASE_URL + "/hyperspectrum/custom-index/profile/collaborators"
+    const url = base + "?" + buildQueryString( parameters )
+
+    return await apiFetch<any>( url )
+}
+
+var addCustomIndexProfileCollaborator = async (
+    profileID: string,
+    email: string,
+    dataType: string = ""
+) => {
+
+    const normalizedProfileID = String( profileID ?? "" ).trim()
+    const normalizedEmail = String( email ?? "" ).trim()
+    if( normalizedProfileID.length === 0 ){
+        throw new Error( "Custom index profile id is required." )
+    }
+    if( normalizedEmail.length === 0 ){
+        throw new Error( "Collaborator email is required." )
+    }
+
+    const parameters: Record<string, string> = {
+        profileID: normalizedProfileID,
+        dataType: resolveHyperspectrumDataType( dataType )
+    }
+
+    const base = (import.meta as any).env.VITE_BASE_URL + "/hyperspectrum/custom-index/profile/collaborator"
+    const url = base + "?" + buildQueryString( parameters )
+
+    return await apiFetch<any>( url, {
+        method: "POST",
+        body: JSON.stringify({ email: normalizedEmail })
+    })
+}
+
+var removeCustomIndexProfileCollaborator = async (
+    profileID: string,
+    collaboratorID: string,
+    dataType: string = ""
+) => {
+
+    const normalizedProfileID = String( profileID ?? "" ).trim()
+    const normalizedCollaboratorID = String( collaboratorID ?? "" ).trim()
+    if( normalizedProfileID.length === 0 ){
+        throw new Error( "Custom index profile id is required." )
+    }
+    if( normalizedCollaboratorID.length === 0 ){
+        throw new Error( "Custom index collaborator id is required." )
+    }
+
+    const parameters: Record<string, string> = {
+        profileID: normalizedProfileID,
+        collaboratorID: normalizedCollaboratorID,
+        dataType: resolveHyperspectrumDataType( dataType )
+    }
+
+    const base = (import.meta as any).env.VITE_BASE_URL + "/hyperspectrum/custom-index/profile/collaborator"
+    const url = base + "?" + buildQueryString( parameters )
+
+    return await apiFetch<any>( url, { method: "DELETE" })
+}
+
+var previewCustomIndex = async (
+    project: any,
+    model: CustomIndexFormulaModel,
+    dataType: string = ""
+) => {
+
+    const projectReference = resolveProjectReference( project )
+    if( projectReference.projectID.length === 0 ){
+        throw new Error( "Missing projectID for custom index preview request." )
+    }
+
+    const normalizedDataType = resolveHyperspectrumDataType( dataType )
+    const parameters: Record<string, string> = {
+        projectID: projectReference.projectID,
+        dataType: normalizedDataType
+    }
+    if( projectReference.isShared || projectReference.projectKey.length > 0 ){
+        parameters.projectKey = projectReference.projectKey
+    }
+
+    const body: CustomIndexPreviewRequest = {
+        version: "custom-index-preview-request-v1",
+        projectID: projectReference.projectID,
+        dataType: normalizedDataType,
+        model
+    }
+    if( projectReference.isShared || projectReference.projectKey.length > 0 ){
+        body.projectKey = projectReference.projectKey
+    }
+
+    const base = (import.meta as any).env.VITE_BASE_URL + "/hyperspectrum/custom-index/preview"
+    const url = base + "?" + buildQueryString( parameters )
+
+    return await apiFetch<any>( url, {
+        method: "POST",
+        body: JSON.stringify( body )
+    })
+}
+
+var loadProjectCustomIndexAssignment = async (
+    project: any,
+    dataType: string = ""
+) => {
+
+    const projectReference = resolveProjectReference( project )
+    if( projectReference.projectID.length === 0 ){
+        throw new Error( "Missing projectID for custom index assignment request." )
+    }
+
+    const parameters: Record<string, string> = {
+        projectID: projectReference.projectID,
+        dataType: resolveHyperspectrumDataType( dataType )
+    }
+    if( projectReference.isShared || projectReference.projectKey.length > 0 ){
+        parameters.projectKey = projectReference.projectKey
+    }
+
+    const route = projectReference.isShared
+        ? "/hyperspectrum/shared/custom-index/project"
+        : "/hyperspectrum/custom-index/project"
+    const base = (import.meta as any).env.VITE_BASE_URL + route
+    const url = base + "?" + buildQueryString( parameters )
+
+    return await apiFetch<any>( url )
+}
+
+var saveProjectCustomIndexAssignment = async (
+    project: any,
+    entries: Array<{ profileID: string, order: number }> = [],
+    dataType: string = ""
+) => {
+
+    const projectReference = resolveProjectReference( project )
+    if( projectReference.projectID.length === 0 ){
+        throw new Error( "Missing projectID for custom index assignment save." )
+    }
+    if( projectReference.isShared ){
+        throw new Error( "Custom index assignment is not available for shared projects." )
+    }
+
+    const normalizedEntries = ( Array.isArray( entries ) ? entries : [] )
+        .map(( entry, index ) => ({
+            profileID: String( entry?.profileID ?? "" ).trim(),
+            order: Number.isInteger( Number( entry?.order )) ? Number( entry.order ) : index
+        }))
+        .filter(( entry ) => entry.profileID.length > 0 )
+
+    const body: ProjectCustomIndexAssignmentWriteRequest = {
+        version: "project-custom-index-assignment-write-v1",
+        entries: normalizedEntries
+    }
+    const parameters: Record<string, string> = {
+        projectID: projectReference.projectID,
+        dataType: resolveHyperspectrumDataType( dataType )
+    }
+
+    const base = (import.meta as any).env.VITE_BASE_URL + "/hyperspectrum/custom-index/project"
+    const url = base + "?" + buildQueryString( parameters )
+
+    return await apiFetch<any>( url, {
+        method: "PUT",
+        body: JSON.stringify( body )
+    })
+}
+
+var loadCustomIndexArtifact = async (
+    project: any,
+    profileID: string,
+    dataType: string = ""
+) => {
+
+    const projectReference = resolveProjectReference( project )
+    const normalizedProfileID = String( profileID ?? "" ).trim()
+    if( projectReference.projectID.length === 0 ){
+        throw new Error( "Missing projectID for custom index artifact request." )
+    }
+    if( normalizedProfileID.length === 0 ){
+        throw new Error( "Custom index profile id is required." )
+    }
+
+    const parameters: Record<string, string> = {
+        projectID: projectReference.projectID,
+        profileID: normalizedProfileID,
+        dataType: resolveHyperspectrumDataType( dataType )
+    }
+    if( projectReference.isShared || projectReference.projectKey.length > 0 ){
+        parameters.projectKey = projectReference.projectKey
+    }
+
+    const route = projectReference.isShared
+        ? "/hyperspectrum/shared/custom-index/artifact"
+        : "/hyperspectrum/custom-index/artifact"
+    const base = (import.meta as any).env.VITE_BASE_URL + route
+    const url = base + "?" + buildQueryString( parameters )
+
+    return await apiFetch<any>( url )
+}
+
 var listRois = async (
     project: any,
     dataType: string = ""
@@ -1162,6 +1560,18 @@ export default {
     spectrum,
     meanSpectrum,
     status,
+    listCustomIndexProfiles,
+    getCustomIndexProfile,
+    createCustomIndexProfile,
+    updateCustomIndexProfile,
+    deleteCustomIndexProfile,
+    listCustomIndexProfileCollaborators,
+    addCustomIndexProfileCollaborator,
+    removeCustomIndexProfileCollaborator,
+    previewCustomIndex,
+    loadProjectCustomIndexAssignment,
+    saveProjectCustomIndexAssignment,
+    loadCustomIndexArtifact,
     listRois,
     createRoi,
     deleteRoi,

@@ -133,14 +133,14 @@
 
 <script setup>
 
-import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from "vue"
+import { ref, computed, watch, nextTick, onBeforeUnmount } from "vue"
 import { Amplify } from "aws-amplify"
 import { chat } from "@harkana/tools"
 import katex from "katex"
+import { useFloatingPanel } from "../../composables/useFloatingPanel.js"
 
 const Auth = Amplify.Auth
 const PAGE_LIMIT = 50
-const WINDOW_MARGIN = 8
 const messageBodySegmentCache = new Map()
 
 const props = defineProps({
@@ -155,10 +155,16 @@ const emit = defineEmits([ "update:modelValue" ])
 const panel = ref(null)
 const messageList = ref(null)
 
-const panelPosition = ref({ left: WINDOW_MARGIN, top: WINDOW_MARGIN })
-const hasInitializedPosition = ref(false)
-const isDragging = ref(false)
-const dragOffset = ref({ x: 0, y: 0 })
+const {
+	panelStyles,
+	startDragging
+} = useFloatingPanel({
+	panel,
+	isOpen: computed(() => props.modelValue),
+	defaultWidth: 420,
+	defaultHeight: 560,
+	placement: "bottom-right"
+})
 
 const currentUserSub = ref("")
 const messages = ref([])
@@ -211,13 +217,6 @@ const projectOwnerSub = computed(() => {
 	}
 
 	return ""
-})
-
-const panelStyles = computed(() => {
-	return {
-		left: `${panelPosition.value.left}px`,
-		top: `${panelPosition.value.top}px`
-	}
 })
 
 const close = () => {
@@ -778,70 +777,8 @@ const handleComposerKeydown = ( event ) => {
 	void sendMessage()
 }
 
-const clampPanelPosition = ( left, top ) => {
-	const panelElement = panel.value
-	const width = panelElement?.offsetWidth ?? 420
-	const height = panelElement?.offsetHeight ?? 560
-
-	const maxLeft = Math.max( WINDOW_MARGIN, window.innerWidth - width - WINDOW_MARGIN )
-	const maxTop = Math.max( WINDOW_MARGIN, window.innerHeight - height - WINDOW_MARGIN )
-
-	return {
-		left: Math.min( Math.max( WINDOW_MARGIN, left ), maxLeft ),
-		top: Math.min( Math.max( WINDOW_MARGIN, top ), maxTop )
-	}
-}
-
-const initializePanelPosition = async () => {
-	await nextTick()
-
-	const panelElement = panel.value
-	const width = panelElement?.offsetWidth ?? 420
-	const height = panelElement?.offsetHeight ?? 560
-
-	const preferredLeft = window.innerWidth - width - WINDOW_MARGIN
-	const preferredTop = window.innerHeight - height - WINDOW_MARGIN
-	panelPosition.value = clampPanelPosition( preferredLeft, preferredTop )
-	hasInitializedPosition.value = true
-}
-
-const startDragging = ( event ) => {
-	if( event.button !== 0 ) return
-
-	isDragging.value = true
-	dragOffset.value = {
-		x: event.clientX - panelPosition.value.left,
-		y: event.clientY - panelPosition.value.top
-	}
-
-	event.preventDefault()
-}
-
-const onMouseMove = ( event ) => {
-	if( isDragging.value === false ) return
-
-	panelPosition.value = clampPanelPosition(
-		event.clientX - dragOffset.value.x,
-		event.clientY - dragOffset.value.y
-	)
-}
-
-const onMouseUp = () => {
-	isDragging.value = false
-}
-
-const onWindowResize = () => {
-	panelPosition.value = clampPanelPosition( panelPosition.value.left, panelPosition.value.top )
-}
-
 watch( () => props.modelValue, async ( nextOpen ) => {
 	if( nextOpen ){
-		if( hasInitializedPosition.value === false ){
-			await initializePanelPosition()
-		} else {
-			panelPosition.value = clampPanelPosition( panelPosition.value.left, panelPosition.value.top )
-		}
-
 		await loadInitialMessages()
 		startPolling()
 		return
@@ -861,16 +798,7 @@ watch(
 	}
 )
 
-onMounted(() => {
-	window.addEventListener( "mousemove", onMouseMove )
-	window.addEventListener( "mouseup", onMouseUp )
-	window.addEventListener( "resize", onWindowResize )
-})
-
 onBeforeUnmount(() => {
 	stopPolling()
-	window.removeEventListener( "mousemove", onMouseMove )
-	window.removeEventListener( "mouseup", onMouseUp )
-	window.removeEventListener( "resize", onWindowResize )
 })
 </script>

@@ -22,6 +22,7 @@ export function useProjectViewLifecycle( options ){
 	const loadRoiList = options.loadRoiList
 	const loadXyz = options.loadXyz
 	const loadSpectralCalibrationState = options.loadSpectralCalibrationState
+	const loadCustomIndexState = options.loadCustomIndexState
 	const layerCacheOptions = options.layerCacheOptions
 	const ensureDefaultZBlendState = options.ensureDefaultZBlendState
 	const loadProjectSpectrumGridlinePreset = options.loadProjectSpectrumGridlinePreset
@@ -82,6 +83,12 @@ export function useProjectViewLifecycle( options ){
 
 			if( typeof loadSpectralCalibrationState === "function" ){
 				await loadSpectralCalibrationState()
+			}
+
+			if( requestID !== activeProjectLoadRequestID.value ) return
+
+			if( typeof loadCustomIndexState === "function" ){
+				await loadCustomIndexState()
 			}
 
 			if( requestID !== activeProjectLoadRequestID.value ) return

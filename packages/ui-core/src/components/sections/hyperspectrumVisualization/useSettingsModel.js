@@ -163,7 +163,13 @@ function useHyperspectrumVisualizationSettings(){
 
     const colormaps = reactive({
         mip: "Viridis",
-        layer: "Viridis"
+        layer: "Viridis",
+        customIndex: "Viridis"
+    })
+
+    const customIndexSymbols = reactive({
+        data: "D",
+        estimate: "E"
     })
 
     const spectrumColors = reactive({
@@ -237,6 +243,17 @@ function useHyperspectrumVisualizationSettings(){
         colormaps.layer = typeof savedSettings?.colormaps?.layer === "string" && savedSettings.colormaps.layer.length > 0
             ? savedSettings.colormaps.layer
             : "Viridis"
+        colormaps.customIndex = typeof savedSettings?.colormaps?.customIndex === "string" && savedSettings.colormaps.customIndex.length > 0
+            ? savedSettings.colormaps.customIndex
+            : "Viridis"
+        customIndexSymbols.data =
+            typeof savedSettings?.hyperspectrumCustomIndex?.symbols?.data === "string" && savedSettings.hyperspectrumCustomIndex.symbols.data.length > 0
+                ? savedSettings.hyperspectrumCustomIndex.symbols.data
+                : "D"
+        customIndexSymbols.estimate =
+            typeof savedSettings?.hyperspectrumCustomIndex?.symbols?.estimate === "string" && savedSettings.hyperspectrumCustomIndex.symbols.estimate.length > 0
+                ? savedSettings.hyperspectrumCustomIndex.symbols.estimate
+                : "E"
 
         spectrumColors.queriedSpectrum =
             typeof savedSettings?.hyperspectrumColors?.queriedSpectrum === "string" && savedSettings.hyperspectrumColors.queriedSpectrum.length > 0
@@ -409,7 +426,17 @@ function useHyperspectrumVisualizationSettings(){
         savedSettings.colormaps = {
             ...( savedSettings.colormaps ?? {} ),
             mip: colormaps.mip,
-            layer: colormaps.layer
+            layer: colormaps.layer,
+            customIndex: colormaps.customIndex
+        }
+
+        savedSettings.hyperspectrumCustomIndex = {
+            ...( savedSettings.hyperspectrumCustomIndex ?? {} ),
+            symbols: {
+                ...( savedSettings.hyperspectrumCustomIndex?.symbols ?? {} ),
+                data: String( customIndexSymbols.data ?? "" ).trim() || "D",
+                estimate: String( customIndexSymbols.estimate ?? "" ).trim() || "E"
+            }
         }
 
         const normalizedRoiPalette = normalizeRoiPalette( roiPalette )
@@ -511,6 +538,7 @@ function useHyperspectrumVisualizationSettings(){
         activeVisualizationTab,
         colorscales,
         colormaps,
+        customIndexSymbols,
         fontSizes,
         gridlines,
         labels,

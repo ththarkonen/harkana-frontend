@@ -24,6 +24,7 @@ export function useHyperspectrumRenderPipeline( options ){
 	const normalizedHiddenSpectrumLegendKeys = options.normalizedHiddenSpectrumLegendKeys
 	const activePlot = options.activePlot
 	const ensureZBlendVisualizationMatrix = options.ensureZBlendVisualizationMatrix
+	const ensureCustomIndexMatrix = options.ensureCustomIndexMatrix
 	const ensureEstimatedVisualizationMatrix = options.ensureEstimatedVisualizationMatrix
 	const ensureActivePlotLoadings = options.ensureActivePlotLoadings
 	const syncSpectrumPlotGraphListeners = options.syncSpectrumPlotGraphListeners
@@ -274,6 +275,10 @@ export function useHyperspectrumRenderPipeline( options ){
 
 		if( activePlot.value === "z_blend" ){
 			await ensureZBlendVisualizationMatrix( "high" )
+		} else if( activePlot.value === "custom_index" ){
+			if( typeof ensureCustomIndexMatrix === "function" ){
+				await ensureCustomIndexMatrix( "high" )
+			}
 		} else if( options.heatmapUsesEstimatedRaman.value ){
 			await ensureEstimatedVisualizationMatrix( "high" )
 		}

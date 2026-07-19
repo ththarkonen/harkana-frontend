@@ -13,6 +13,7 @@ function createHyperspectrumDisplayRegistry( deps ){
         estimatedUmap,
         zBlendMeasurementSource,
         zBlendEstimatedSource,
+        customIndexMatrix,
         pcaClassificationMip,
         estimatedPcaClassificationMip,
         pcaMip,
@@ -70,6 +71,15 @@ function createHyperspectrumDisplayRegistry( deps ){
             const source = loadedData ?? ( heatmapUsesEstimatedRaman.value ? zBlendEstimatedSource.value : zBlendMeasurementSource.value )
             if( source === null ) return
             hyperspectrum.prewarmZBlendHeatmapRendererPayload( graph.value, source )
+            return
+        }
+
+        if( target === "custom_index" ){
+            const matrix = loadedData ?? customIndexMatrix.value
+            if( matrix === null ) return
+            hyperspectrum.prewarmScalarHeatmapRendererPayload( graph.value, matrix, {
+                colorscale: settings.value?.colormaps?.customIndex ?? "Viridis"
+            } )
             return
         }
 
@@ -234,7 +244,11 @@ function createHyperspectrumDisplayRegistry( deps ){
 
         const scalarColorscale = activePlot.value === "layer"
             ? settings.value?.colormaps?.layer
-            : settings.value?.colormaps?.mip
+            : (
+                activePlot.value === "custom_index"
+                    ? settings.value?.colormaps?.customIndex
+                    : settings.value?.colormaps?.mip
+            )
         const colorscale = typeof scalarColorscale === "string" && scalarColorscale.length > 0
             ? scalarColorscale
             : "Viridis"
