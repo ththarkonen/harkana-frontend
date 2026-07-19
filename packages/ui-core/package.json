@@ -12,6 +12,7 @@
     "./DataFormats": "./src/components/DataFormats.vue",
     "./HyperDataFormats": "./src/components/HyperDataFormats.vue",
     "./CheckoutSuccess": "./src/components/CheckoutSuccess.vue",
+    "./AccountDeletionStatus": "./src/components/AccountDeletionStatus.vue",
     "./SignIn": "./src/components/SignIn.vue",
     "./Application": "./src/components/Application.vue",
     "./fontawesome": "./src/fontawesome.js",
