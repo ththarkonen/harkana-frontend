@@ -93,7 +93,6 @@
 										</button>
 									</li>
 
-							
 
 								<li><hr class = "h-0.5 bg-gray border-0"></li>
 								<li class = "px-4 pt-2 pb-1 text-xs uppercase tracking-wide text-white/70">
@@ -152,9 +151,9 @@
 											   :menu-class = "displaySelectMenuClass"></FloatingLabelSelect>
 						</div>
 
-				<div v-if = "activePlot === 'layer'" class = "mt-3" data-tutorial = "layer-controls">
-					<label for = "layer-input" class = "block text-sm font-semibold text-white mb-1">
-						Layer index
+					<div v-if = "activePlot === 'layer'" class = "mt-3" data-tutorial = "layer-controls">
+						<label for = "layer-input" class = "block text-sm font-semibold text-white mb-1">
+							Layer index
 					</label>
 					<div class = "viewer-stepper w-full border-b border-white/30 transition-colors focus-within:border-brand">
 						<input id = "layer-input"
@@ -185,12 +184,91 @@
 							</button>
 						</div>
 					</div>
-					<div class = "mt-1 text-xs text-white/70">
-						{{ layerAxisValueLabel }}
+						<div class = "mt-1 text-xs text-white/70">
+							{{ layerAxisValueLabel }}
+						</div>
 					</div>
-				</div>
 
-				<div v-if = "activePlot === 'z_blend'" class = "mt-3 space-y-3">
+					<div v-if = "activePlot === 'custom_index'" class = "mt-3 space-y-2">
+						<BaseDropdown root-class = "relative block w-full min-w-0 text-left"
+									  :show-chevron = "false"
+									  :close-on-select = "true"
+									  :teleport-to-body = "true"
+									  portal-placement = "bottom-start"
+									  trigger-class = "group flex h-9 w-full min-w-0 items-center justify-between gap-2 border-0 border-b border-white/20 bg-transparent px-0 py-1 text-left text-sm font-medium text-white transition focus:border-brand focus:outline-none focus-visible:border-brand"
+									  menu-class = "fixed z-[45] w-[min(24rem,calc(100vw-1rem))] max-w-[calc(100vw-1rem)] origin-top-left rounded-md bg-dark-gray shadow-lg ring-1 ring-black/30"
+									  list-class = "max-h-[min(18rem,calc(100vh-12rem))] overflow-y-auto py-1">
+							<template v-slot:trigger>
+								<span class = "min-w-0 flex-1 truncate pl-1"
+									  :title = "activeCustomIndexProfileLabel">
+									{{ activeCustomIndexProfileLabel }}
+								</span>
+								<i class = "fas fa-chevron-down shrink-0 text-xs text-white/60 transition group-hover:text-white"
+								   aria-hidden = "true"></i>
+							</template>
+
+							<BaseDropdownItem tooltip = "No custom index"
+											  @select = "selectCustomIndexProfile( '' )">
+								<div class = "flex min-w-0 items-center justify-between gap-3">
+									<span class = "min-w-0 flex-1 truncate">No custom index</span>
+									<i :class = "customIndexActiveProfileID.length === 0 ? 'fas fa-check text-brand' : 'fas fa-check opacity-0'"
+									   aria-hidden = "true"></i>
+								</div>
+							</BaseDropdownItem>
+
+							<BaseDropdownItem v-if = "customIndexPreviewAvailable"
+											  tooltip = "Unsaved preview"
+											  @select = "selectCustomIndexProfile( CUSTOM_INDEX_PREVIEW_PROFILE_ID )">
+								<div class = "flex min-w-0 items-center justify-between gap-3">
+									<span class = "min-w-0 flex-1 truncate">{{ customIndexPreviewLabel }}</span>
+									<i :class = "customIndexActiveProfileID === CUSTOM_INDEX_PREVIEW_PROFILE_ID ? 'fas fa-check text-brand' : 'fas fa-check opacity-0'"
+									   aria-hidden = "true"></i>
+								</div>
+							</BaseDropdownItem>
+
+							<BaseDropdownItem v-for = "entry in customIndexProjectEntries"
+											  :key = "'display-custom-index-' + entry.profileID"
+											  :tooltip = "formatCustomIndexProfileLabel( entry.profile ?? entry )"
+											  @select = "selectCustomIndexProfile( entry.profileID )">
+								<div class = "flex min-w-0 items-center justify-between gap-3">
+									<span class = "min-w-0 flex-1 truncate">{{ formatCustomIndexProfileLabel( entry.profile ?? entry ) }}</span>
+									<i :class = "customIndexActiveProfileID === entry.profileID ? 'fas fa-check text-brand' : 'fas fa-check opacity-0'"
+									   aria-hidden = "true"></i>
+								</div>
+							</BaseDropdownItem>
+						</BaseDropdown>
+
+						<div v-if = "project.shared !== true"
+							 class = "flex flex-wrap items-center gap-1.5">
+							<button type = "button"
+									@click = "openCustomIndexFormulaModal"
+									:disabled = "customIndexProfilesSupported === false"
+									class = "inline-flex h-8 w-8 items-center justify-center rounded-md text-white transition-colors hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-brand disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+									title = "Create custom index profile"
+									aria-label = "Create custom index profile">
+								<i class = "fas fa-square-root-alt" aria-hidden = "true"></i>
+							</button>
+							<button type = "button"
+									@click = "openCustomIndexProjectProfilesModal"
+									:disabled = "customIndexProfilesSupported === false"
+									class = "inline-flex h-8 w-8 items-center justify-center rounded-md text-white transition-colors hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-brand disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+									title = "Modify project custom index profiles"
+									aria-label = "Modify project custom index profiles">
+								<i class = "fas fa-tasks" aria-hidden = "true"></i>
+							</button>
+						</div>
+
+						<p v-if = "customIndexProfilesSupported === false"
+						   class = "text-xs leading-snug text-white/70">
+							Custom index profiles are not available in this environment.
+						</p>
+						<p v-if = "customIndexError.length > 0"
+						   class = "text-xs leading-snug text-red-300">
+							{{ customIndexError }}
+						</p>
+					</div>
+
+					<div v-if = "activePlot === 'z_blend'" class = "mt-3 space-y-3">
 					<div class = "w-full">
 						<BaseDropdown root-class = "relative block w-full text-left"
 									  :show-chevron = "false"
@@ -880,13 +958,13 @@
 				   class = "mt-2 text-xs leading-snug text-white/70">
 					Applied on top of the raw Z axis values.
 				</p>
-				<p v-if = "spectralCalibrationError.length > 0"
-				   class = "mt-2 text-xs leading-snug text-red-300">
-					{{ spectralCalibrationError }}
-				</p>
-			</div>
+					<p v-if = "spectralCalibrationError.length > 0"
+					   class = "mt-2 text-xs leading-snug text-red-300">
+						{{ spectralCalibrationError }}
+					</p>
+				</div>
 
-		</Sidebar>
+			</Sidebar>
 
 		<NavigationBar>
 			<template v-slot:left-items>
@@ -997,9 +1075,10 @@
 
 
 		<!-- Main Content -->
-			<main class="relative z-0 bg-dark-gray rounded-lg overflow-hidden shadow-sm p-0">
+			<main ref = "plottingAreaContainer"
+				  class="relative z-0 bg-dark-gray rounded-lg overflow-hidden shadow-sm p-0">
 				<template v-if = "heatmapRendererMode === 'deckgl'">
-					<div ref = "deckLayoutContainer" class = "flex h-full min-h-0 gap-0 p-2">
+					<div ref = "deckLayoutContainer" class = "flex h-full min-h-0 gap-0 p-4">
 						<div ref = "deckSpectraPaneContainer"
 							 class = "relative grid h-full min-h-0 min-w-0 flex-1 md:min-w-[20rem]"
 							 :style = "deckSpectraPaneGridStyle"
@@ -1101,18 +1180,34 @@
 															 :view-mode = "activePlot"
 															 :benchmark-token = "heatmapRenderBenchmarkToken"
 															 @point-select = "handleHeatmapPointSelection"
-															 @region-select = "handleHeatmapRegionSelection"
-															 @zoom-range = "handleHeatmapZoomRange"
-															 @reset-zoom = "handleHeatmapResetZoom"
-															 @render-timing = "handleHeatmapRendererTiming"></HeatmapRendererPane>
+																 @region-select = "handleHeatmapRegionSelection"
+																 @zoom-range = "handleHeatmapZoomRange"
+																 @reset-zoom = "handleHeatmapResetZoom"
+																 @render-timing = "handleHeatmapRendererTiming"></HeatmapRendererPane>
+											<div v-if = "customIndexEmptyStateVisible"
+												 class = "pointer-events-auto absolute inset-0 z-30 flex items-center justify-center rounded-lg bg-white px-6 text-center">
+												<div class = "max-w-sm text-sm leading-relaxed text-slate-700">
+													<div class = "mb-2 text-base font-semibold text-slate-900">No custom index displayed</div>
+													{{ customIndexEmptyStateText }}
+												</div>
+											</div>
+										</div>
 									</div>
+								</div>
+							</div>
+						</template>
+					<template v-else>
+						<div class = "relative h-full w-full rounded-lg bg-white">
+							<div ref = "graph" class = "w-full h-full bg-white rounded-lg"></div>
+							<div v-if = "customIndexEmptyStateVisible"
+								 class = "pointer-events-auto absolute inset-0 z-30 flex items-center justify-center rounded-lg bg-white px-6 text-center">
+								<div class = "max-w-sm text-sm leading-relaxed text-slate-700">
+									<div class = "mb-2 text-base font-semibold text-slate-900">No custom index displayed</div>
+									{{ customIndexEmptyStateText }}
 								</div>
 							</div>
 						</div>
 					</template>
-				<template v-else>
-					<div ref = "graph" class = "w-full h-full bg-white rounded-lg"></div>
-				</template>
 			</main>
 
 	</div>
@@ -1171,6 +1266,35 @@
 								 :reserved-names = "spectralCalibrationReservedProfileNames"
 								 :base-disabled-reason = "spectralCalibrationProfileSaveDisabledReason"
 								 @save = "saveSpectralCalibrationProfile"></CalibrationProfileSaveModal>
+	<CustomIndexFormulaModal ref = "customIndexFormulaModal"
+							 :axis-values = "customIndexAxisValues"
+							 :axis-unit = "customIndexAxisUnit"
+							 :data-symbol = "customIndexSymbolSettings.data"
+							 :estimate-symbol = "customIndexSymbolSettings.estimate"
+							 :estimates-available = "hasEstimatedRamanSpectraReady"
+							 :previewing = "customIndexPreviewing"
+							 :saving = "customIndexProfileSaving"
+							 :preview-signature = "customIndexPreviewSignature"
+							 :reserved-names = "customIndexReservedProfileNames"
+							 :error-message = "customIndexError"
+							 :anchor-element = "plottingAreaContainer"
+							 @preview = "previewCustomIndexFormula"
+							 @save = "saveCustomIndexFormulaProfile"></CustomIndexFormulaModal>
+	<CustomIndexProjectProfilesModal ref = "customIndexProjectProfilesModal"
+									 :supported = "customIndexProfilesSupported"
+									 :profiles-loading = "customIndexProfilesLoading"
+									 :saving = "customIndexAssignmentSaving"
+									 :dirty = "customIndexAssignmentDirty"
+									 :profile-options = "customIndexProfileOptions"
+									 :assigned-entries = "customIndexProjectEntries"
+									 :error-message = "customIndexError"
+									 @refresh = "refreshCustomIndexProfiles"
+									 @add-profile = "addCustomIndexProfileToProject"
+									 @remove-profile = "removeCustomIndexProfileFromProject"
+									 @move-profile = "moveCustomIndexProfileInProject"
+									 @update:active-profile-id = "selectCustomIndexProfile"
+									 @open-settings = "openCustomIndexSettingsFromProjectProfiles"
+									 @done = "handleCustomIndexProjectProfilesModalDone"></CustomIndexProjectProfilesModal>
 	<ProjectChatWindow v-model = "projectChatOpen"
 					   :project = "project"></ProjectChatWindow>
 	<ViewerTutorialPrompt :visible = "viewerTutorialPromptVisible"
@@ -1266,6 +1390,8 @@ import ProjectChatWindow from './chat/ProjectChatWindow.vue'
 import HeatmapRendererPane from './plot/HeatmapRendererPane.vue'
 import CalibrationPanel from './modals/CalibrationPanel.vue'
 import CalibrationProfileSaveModal from './modals/CalibrationProfileSaveModal.vue'
+import CustomIndexFormulaModal from './modals/CustomIndexFormulaModal.vue'
+import CustomIndexProjectProfilesModal from './modals/CustomIndexProjectProfilesModal.vue'
 import SpectralAxisOverwriteModal from './modals/SpectralAxisOverwriteModal.vue'
 import { createHyperspectrumDisplayRegistry } from './plot/hyperspectrum/displayRegistry.js'
 import DualRangeSlider from './general/DualRangeSlider.vue'
@@ -1296,6 +1422,17 @@ import { useSpectrumPlotSync } from '../composables/hyperspectrum/useSpectrumPlo
 import { useSpectrumPaneState } from '../composables/hyperspectrum/useSpectrumPaneState.js'
 import { useViewerTutorial } from '../composables/hyperspectrum/useViewerTutorial.js'
 import {
+	CUSTOM_INDEX_PROFILE_KIND,
+	buildCustomIndexFormulaModel,
+	formatCustomIndexProfileLabel,
+	isMissingCustomIndexApiError,
+	normalizeCustomIndexAssignmentEntries,
+	normalizeCustomIndexMatrixResponse,
+	normalizeCustomIndexProfileListResponse,
+	normalizeSymbolSettings,
+	serializeCustomIndexComputationModel
+} from '../composables/hyperspectrum/customIndex/formula.js'
+import {
 	normalizedLoadPriority,
 	shouldChunkBackgroundLoad,
 	yieldToBrowser
@@ -1314,6 +1451,9 @@ const downloadPreparingModal = ref(null)
 const xyzSettingsModal = ref(null)
 const spectralCalibrationProfileSaveModal = ref(null)
 const spectralAxisOverwriteModal = ref(null)
+const customIndexFormulaModal = ref(null)
+const customIndexProjectProfilesModal = ref(null)
+const plottingAreaContainer = ref(null)
 const displayInfoTrigger = ref(null)
 const displayOptionsDropdown = ref(null)
 const projectMenuDropdown = ref(null)
@@ -1362,6 +1502,22 @@ const spectralCalibrationDraft = ref({
 	includedOrders: [ 0 ],
 	points: []
 })
+const customIndexProfilesSupported = ref(true)
+const customIndexProfilesLoading = ref(false)
+const customIndexAssignmentSaving = ref(false)
+const customIndexProfileSaving = ref(false)
+const customIndexPreviewing = ref(false)
+const customIndexProfiles = ref([])
+const customIndexProjectEntries = ref([])
+const customIndexSavedAssignmentSignature = ref("[]")
+const customIndexActiveProfileID = ref("")
+const customIndexError = ref("")
+const customIndexPreviewResult = shallowRef(null)
+const customIndexPreviewModel = shallowRef(null)
+const customIndexPreviewSignature = ref("")
+const customIndexMatrixByProfileID = shallowRef({})
+const customIndexLoadingProfileID = ref("")
+const customIndexMatrixRequestID = ref(0)
 const layer = shallowRef(null)
 const pcaClassification = shallowRef(null)
 const pcaClassificationMip = shallowRef(null)
@@ -1452,6 +1608,7 @@ const DISPLAY_MODE_OPTIONS = new Set([
 	"umap",
 	"layer",
 	"z_blend",
+	"custom_index",
 	"pca",
 	"pca_mip",
 	"pca_rgb",
@@ -1477,6 +1634,7 @@ const DEFAULT_HYPERSPECTRUM_PRIORITIZATION = {
 	mip_hsv: true,
 	umap: true,
 	z_blend: false,
+	custom_index: false,
 	layer_window: true,
 	pca: false,
 	pca_mip: false,
@@ -1490,6 +1648,7 @@ const PREPARATION_TARGET_ORDER = [
 	"mip_hsv",
 	"umap",
 	"z_blend",
+	"custom_index",
 	"pca",
 	"pca_mip",
 	"pca_rgb",
@@ -1505,6 +1664,7 @@ const PREPARATION_TARGET_LABELS = {
 	umap: "UMAP",
 	layer_window: "Layer neighborhood",
 	z_blend: "Z-blend",
+	custom_index: "Custom index",
 	pca: "PCA classification",
 	pca_mip: "PCA MIP",
 	pca_rgb: "PCA RGB",
@@ -1518,6 +1678,7 @@ const DISPLAY_MODE_SELECT_OPTIONS = [
 	{ value: "umap", label: "UMAP" },
 	{ value: "layer", label: "Layer" },
 	{ value: "z_blend", label: "Z-blend" },
+	{ value: "custom_index", label: "Custom index" },
 	{ value: "pca", label: "PCA classification" },
 	{ value: "pca_mip", label: "PCA MIP" },
 	{ value: "pca_rgb", label: "PCA RGB" },
@@ -1531,6 +1692,7 @@ const DISPLAY_MODE_LABELS = {
 	umap: "UMAP",
 	layer: "Layer",
 	z_blend: "Z-blend",
+	custom_index: "Custom index",
 	pca: "PCA classification",
 	pca_mip: "PCA MIP",
 	pca_rgb: "PCA RGB",
@@ -1617,6 +1779,7 @@ const {
 
 const measurementDataType = String( import.meta.env?.VITE_DATA_TYPE ?? "hypercars" ).trim() || "hypercars"
 const HYPERSPECTRAL_CALIBRATION_AXIS_ROLE = "hyperspectral-spectral"
+const CUSTOM_INDEX_PREVIEW_PROFILE_ID = "__custom_index_preview__"
 
 const isMissingCalibrationProfileApiError = ( error ) => {
 	const status = Number( error?.status )
@@ -2105,6 +2268,11 @@ const openVisualizationSettings = () => {
 	navigation.redirect('Settings', 'Visualization')
 }
 
+const openCustomIndexSettingsFromProjectProfiles = () => {
+	customIndexProjectProfilesModal.value?.close?.()
+	openVisualizationSettings()
+}
+
 const openMetadataModal = () => {
 	metadataModal.value?.open()
 }
@@ -2208,6 +2376,9 @@ const currentMeasurementMatrix = () => {
 	}
 	if( activePlot.value === "z_blend" ){
 		return zBlendMeasurementSource.value
+	}
+	if( activePlot.value === "custom_index" ){
+		return customIndexMatrix.value
 	}
 	if( activePlot.value === "pca" ){
 		return pcaClassificationMip.value
@@ -2742,6 +2913,602 @@ const zAxisValues = () => {
 	}
 
 	return [ 0 ]
+}
+
+const customIndexAxisValues = computed(() => {
+	const values = effectiveSpectralAxisValues()
+	return values.length > 0 ? values : zAxisValues()
+})
+
+const customIndexAxisUnit = computed(() => {
+	const unit = String( xyzAxes.value?.zUnit ?? "index" ).trim()
+	return unit.length > 0 ? unit : "index"
+})
+
+const customIndexSymbolSettings = computed(() => {
+	return normalizeSymbolSettings( settings.value?.hyperspectrumCustomIndex?.symbols )
+})
+
+const customIndexPreviewMatrix = computed(() => {
+	return normalizeCustomIndexMatrixResponse( customIndexPreviewResult.value )
+})
+
+const customIndexMatrix = computed(() => {
+	const activeProfileID = String( customIndexActiveProfileID.value ?? "" ).trim()
+	if( activeProfileID.length === 0 ){
+		return null
+	}
+
+	if( activeProfileID === CUSTOM_INDEX_PREVIEW_PROFILE_ID ){
+		return customIndexPreviewMatrix.value
+	}
+
+	return customIndexMatrixByProfileID.value[activeProfileID] ?? null
+})
+
+const customIndexPreviewAvailable = computed(() => {
+	return customIndexPreviewMatrix.value !== null
+})
+
+const customIndexPreviewLabel = computed(() => {
+	const outputLabel = String( customIndexPreviewModel.value?.outputLabel ?? "" ).trim()
+	return outputLabel.length > 0 ? `Preview: ${outputLabel}` : "Unsaved preview"
+})
+
+const customIndexAssignmentSignature = ( entries = [] ) => {
+	return JSON.stringify(
+		normalizeCustomIndexAssignmentEntries( entries )
+			.map(( entry, index ) => ({
+				profileID: String( entry?.profileID ?? "" ).trim(),
+				order: index
+			}))
+	)
+}
+
+const customIndexAssignmentDirty = computed(() => {
+	return customIndexAssignmentSignature( customIndexProjectEntries.value ) !== customIndexSavedAssignmentSignature.value
+})
+
+const customIndexProfileOptions = computed(() => {
+	return customIndexProfiles.value.map(( profile ) => {
+		const profileID = String( profile?.profileID ?? "" ).trim()
+		const shared = profile?.shared === true
+		const suffix = shared ? " • shared" : ""
+		return {
+			value: profileID,
+			label: `${formatCustomIndexProfileLabel( profile )}${suffix}`
+		}
+	}).filter(( option ) => option.value.length > 0 )
+})
+
+const customIndexReservedProfileNames = computed(() => {
+	return customIndexProfiles.value
+		.filter(( profile ) => profile?.shared !== true )
+		.map(( profile ) => String( profile?.friendlyName ?? "" ).trim() )
+		.filter(( friendlyName ) => friendlyName.length > 0 )
+})
+
+const customIndexActiveEntry = computed(() => {
+	const activeProfileID = String( customIndexActiveProfileID.value ?? "" ).trim()
+	if( activeProfileID.length === 0 ){
+		return null
+	}
+
+	return customIndexProjectEntries.value.find(( entry ) => String( entry?.profileID ?? "" ).trim() === activeProfileID ) ?? null
+})
+
+const activeCustomIndexProfileLabel = computed(() => {
+	if( customIndexActiveProfileID.value === CUSTOM_INDEX_PREVIEW_PROFILE_ID ){
+		return customIndexPreviewLabel.value
+	}
+
+	const entry = customIndexActiveEntry.value
+	if( entry !== null ){
+		return formatCustomIndexProfileLabel( entry?.profile ?? entry )
+	}
+
+	const activeProfileID = String( customIndexActiveProfileID.value ?? "" ).trim()
+	return activeProfileID.length > 0 ? activeProfileID : "No custom index"
+})
+
+const customIndexEmptyStateVisible = computed(() => {
+	return activePlot.value === "custom_index" && customIndexMatrix.value === null
+})
+
+const customIndexEmptyStateText = computed(() => {
+	if( customIndexLoadingProfileID.value.length > 0 ){
+		return "Loading custom index..."
+	}
+	if( customIndexActiveProfileID.value.length === 0 ){
+		return "Create a custom index profile or add saved profiles from the Display controls to show it here."
+	}
+	if( customIndexError.value.length > 0 ){
+		return customIndexError.value
+	}
+	return "The selected custom index has not been materialized for this project yet. Close the project profile manager to save the assignment."
+})
+
+const customIndexProfileByID = ( profileID ) => {
+	const normalizedProfileID = String( profileID ?? "" ).trim()
+	if( normalizedProfileID.length === 0 ){
+		return null
+	}
+
+	return customIndexProfiles.value.find(( profile ) => {
+		return String( profile?.profileID ?? "" ).trim() === normalizedProfileID
+	}) ?? null
+}
+
+const withCustomIndexProfileDetails = ( entries = [] ) => {
+	return normalizeCustomIndexAssignmentEntries( entries ).map(( entry ) => {
+		const profile = entry?.profile ?? customIndexProfileByID( entry.profileID )
+		return profile !== null && typeof profile === "object"
+			? { ...entry, profile }
+			: entry
+	})
+}
+
+const setCustomIndexMatrixForProfile = ( profileID, matrix ) => {
+	const normalizedProfileID = String( profileID ?? "" ).trim()
+	if( normalizedProfileID.length === 0 || matrix === null ){
+		return
+	}
+
+	customIndexMatrixByProfileID.value = {
+		...customIndexMatrixByProfileID.value,
+		[normalizedProfileID]: matrix
+	}
+}
+
+const loadCustomIndexMatrix = async ( priority = "high" ) => {
+	const activeProfileID = String( customIndexActiveProfileID.value ?? "" ).trim()
+	if( activeProfileID.length === 0 ){
+		return null
+	}
+
+	if( activeProfileID === CUSTOM_INDEX_PREVIEW_PROFILE_ID ){
+		return customIndexPreviewMatrix.value
+	}
+
+	if( customIndexMatrixByProfileID.value[activeProfileID] !== undefined ){
+		return customIndexMatrixByProfileID.value[activeProfileID]
+	}
+
+	const requestID = customIndexMatrixRequestID.value + 1
+	customIndexMatrixRequestID.value = requestID
+	customIndexLoadingProfileID.value = activeProfileID
+	customIndexError.value = ""
+
+	try{
+		const response = await hyperspectra.loadCustomIndexArtifact(
+			project.value,
+			activeProfileID,
+			measurementDataType
+		)
+		if( requestID !== customIndexMatrixRequestID.value ){
+			return null
+		}
+
+		const matrix = normalizeCustomIndexMatrixResponse( response )
+		if( matrix === null ){
+			throw new Error( "Custom index artifact response did not include a matrix." )
+		}
+
+		setCustomIndexMatrixForProfile( activeProfileID, matrix )
+		return matrix
+	} catch( error ){
+		if( requestID === customIndexMatrixRequestID.value ){
+			if( isMissingCustomIndexApiError( error ) ){
+				customIndexError.value = "Custom index artifact is not available yet."
+			} else {
+				customIndexError.value = String( error?.detail ?? error?.message ?? "Failed to load custom index artifact." ).trim()
+				console.log( error )
+			}
+		}
+		return null
+	} finally {
+		if( requestID === customIndexMatrixRequestID.value ){
+			customIndexLoadingProfileID.value = ""
+		}
+	}
+}
+
+const ensureCustomIndexMatrix = async ( priority = "high" ) => {
+	return await loadCustomIndexMatrix( priority )
+}
+
+const clearHeatmapDisplay = () => {
+	heatmapRendererPayload.value = null
+	heatmapRendererPaneState.value = null
+	pendingDeckRenderBenchmark.value = null
+}
+
+const selectCustomIndexProfile = async ( profileID ) => {
+	const normalizedProfileID = String( profileID ?? "" ).trim()
+	customIndexActiveProfileID.value = normalizedProfileID
+	customIndexError.value = ""
+
+	if( activePlot.value === "custom_index" ){
+		if( normalizedProfileID.length === 0 ){
+			clearHeatmapDisplay()
+			return
+		}
+		await loadCustomIndexMatrix( "high" )
+		await renderCurrentMatrix()
+	}
+}
+
+const refreshCustomIndexProfiles = async () => {
+	if( project.value?.shared === true ){
+		return
+	}
+
+	customIndexProfilesLoading.value = true
+	customIndexError.value = ""
+
+	try{
+		const ownedResponse = await hyperspectra.listCustomIndexProfiles({
+			dataType: measurementDataType,
+			scope: "owned"
+		})
+		const ownedProfiles = normalizeCustomIndexProfileListResponse( ownedResponse )
+		let sharedProfiles = []
+
+		try{
+			const sharedResponse = await hyperspectra.listCustomIndexProfiles({
+				dataType: measurementDataType,
+				scope: "shared"
+			})
+			sharedProfiles = normalizeCustomIndexProfileListResponse( sharedResponse )
+				.map(( profile ) => ({ ...profile, shared: true }))
+		} catch( error ){
+			if( isMissingCustomIndexApiError( error ) === false ){
+				console.log( error )
+			}
+		}
+
+		customIndexProfiles.value = [ ...ownedProfiles, ...sharedProfiles ]
+		customIndexProjectEntries.value = withCustomIndexProfileDetails( customIndexProjectEntries.value )
+		customIndexProfilesSupported.value = true
+	} catch( error ){
+		if( isMissingCustomIndexApiError( error ) ){
+			customIndexProfilesSupported.value = false
+			customIndexProfiles.value = []
+			return
+		}
+
+		customIndexError.value = String( error?.detail ?? error?.message ?? "Failed to load custom index profiles." ).trim()
+		console.log( error )
+	} finally {
+		customIndexProfilesLoading.value = false
+	}
+}
+
+const loadCustomIndexAssignment = async () => {
+	customIndexError.value = ""
+
+	try{
+		const response = await hyperspectra.loadProjectCustomIndexAssignment(
+			project.value,
+			measurementDataType
+		)
+		const entries = withCustomIndexProfileDetails( response )
+		customIndexProjectEntries.value = entries
+		customIndexSavedAssignmentSignature.value = customIndexAssignmentSignature( entries )
+		customIndexProfilesSupported.value = true
+
+		const activeProfileID = String( customIndexActiveProfileID.value ?? "" ).trim()
+		if( entries.some(( entry ) => entry.profileID === activeProfileID ) === false ){
+			customIndexActiveProfileID.value = String( entries[0]?.profileID ?? "" ).trim()
+		}
+	} catch( error ){
+		if( isMissingCustomIndexApiError( error ) ){
+			customIndexProfilesSupported.value = false
+			customIndexProjectEntries.value = []
+			customIndexSavedAssignmentSignature.value = "[]"
+			customIndexActiveProfileID.value = ""
+			return
+		}
+
+		customIndexError.value = String( error?.detail ?? error?.message ?? "Failed to load project custom indices." ).trim()
+		console.log( error )
+	}
+}
+
+const loadCustomIndexState = async () => {
+	await loadCustomIndexAssignment()
+	if( project.value?.shared !== true && customIndexProfilesSupported.value ){
+		await refreshCustomIndexProfiles()
+	}
+}
+
+const openCustomIndexProjectProfilesModal = async () => {
+	if( project.value?.shared === true ){
+		return
+	}
+
+	customIndexProjectProfilesModal.value?.open?.()
+
+	if(
+		project.value?.shared !== true &&
+		customIndexProfilesSupported.value &&
+		customIndexProfilesLoading.value === false &&
+		customIndexProfiles.value.length === 0
+	){
+		void refreshCustomIndexProfiles().catch(( error ) => {
+			console.log( error )
+		})
+	}
+}
+
+const handleCustomIndexProjectProfilesModalDone = async () => {
+	if( project.value?.shared === true ){
+		return
+	}
+
+	if( customIndexAssignmentDirty.value === false ){
+		customIndexProjectProfilesModal.value?.close?.()
+		return
+	}
+
+	const saved = await saveProjectCustomIndexAssignment()
+	if( saved ){
+		customIndexProjectProfilesModal.value?.close?.()
+	}
+}
+
+const addCustomIndexProfileToProject = async ( profileID ) => {
+	const normalizedProfileID = String( profileID ?? "" ).trim()
+	if( normalizedProfileID.length === 0 ){
+		return
+	}
+	if( customIndexProjectEntries.value.some(( entry ) => String( entry?.profileID ?? "" ).trim() === normalizedProfileID )){
+		return
+	}
+
+	const profile = customIndexProfileByID( normalizedProfileID )
+	customIndexProjectEntries.value = withCustomIndexProfileDetails([
+		...customIndexProjectEntries.value,
+		{
+			profileID: normalizedProfileID,
+			order: customIndexProjectEntries.value.length,
+			profile: profile ?? undefined
+		}
+	])
+	customIndexActiveProfileID.value = normalizedProfileID
+
+	if( activePlot.value === "custom_index" ){
+		await loadCustomIndexMatrix( "high" )
+		await renderCurrentMatrix()
+	}
+}
+
+const removeCustomIndexProfileFromProject = async ( profileID ) => {
+	const normalizedProfileID = String( profileID ?? "" ).trim()
+	if( normalizedProfileID.length === 0 ){
+		return
+	}
+
+	const nextEntries = customIndexProjectEntries.value.filter(( entry ) => {
+		return String( entry?.profileID ?? "" ).trim() !== normalizedProfileID
+	})
+	customIndexProjectEntries.value = withCustomIndexProfileDetails( nextEntries )
+
+	if( customIndexActiveProfileID.value === normalizedProfileID ){
+		customIndexActiveProfileID.value = String( customIndexProjectEntries.value[0]?.profileID ?? "" ).trim()
+	}
+
+	if( activePlot.value === "custom_index" ){
+		await loadCustomIndexMatrix( "high" )
+		await renderCurrentMatrix()
+	}
+}
+
+const moveCustomIndexProfileInProject = ({ profileID, direction } = {}) => {
+	const normalizedProfileID = String( profileID ?? "" ).trim()
+	const step = Number( direction ) < 0 ? -1 : 1
+	const currentEntries = [ ...customIndexProjectEntries.value ]
+	const currentIndex = currentEntries.findIndex(( entry ) => String( entry?.profileID ?? "" ).trim() === normalizedProfileID )
+	const nextIndex = currentIndex + step
+	if( currentIndex < 0 || nextIndex < 0 || nextIndex >= currentEntries.length ){
+		return
+	}
+
+	const [ entry ] = currentEntries.splice( currentIndex, 1 )
+	currentEntries.splice( nextIndex, 0, entry )
+	customIndexProjectEntries.value = withCustomIndexProfileDetails(
+		currentEntries.map(( currentEntry, index ) => ({
+			...currentEntry,
+			order: index
+		}))
+	)
+}
+
+const saveProjectCustomIndexAssignment = async () => {
+	if( project.value?.shared === true || customIndexAssignmentSaving.value ){
+		return false
+	}
+
+	customIndexAssignmentSaving.value = true
+	customIndexError.value = ""
+
+	try{
+		const entries = normalizeCustomIndexAssignmentEntries( customIndexProjectEntries.value )
+		const response = await hyperspectra.saveProjectCustomIndexAssignment(
+			project.value,
+			entries.map(( entry, index ) => ({ profileID: entry.profileID, order: index })),
+			measurementDataType
+		)
+		const nextEntries = normalizeCustomIndexAssignmentEntries( response ).length > 0
+			? withCustomIndexProfileDetails( response )
+			: withCustomIndexProfileDetails( entries )
+		customIndexProjectEntries.value = nextEntries
+		customIndexSavedAssignmentSignature.value = customIndexAssignmentSignature( nextEntries )
+		customIndexMatrixByProfileID.value = {}
+
+		if( customIndexActiveProfileID.value.length > 0 ){
+			await loadCustomIndexMatrix( "high" )
+		}
+		if( activePlot.value === "custom_index" ){
+			await renderCurrentMatrix()
+		}
+		return true
+	} catch( error ){
+		if( isMissingCustomIndexApiError( error ) ){
+			customIndexProfilesSupported.value = false
+			return false
+		}
+
+		customIndexError.value = String( error?.detail ?? error?.message ?? "Failed to save project custom indices." ).trim()
+		console.log( error )
+		return false
+	} finally {
+		customIndexAssignmentSaving.value = false
+	}
+}
+
+const previewCustomIndexFormula = async ( model ) => {
+	customIndexPreviewing.value = true
+	if( customIndexActiveProfileID.value === CUSTOM_INDEX_PREVIEW_PROFILE_ID ){
+		clearHeatmapDisplay()
+	}
+	customIndexPreviewResult.value = null
+	customIndexPreviewModel.value = null
+	customIndexPreviewSignature.value = ""
+	customIndexError.value = ""
+
+	try{
+		const previewOutputLabel = String( model?.outputLabel ?? "" ).trim() || "Custom index preview"
+		const normalizedModel = buildCustomIndexFormulaModel({
+			expression: model?.expression,
+			outputLabel: previewOutputLabel,
+			outputUnit: model?.outputUnit,
+			axisValues: customIndexAxisValues.value,
+			axisUnit: customIndexAxisUnit.value
+		})
+		const response = await hyperspectra.previewCustomIndex(
+			project.value,
+			normalizedModel,
+			measurementDataType
+		)
+		const previewMatrix = normalizeCustomIndexMatrixResponse( response )
+		if( previewMatrix === null ){
+			throw new Error( "Custom index preview response did not include a matrix." )
+		}
+		customIndexPreviewResult.value = response
+		customIndexPreviewModel.value = normalizedModel
+		customIndexPreviewSignature.value = serializeCustomIndexComputationModel( normalizedModel )
+		customIndexActiveProfileID.value = CUSTOM_INDEX_PREVIEW_PROFILE_ID
+		setActiveDisplayMode( "custom_index" )
+		await nextTick()
+		await renderCurrentMatrix( true )
+	} catch( error ){
+		customIndexError.value = String( error?.detail ?? error?.message ?? "Failed to preview custom index." ).trim()
+		console.log( error )
+	} finally {
+		customIndexPreviewing.value = false
+	}
+}
+
+const openCustomIndexFormulaModal = async () => {
+	if( project.value?.shared === true ){
+		return
+	}
+
+	if( customIndexActiveProfileID.value === CUSTOM_INDEX_PREVIEW_PROFILE_ID ){
+		customIndexActiveProfileID.value = ""
+		clearHeatmapDisplay()
+	}
+
+	customIndexPreviewResult.value = null
+	customIndexPreviewModel.value = null
+	customIndexPreviewSignature.value = ""
+	customIndexError.value = ""
+	await customIndexFormulaModal.value?.open?.({
+		expression: "",
+		outputLabel: "",
+		outputUnit: "",
+		friendlyName: "",
+		description: ""
+	})
+}
+
+const saveCustomIndexFormulaProfile = async ( payload = {} ) => {
+	if( project.value?.shared === true || customIndexProfileSaving.value ){
+		return
+	}
+
+	const friendlyName = String( payload?.friendlyName ?? "" ).trim()
+	const sourceProjectID = String( project.value?.id ?? "" ).trim()
+	if( friendlyName.length === 0 || sourceProjectID.length === 0 ){
+		return
+	}
+
+	customIndexProfileSaving.value = true
+	customIndexError.value = ""
+
+	try{
+		const model = buildCustomIndexFormulaModel({
+			expression: payload?.model?.expression,
+			outputLabel: payload?.model?.outputLabel,
+			outputUnit: payload?.model?.outputUnit,
+			axisValues: customIndexAxisValues.value,
+			axisUnit: customIndexAxisUnit.value
+		})
+		const savedProfile = await hyperspectra.createCustomIndexProfile({
+			version: "custom-index-profile-write-v1",
+			profileKind: CUSTOM_INDEX_PROFILE_KIND,
+			dataType: measurementDataType,
+			friendlyName,
+			description: String( payload?.description ?? "" ).trim(),
+			sourceProjectID,
+			model
+		}, measurementDataType )
+
+		await refreshCustomIndexProfiles()
+
+		const savedProfileID = String( savedProfile?.profileID ?? "" ).trim()
+		if( savedProfileID.length > 0 ){
+			const profile = customIndexProfileByID( savedProfileID ) ?? savedProfile
+			customIndexProjectEntries.value = withCustomIndexProfileDetails([
+				...customIndexProjectEntries.value,
+				{
+					profileID: savedProfileID,
+					order: customIndexProjectEntries.value.length,
+					profile
+				}
+			])
+			customIndexActiveProfileID.value = savedProfileID
+
+			const previewMatrix = customIndexPreviewMatrix.value
+			if( previewMatrix !== null ){
+				setCustomIndexMatrixForProfile( savedProfileID, previewMatrix )
+			}
+
+			const assignmentSaved = await saveProjectCustomIndexAssignment()
+			if( assignmentSaved === false ){
+				return
+			}
+			if( previewMatrix !== null ){
+				setCustomIndexMatrixForProfile( savedProfileID, previewMatrix )
+			}
+		}
+
+		if( activePlot.value === "custom_index" ){
+			await renderCurrentMatrix()
+		}
+		customIndexFormulaModal.value?.close?.()
+	} catch( error ){
+		if( isMissingCustomIndexApiError( error ) ){
+			customIndexProfilesSupported.value = false
+			return
+		}
+
+		customIndexError.value = String( error?.detail ?? error?.message ?? "Failed to save custom index profile." ).trim()
+		console.log( error )
+	} finally {
+		customIndexProfileSaving.value = false
+	}
 }
 
 const normalizeZBlendLayerIndex = ( value, fallback = 0 ) => {
@@ -3287,6 +4054,7 @@ const {
 	loadUmap: ( priority ) => loadUmap( priority ),
 	loadLayer: ( index, priority ) => loadLayer( index, priority ),
 	loadZBlendSource: ( estimated, priority ) => loadZBlendSource( estimated, priority ),
+	loadCustomIndexMatrix: ( priority ) => loadCustomIndexMatrix( priority ),
 	loadPcaClassificationMip: ( count, priority ) => loadPcaClassificationMip( count, priority ),
 	loadPcaMip: ( count, priority ) => loadPcaMip( count, priority ),
 	loadPcaClassification: ( priority ) => loadPcaClassification( priority ),
@@ -3925,10 +4693,11 @@ const {
 			: ""
 	}),
 	normalizedHiddenSpectrumLegendKeys,
-	activePlot,
-	heatmapUsesEstimatedRaman,
-	ensureZBlendVisualizationMatrix: ( priority ) => ensureZBlendVisualizationMatrix( priority ),
-	ensureEstimatedVisualizationMatrix: ( priority ) => ensureEstimatedVisualizationMatrix( priority ),
+		activePlot,
+		heatmapUsesEstimatedRaman,
+		ensureZBlendVisualizationMatrix: ( priority ) => ensureZBlendVisualizationMatrix( priority ),
+		ensureCustomIndexMatrix: ( priority ) => ensureCustomIndexMatrix( priority ),
+		ensureEstimatedVisualizationMatrix: ( priority ) => ensureEstimatedVisualizationMatrix( priority ),
 	ensureActivePlotLoadings: ( priority ) => ensureActivePlotLoadings( priority ),
 	syncSpectrumPlotGraphListeners: () => syncSpectrumPlotGraphListeners(),
 	syncHeatmapModebarGraphListeners: () => syncHeatmapModebarGraphListeners(),
@@ -3954,6 +4723,9 @@ const {
 
 const renderCurrentMatrix = async ( initialize = false ) => {
 	const result = await renderCurrentMatrixBase( initialize )
+	if( activePlot.value === "custom_index" && currentMatrix() === null ){
+		clearHeatmapDisplay()
+	}
 	if( spectralCalibrationEditingActive.value ){
 		await nextTick()
 		syncSpectralCalibrationPlotClickListeners()
@@ -6015,6 +6787,7 @@ const hyperspectrumDisplayRegistry = createHyperspectrumDisplayRegistry({
 	estimatedUmap,
 	zBlendMeasurementSource,
 	zBlendEstimatedSource,
+	customIndexMatrix,
 	pcaClassificationMip,
 	estimatedPcaClassificationMip,
 	pcaMip,
@@ -7345,6 +8118,22 @@ const resetViewerState = () => {
 	spectralCalibrationDraft.value = buildSpectralCalibrationDraftFromModel( buildDefaultSpectralCalibrationModel() )
 	spectralCalibrationError.value = ""
 	spectralCalibrationSidebarOpen.value = false
+	customIndexProfilesSupported.value = true
+	customIndexProfilesLoading.value = false
+	customIndexAssignmentSaving.value = false
+	customIndexProfileSaving.value = false
+	customIndexPreviewing.value = false
+	customIndexProfiles.value = []
+	customIndexProjectEntries.value = []
+	customIndexSavedAssignmentSignature.value = "[]"
+	customIndexActiveProfileID.value = ""
+	customIndexError.value = ""
+	customIndexPreviewResult.value = null
+	customIndexPreviewModel.value = null
+	customIndexPreviewSignature.value = ""
+	customIndexMatrixByProfileID.value = {}
+	customIndexLoadingProfileID.value = ""
+	customIndexMatrixRequestID.value += 1
 	layer.value = null
 	estimatedMip.value = null
 	estimatedMipHsv.value = null
@@ -7404,6 +8193,7 @@ useProjectViewLifecycle({
 	loadRoiList: () => loadRoiList(),
 	loadXyz: ( priority ) => loadXyz( priority ),
 	loadSpectralCalibrationState: () => loadSpectralCalibrationState(),
+	loadCustomIndexState: () => loadCustomIndexState(),
 	layerCacheOptions: () => layerCacheOptions(),
 	ensureDefaultZBlendState: () => ensureDefaultZBlendState(),
 	loadProjectSpectrumGridlinePreset: ( requestID ) => loadProjectSpectrumGridlinePreset( requestID ),
@@ -7436,6 +8226,7 @@ useDisplayModeWorkflow({
 	loadMipHsv: ( priority ) => loadMipHsv( priority ),
 	loadUmap: ( priority ) => loadUmap( priority ),
 	ensureZBlendVisualizationMatrix: ( priority ) => ensureZBlendVisualizationMatrix( priority ),
+	ensureCustomIndexMatrix: ( priority ) => ensureCustomIndexMatrix( priority ),
 	renderZBlendHeatmapOnly: () => renderZBlendHeatmapOnly(),
 	applyLayerInput: () => applyLayerInput(),
 	resetActivePcaComponents: ( count ) => resetActivePcaComponents( count ),
@@ -7517,10 +8308,10 @@ watch( heatmapRendererMode, async () => {
 
 	await nextTick()
 
-	if( heatmapRendererMode.value === "deckgl" ){
-		ensureDeckHeatmapPaneWidth()
-		scheduleDisplayPayloadPrewarm([ "mip", "mip_hsv", "umap", "z_blend", "pca", "pca_mip", "pca_rgb", "rpca", "rpca_mip", "rpca_rgb" ])
-	}
+		if( heatmapRendererMode.value === "deckgl" ){
+			ensureDeckHeatmapPaneWidth()
+			scheduleDisplayPayloadPrewarm([ "mip", "mip_hsv", "umap", "z_blend", "custom_index", "pca", "pca_mip", "pca_rgb", "rpca", "rpca_mip", "rpca_rgb" ])
+		}
 
 	if( graph.value === null ){
 		heatmapRendererPayload.value = null

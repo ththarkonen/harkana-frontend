@@ -126,6 +126,16 @@
 							</option>
 						</select>
 					</label>
+
+					<label class = "block">
+						<div class = "mb-1 text-xs font-semibold uppercase tracking-wide text-black/70">Custom index colormap</div>
+						<select v-model = "colormaps.customIndex"
+								class = "w-full border-0 border-b border-black/35 bg-transparent px-0 py-1 text-sm font-medium text-slate-900 focus:border-brand focus:outline-none focus-visible:border-brand">
+							<option v-for = "scale in colorscales" :key = "'custom-index-' + scale" :value = "scale">
+								{{ scale }}
+							</option>
+						</select>
+					</label>
 				</div>
 			</div>
 		</div>
@@ -256,6 +266,22 @@
 							 v-model = "zBlendPalette[index]"
 							 :description = "'Z-blend color ' + ( index + 1 )">
 				</ColorPicker>
+			</div>
+		</div>
+
+		<div v-show = "activeVisualizationTab === 'custom-index'" role = "tabpanel" class = "max-w-2xl space-y-8">
+			<p class = "text-sm text-black/70">
+				Configure how custom index formulas are displayed. The backend formula variables remain D and E;
+				these symbols only affect labels and operand lists in the interface.
+			</p>
+
+			<div class = "grid gap-5 md:grid-cols-2">
+				<LatexField description = "Measured layer symbol"
+							v-model = "customIndexSymbols.data"
+							placeholder = "D"></LatexField>
+				<LatexField description = "Estimate layer symbol"
+							v-model = "customIndexSymbols.estimate"
+							placeholder = "E"></LatexField>
 			</div>
 		</div>
 
@@ -428,6 +454,7 @@ const {
 	activeVisualizationTab,
 	colorscales,
 	colormaps,
+	customIndexSymbols,
 	fontSizes,
 	gridlines,
 	labels,

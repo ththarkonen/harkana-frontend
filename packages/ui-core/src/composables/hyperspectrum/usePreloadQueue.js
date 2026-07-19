@@ -59,6 +59,7 @@ function useHyperspectrumPreloadQueue( options ){
 		loadUmap: options.loadUmap,
 		loadLayer: options.loadLayer,
 		loadZBlendSource: options.loadZBlendSource,
+		loadCustomIndexMatrix: options.loadCustomIndexMatrix,
 		loadPcaClassificationMip: options.loadPcaClassificationMip,
 		loadPcaMip: options.loadPcaMip,
 		loadPcaClassification: options.loadPcaClassification,

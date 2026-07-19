@@ -46,6 +46,7 @@
                 <Tokens  v-show = "selected === 'Compute tokens'" class = "h-full min-h-0"></Tokens>
                 <component :is = "Visualization" v-show = "selected === 'Visualization'"></component>
                 <Calibration v-show = "selected === 'Calibration'"></Calibration>
+                <CustomIndices v-if = "isHyperspectrumApp" v-show = "selected === 'Custom indices'"></CustomIndices>
                 <Metadata v-show = "selected === 'Metadata'"></Metadata>
                 <Zenodo v-show = "selected === 'Zenodo'"></Zenodo>
                 <!-- JSON -->
@@ -76,11 +77,14 @@ import Tokens from './sections/Tokens.vue'
 import StandardVisualization from './sections/Visualization.vue'
 import HyperspectrumVisualization from './sections/HyperspectrumVisualization.vue'
 import Calibration from './sections/Calibration.vue'
+import CustomIndices from './sections/CustomIndices.vue'
 import Metadata from './sections/Metadata.vue'
 import Zenodo from './sections/Zenodo.vue'
 
 const dataType = import.meta.env.VITE_DATA_TYPE
-const Visualization = dataType === "hypercars" ? HyperspectrumVisualization : StandardVisualization
+const normalizedDataType = String( dataType ?? "" ).trim().toLowerCase()
+const isHyperspectrumApp = normalizedDataType === "hypercars" || normalizedDataType === "hyperraman"
+const Visualization = isHyperspectrumApp ? HyperspectrumVisualization : StandardVisualization
 
 const route = useRoute()
 const router = useRouter()
@@ -94,7 +98,9 @@ const sidebarStyle = computed(() => {
         : { left: 'calc(-16rem - 2px)' }
 })
 
-const sections = ["Profile", "Compute tokens", "Visualization", "Calibration", "Metadata", "Zenodo"]
+const sections = isHyperspectrumApp
+    ? ["Profile", "Compute tokens", "Visualization", "Calibration", "Custom indices", "Metadata", "Zenodo"]
+    : ["Profile", "Compute tokens", "Visualization", "Calibration", "Metadata", "Zenodo"]
 const selected = ref(route.query.section || 'Plain text')
 
 // Function to change section without triggering route navigation
