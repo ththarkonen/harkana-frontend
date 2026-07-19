@@ -41,14 +41,11 @@
             <div class="w-full max-w-3xl rounded-lg"
                  :class="selected === 'Compute tokens' ? 'flex h-full min-h-0 flex-col' : ''">
 
-                <!-- Plain text -->
-                <Profile v-show = "selected === 'Profile'"></Profile>
-                <Tokens  v-show = "selected === 'Compute tokens'" class = "h-full min-h-0"></Tokens>
-                <component :is = "Visualization" v-show = "selected === 'Visualization'"></component>
-                <Calibration v-show = "selected === 'Calibration'"></Calibration>
-                <CustomIndices v-if = "isHyperspectrumApp" v-show = "selected === 'Custom indices'"></CustomIndices>
-                <Metadata v-show = "selected === 'Metadata'"></Metadata>
-                <Zenodo v-show = "selected === 'Zenodo'"></Zenodo>
+                <component v-for = "section in mountedSections"
+                           :key = "section"
+                           :is = "sectionComponentFor( section )"
+                           v-show = "selected === section"
+                           :class = "section === 'Compute tokens' ? 'h-full min-h-0' : ''"></component>
                 <!-- JSON -->
                 <div v-show="selected === 'JSON'" class="prose prose-gray max-w-none">
                 </div>
@@ -61,7 +58,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, defineAsyncComponent } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { navigation } from '@harkana/tools'
 
@@ -72,19 +69,19 @@ import NavigationBar from './navbar/NavigationBar.vue'
 import MenuDropdown from './navbar/MenuDropdown.vue'
 import AccountDropdown from './navbar/AccountDropdown.vue'
 
-import Profile from './sections/Profile.vue'
-import Tokens from './sections/Tokens.vue'
-import StandardVisualization from './sections/Visualization.vue'
-import HyperspectrumVisualization from './sections/HyperspectrumVisualization.vue'
-import Calibration from './sections/Calibration.vue'
-import CustomIndices from './sections/CustomIndices.vue'
-import Metadata from './sections/Metadata.vue'
-import Zenodo from './sections/Zenodo.vue'
-
 const dataType = import.meta.env.VITE_DATA_TYPE
 const normalizedDataType = String( dataType ?? "" ).trim().toLowerCase()
 const isHyperspectrumApp = normalizedDataType === "hypercars" || normalizedDataType === "hyperraman"
-const Visualization = isHyperspectrumApp ? HyperspectrumVisualization : StandardVisualization
+const Profile = defineAsyncComponent(() => import('./sections/Profile.vue'))
+const Tokens = defineAsyncComponent(() => import('./sections/Tokens.vue'))
+const Visualization = defineAsyncComponent(() => isHyperspectrumApp
+    ? import('./sections/HyperspectrumVisualization.vue')
+    : import('./sections/Visualization.vue')
+)
+const Calibration = defineAsyncComponent(() => import('./sections/Calibration.vue'))
+const CustomIndices = defineAsyncComponent(() => import('./sections/CustomIndices.vue'))
+const Metadata = defineAsyncComponent(() => import('./sections/Metadata.vue'))
+const Zenodo = defineAsyncComponent(() => import('./sections/Zenodo.vue'))
 
 const route = useRoute()
 const router = useRouter()
@@ -101,29 +98,58 @@ const sidebarStyle = computed(() => {
 const sections = isHyperspectrumApp
     ? ["Profile", "Compute tokens", "Visualization", "Calibration", "Custom indices", "Metadata", "Zenodo"]
     : ["Profile", "Compute tokens", "Visualization", "Calibration", "Metadata", "Zenodo"]
-const selected = ref(route.query.section || 'Plain text')
+const normalizeSectionName = ( value ) => {
+    const normalized = String( value ?? "" ).trim()
+    return sections.includes( normalized ) ? normalized : "Profile"
+}
+const selected = ref(normalizeSectionName( route.query.section ))
+const mountedSections = ref([ selected.value ])
+
+const sectionComponents = {
+    Profile,
+    "Compute tokens": Tokens,
+    Visualization,
+    Calibration,
+    "Custom indices": CustomIndices,
+    Metadata,
+    Zenodo
+}
+
+const sectionComponentFor = ( section ) => {
+    return sectionComponents[section] ?? Profile
+}
+
+const ensureSectionMounted = ( section ) => {
+    const normalized = normalizeSectionName( section )
+    if( mountedSections.value.includes( normalized ) ){
+        return
+    }
+
+    mountedSections.value = [ ...mountedSections.value, normalized ]
+}
 
 // Function to change section without triggering route navigation
 const selectSection = (section) => {
-    selected.value = section
+    selected.value = normalizeSectionName( section )
 }
 
 // Sync with URL query params when they change externally
 watch(
     () => route.query.section,
     (val) => {
-        if (val && (sections.includes(val) || val === 'Output')) {
-            selected.value = val
+        if( val ){
+            selected.value = normalizeSectionName( val )
         }
     }
 )
 
 // Update URL when section changes, but use replace to avoid navigation event
 watch(selected, (val) => {
+    ensureSectionMounted( val )
     if (route.query.section !== val) {
         router.replace({ query: { section: val } }).catch(() => {})
     }
-})
+}, { immediate: true })
 
 onMounted(() => {
 

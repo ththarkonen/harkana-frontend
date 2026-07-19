@@ -556,6 +556,15 @@ importers:
       '@aws-amplify/ui-vue':
         specifier: ^3.1.30
         version: 3.1.30(@types/node@25.6.0)(aws-amplify@5.3.38(react-native-get-random-values@1.11.0(react-native@0.83.1(@babel/core@7.29.7)(react@19.2.3)))(react-native@0.83.1(@babel/core@7.29.7)(react@19.2.3)))(vue@3.5.27)
+      '@fortawesome/fontawesome-svg-core':
+        specifier: ^7.1.0
+        version: 7.1.0
+      '@fortawesome/free-regular-svg-icons':
+        specifier: ^7.1.0
+        version: 7.1.0
+      '@fortawesome/free-solid-svg-icons':
+        specifier: ^7.1.0
+        version: 7.1.0
       '@harkana/plot':
         specifier: workspace:*
         version: link:../plot

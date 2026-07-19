@@ -1,5 +1,6 @@
 import Plotly from 'plotly.js-dist'
 import { applyCalibrationToValues } from './calibration.js'
+import { plotlyNewPlot } from './mathjax.js'
 
 const SPECTRUM_GRID_MODEBAR_ICON = {
     width: 512,
@@ -854,7 +855,7 @@ var renderMeasurementPane = async function( data, graphContainer, settings, opti
         })
     ]
 
-    await Plotly.newPlot( graphContainer, traces, layout, config )
+    await plotlyNewPlot( Plotly,  graphContainer, traces, layout, config )
     normalizeModebarButtonSpacing( graphContainer )
 }
 
@@ -884,7 +885,7 @@ var renderMeasurementComparisonPane = async function( data, comparisonEntriesInp
         })
     ]
 
-    await Plotly.newPlot( graphContainer, traces, layout, config )
+    await plotlyNewPlot( Plotly,  graphContainer, traces, layout, config )
     normalizeModebarButtonSpacing( graphContainer )
 }
 
@@ -916,7 +917,7 @@ var renderEstimatePane = async function( data, estimate, graphContainer, setting
         })
     )
 
-    await Plotly.newPlot( graphContainer, traces, layout, config )
+    await plotlyNewPlot( Plotly,  graphContainer, traces, layout, config )
     normalizeModebarButtonSpacing( graphContainer )
 }
 
@@ -984,7 +985,7 @@ var renderEstimateComparisonPane = async function(
         })
     ]
 
-    await Plotly.newPlot( graphContainer, traces, layout, config )
+    await plotlyNewPlot( Plotly,  graphContainer, traces, layout, config )
     normalizeModebarButtonSpacing( graphContainer )
 }
 
@@ -1214,9 +1215,9 @@ var initialize = async function( data, estimate, graphContainer, settings, optio
         : [ "xaxis", "yaxis", "yaxis2" ]
     const config = buildPlotConfig( graphContainer, activeAxisKeys )
 
-    if( settings.layout.layout === "vertical" )   await Plotly.newPlot( graphContainer, traces, layoutVertical, config)
-    if( settings.layout.layout === "horizontal" ) await Plotly.newPlot( graphContainer, traces, layoutHorizontal, config)
-    if( settings.layout.layout === "single" )     await Plotly.newPlot( graphContainer, tracesAll, layout, config)
+    if( settings.layout.layout === "vertical" )   await plotlyNewPlot( Plotly,  graphContainer, traces, layoutVertical, config)
+    if( settings.layout.layout === "horizontal" ) await plotlyNewPlot( Plotly,  graphContainer, traces, layoutHorizontal, config)
+    if( settings.layout.layout === "single" )     await plotlyNewPlot( Plotly,  graphContainer, tracesAll, layout, config)
     normalizeModebarButtonSpacing( graphContainer )
 };
 
@@ -1682,9 +1683,9 @@ var comparison = async function( data, estimate,
         : [ "xaxis", "yaxis", "yaxis2" ]
     const config = buildPlotConfig( graphContainer, activeAxisKeys )
 
-    if( settings.layout.layout === "vertical" )   await Plotly.newPlot( graphContainer, traces, layoutVertical, config)
-    if( settings.layout.layout === "horizontal" ) await Plotly.newPlot( graphContainer, traces, layoutHorizontal, config)
-    if( settings.layout.layout === "single" )     await Plotly.newPlot( graphContainer, tracesAll, layout, config)
+    if( settings.layout.layout === "vertical" )   await plotlyNewPlot( Plotly,  graphContainer, traces, layoutVertical, config)
+    if( settings.layout.layout === "horizontal" ) await plotlyNewPlot( Plotly,  graphContainer, traces, layoutHorizontal, config)
+    if( settings.layout.layout === "single" )     await plotlyNewPlot( Plotly,  graphContainer, tracesAll, layout, config)
     normalizeModebarButtonSpacing( graphContainer )
 };
 

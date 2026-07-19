@@ -1,4 +1,5 @@
 import { onMounted, watch } from "vue"
+import { markViewerLoad, measureViewerLoad } from "../../utils/viewerPerformance.js"
 
 export function useProjectViewLifecycle( options ){
 
@@ -36,10 +37,66 @@ export function useProjectViewLifecycle( options ){
 	const renderCurrentMatrix = options.renderCurrentMatrix
 	const emitLoadedOnce = options.emitLoadedOnce
 	const maybeOfferViewerTutorialPrompt = options.maybeOfferViewerTutorialPrompt
+	const enqueueProjectBackgroundTask = options.enqueueProjectBackgroundTask
 	const queueProjectBackgroundHydration = options.queueProjectBackgroundHydration
 	const ensureResizeObserver = options.ensureResizeObserver
 	const installProjectBackgroundInteractionListeners = options.installProjectBackgroundInteractionListeners
 	const currentProjectID = options.currentProjectID
+
+	const isActiveRequest = ( requestID ) => {
+		return requestID === activeProjectLoadRequestID.value
+	}
+
+	const runDeferredProjectStateHydration = async ( requestID, startingDisplayMode ) => {
+		const blockingTarget = blockingPreparationTargetForDisplayMode( startingDisplayMode )
+
+		const runDeferredStep = async ( callback ) => {
+			if( isActiveRequest( requestID ) === false ) return
+			if( typeof callback !== "function" ) return
+
+			try{
+				await callback()
+			} catch( error ){
+				console.log( error )
+			}
+		}
+
+		await runDeferredStep( loadRoiList )
+		await runDeferredStep( () => loadProjectSpectrumGridlinePreset( requestID ) )
+
+		if( blockingTarget !== "z_blend" ){
+			await runDeferredStep( () => loadZBlendPreset( requestID ) )
+		}
+
+		if( typeof loadSpectralCalibrationState === "function" ){
+			await runDeferredStep( () => loadSpectralCalibrationState() )
+		}
+
+		if( blockingTarget !== "custom_index" && typeof loadCustomIndexState === "function" ){
+			await runDeferredStep( () => loadCustomIndexState() )
+		}
+
+		if( isActiveRequest( requestID ) ){
+			markViewerLoad( "hyperspectrum:deferred-ready", { projectID: nextProjectIDFromProject() })
+		}
+	}
+
+	const queueDeferredProjectStateHydration = ( requestID, startingDisplayMode ) => {
+		const task = async () => {
+			await runDeferredProjectStateHydration( requestID, startingDisplayMode )
+		}
+
+		if( typeof enqueueProjectBackgroundTask === "function" ){
+			enqueueProjectBackgroundTask( task )
+			return
+		}
+
+		void task()
+	}
+
+	const nextProjectIDFromProject = () => {
+		return String( project.value?.id ?? "" ).trim()
+	}
 
 	const initializeProjectView = async () => {
 
@@ -50,10 +107,11 @@ export function useProjectViewLifecycle( options ){
 		activeProjectLoadRequestID.value = requestID
 
 		resetViewerState()
+		markViewerLoad( "hyperspectrum:route-mounted", { projectID: nextProjectID })
 
 		try{
 			projects.value = await projectlib.list()
-			if( requestID !== activeProjectLoadRequestID.value ) return
+			if( isActiveRequest( requestID ) === false ) return
 
 			const nextProject = projects.value[nextProjectID]
 			if( nextProject === undefined ){
@@ -61,17 +119,17 @@ export function useProjectViewLifecycle( options ){
 			}
 
 			project.value = nextProject
+			markViewerLoad( "hyperspectrum:project-metadata-ready", { projectID: nextProjectID })
+
 			await restoreGpuInferenceState( requestID )
-			if( requestID !== activeProjectLoadRequestID.value ) return
+			if( isActiveRequest( requestID ) === false ) return
 
 			await hyperspectrumCache.initProjectCache( project.value, cacheOptions )
-			if( requestID !== activeProjectLoadRequestID.value ) return
+			if( isActiveRequest( requestID ) === false ) return
 
 			hyperspectrumCache.setActiveLayer( project.value, 0, cacheOptions )
 			hyperspectrumCache.setActivePca( project.value, 5, cacheOptions )
 			hyperspectrumCache.setActiveRpca( project.value, 5, cacheOptions )
-			await loadRoiList()
-			if( requestID !== activeProjectLoadRequestID.value ) return
 
 			try{
 				await loadXyz( "high" )
@@ -79,37 +137,32 @@ export function useProjectViewLifecycle( options ){
 				console.log( xyzError )
 			}
 
-			if( requestID !== activeProjectLoadRequestID.value ) return
+			if( isActiveRequest( requestID ) === false ) return
 
-			if( typeof loadSpectralCalibrationState === "function" ){
-				await loadSpectralCalibrationState()
-			}
-
-			if( requestID !== activeProjectLoadRequestID.value ) return
-
-			if( typeof loadCustomIndexState === "function" ){
+			const startingDisplayMode = activePlot.value
+			const blockingPreparationTarget = blockingPreparationTargetForDisplayMode( startingDisplayMode )
+			if( blockingPreparationTarget === "custom_index" && typeof loadCustomIndexState === "function" ){
 				await loadCustomIndexState()
+				if( isActiveRequest( requestID ) === false ) return
 			}
-
-			if( requestID !== activeProjectLoadRequestID.value ) return
 
 			const initialLayerIndex = Math.floor( maxLayerIndex.value / 2 )
 			layerInput.value = initialLayerIndex
 			hyperspectrumCache.setActiveLayer( project.value, initialLayerIndex, layerCacheOptions() )
 			hyperspectrumCache.setInitialLayerWindow( project.value, initialLayerIndex, layerCacheOptions() )
 			ensureDefaultZBlendState()
-			await loadProjectSpectrumGridlinePreset( requestID )
-			void loadZBlendPreset( requestID )
-			const startingDisplayMode = activePlot.value
-			const blockingPreparationTarget = blockingPreparationTargetForDisplayMode( startingDisplayMode )
+			if( blockingPreparationTarget === "z_blend" ){
+				await loadZBlendPreset( requestID )
+				if( isActiveRequest( requestID ) === false ) return
+			}
 			markPreparationStarted( blockingPreparationTarget )
-
-			const loadedMip = await hyperspectrumCache.getMip( project.value, cacheOptions )
-			if( requestID !== activeProjectLoadRequestID.value ) return
-			mip.value = loadedMip
 
 			try{
 				await loadVisualizationTargetData( blockingPreparationTarget, initialLayerIndex, "high" )
+				markViewerLoad( "hyperspectrum:first-data-ready", {
+					projectID: nextProjectID,
+					displayMode: activePlot.value
+				})
 			} catch( blockingError ){
 				console.log( blockingError )
 
@@ -118,24 +171,42 @@ export function useProjectViewLifecycle( options ){
 					activePlot.value = "mip"
 					markPreparationStarted( "mip" )
 					await loadVisualizationTargetData( "mip", initialLayerIndex, "high" )
+					markViewerLoad( "hyperspectrum:first-data-ready", {
+						projectID: nextProjectID,
+						displayMode: activePlot.value
+					})
 				} else {
 					throw blockingError
 				}
 			}
 
-			if( requestID !== activeProjectLoadRequestID.value ) return
+			if( isActiveRequest( requestID ) === false ) return
 
 			await nextTick()
-			if( requestID !== activeProjectLoadRequestID.value ) return
+			if( isActiveRequest( requestID ) === false ) return
 
+			markViewerLoad( "hyperspectrum:first-plot-render-start", {
+				projectID: nextProjectID,
+				displayMode: activePlot.value
+			})
 			await renderCurrentMatrix( true )
+			markViewerLoad( "hyperspectrum:first-plot-render-end", {
+				projectID: nextProjectID,
+				displayMode: activePlot.value
+			})
+			measureViewerLoad(
+				"hyperspectrum:first-plot-render",
+				"hyperspectrum:first-plot-render-start",
+				"hyperspectrum:first-plot-render-end"
+			)
 			markPreparationCompleted( blockingPreparationTargetForDisplayMode( activePlot.value ) )
 			emitLoadedOnce()
-			maybeOfferViewerTutorialPrompt( requestID )
+			queueDeferredProjectStateHydration( requestID, startingDisplayMode )
 			queueProjectBackgroundHydration( requestID, initialLayerIndex, activePlot.value )
+			maybeOfferViewerTutorialPrompt( requestID )
 			ensureResizeObserver()
 		} catch( error ){
-			if( requestID !== activeProjectLoadRequestID.value ) return
+			if( isActiveRequest( requestID ) === false ) return
 			console.log( error )
 			navigation.route( "Main menu", {} )
 		}
@@ -146,8 +217,10 @@ export function useProjectViewLifecycle( options ){
 		try{
 			installProjectBackgroundInteractionListeners()
 
-			const savedSettings = await settingslib.get()
-			const savedBilling = await settingslib.getBilling()
+			const [ savedSettings, savedBilling ] = await Promise.all([
+				settingslib.get(),
+				settingslib.getBilling()
+			])
 
 			settings.value = savedSettings
 			if( savedBilling && typeof savedBilling === "object" ){
