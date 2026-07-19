@@ -2,6 +2,9 @@
   "name": "frontend",
   "private": true,
   "version": "1.0.0",
+  "scripts": {
+    "bench:viewer-load": "node scripts/viewer-load-summary.mjs"
+  },
   "workspaces": [
     "apps/*",
     "packages/*"

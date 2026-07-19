@@ -1,4 +1,5 @@
 import Plotly from "plotly.js-dist"
+import { plotlyNewPlot, plotlyReact } from "./mathjax.js"
 import { setPcaComponentColors } from "./hyperspectrum/pcaColors.js"
 import {
     buildExternalHeatmapPayloadCacheKey,
@@ -2052,7 +2053,7 @@ async function renderFigure( graphContainer, figure, preferReact ){
         ]]
 
         if( preferReact || hasExistingFigure ){
-            await Plotly.react( graphContainer, figure.traces, figure.layout, config )
+            await plotlyReact( Plotly,  graphContainer, figure.traces, figure.layout, config )
             syncHeatmapModebarState(
                 graphContainer,
                 resolveHeatmapModebarInteractionMode( graphContainer ),
@@ -2062,7 +2063,7 @@ async function renderFigure( graphContainer, figure, preferReact ){
             return
         }
 
-        await Plotly.newPlot( graphContainer, figure.traces, figure.layout, config )
+        await plotlyNewPlot( Plotly,  graphContainer, figure.traces, figure.layout, config )
         syncHeatmapModebarState(
             graphContainer,
             resolveHeatmapModebarInteractionMode( graphContainer ),
@@ -2086,7 +2087,7 @@ async function renderFigure( graphContainer, figure, preferReact ){
     }
 
     if( preferReact || hasExistingFigure ){
-        await Plotly.react( graphContainer, figure.traces, figure.layout, config )
+        await plotlyReact( Plotly,  graphContainer, figure.traces, figure.layout, config )
         await applySpectrumTracePresentationInternal(
             graphContainer,
             graphContainer?.__harkanaSpectrumHighlightGroup
@@ -2096,7 +2097,7 @@ async function renderFigure( graphContainer, figure, preferReact ){
         return
     }
 
-    await Plotly.newPlot( graphContainer, figure.traces, figure.layout, config )
+    await plotlyNewPlot( Plotly,  graphContainer, figure.traces, figure.layout, config )
     await applySpectrumTracePresentationInternal(
         graphContainer,
         graphContainer?.__harkanaSpectrumHighlightGroup

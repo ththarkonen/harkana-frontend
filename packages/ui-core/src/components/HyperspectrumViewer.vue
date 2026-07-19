@@ -1212,17 +1212,20 @@
 
 	</div>
 
-	<MetadataModal ref = "metadataModal" :project = "project"></MetadataModal>
-	<ShareModal ref = "shareModal" :project = "project"></ShareModal>
-	<ZenodoModal ref = "zenodoModal" :project = "project"></ZenodoModal>
-	<RoiDescriptionModal ref = "roiDescriptionModal"
+	<MetadataModal v-if = "mountedViewerOverlays.metadata" ref = "metadataModal" :project = "project"></MetadataModal>
+	<ShareModal v-if = "mountedViewerOverlays.share" ref = "shareModal" :project = "project"></ShareModal>
+	<ZenodoModal v-if = "mountedViewerOverlays.zenodo" ref = "zenodoModal" :project = "project"></ZenodoModal>
+	<RoiDescriptionModal v-if = "mountedViewerOverlays.roiDescription"
+						 ref = "roiDescriptionModal"
 						 :rois = "selectedRois"></RoiDescriptionModal>
-	<RoiSaveModal ref = "roiSaveModal" :saving = "savingRoi" @save = "saveRoi"></RoiSaveModal>
-	<RoiDeleteModal ref = "roiDeleteModal"
+	<RoiSaveModal v-if = "mountedViewerOverlays.roiSave" ref = "roiSaveModal" :saving = "savingRoi" @save = "saveRoi"></RoiSaveModal>
+	<RoiDeleteModal v-if = "mountedViewerOverlays.roiDelete"
+					ref = "roiDeleteModal"
 					:rois = "selectedRois"
 					:deleting = "deletingRoi"
 					@confirm = "deleteSelectedRoi"></RoiDeleteModal>
-	<GpuInferenceModal ref = "gpuInferenceModal"
+	<GpuInferenceModal v-if = "mountedViewerOverlays.gpuInference"
+					  ref = "gpuInferenceModal"
 					  :project = "project"
 					  :default-group-id = "resolvedActiveGroupID"
 					  :initial-job-id = "gpuInferenceJobId"
@@ -1230,17 +1233,20 @@
 					  :spectral-calibration-profile-name = "spectralCalibrationAssignedProfileID.length > 0 ? activeSpectralCalibrationProfileLabel : ''"
 					  @submitted = "handleGpuInferenceSubmitted"
 					  @status = "handleGpuInferenceStatus"></GpuInferenceModal>
-	<GpuInferenceOutcomeModal ref = "gpuInferenceOutcomeModal"></GpuInferenceOutcomeModal>
-	<DownloadPreparingModal ref = "downloadPreparingModal"></DownloadPreparingModal>
-	<XyzSettingsModal ref = "xyzSettingsModal"
+	<GpuInferenceOutcomeModal v-if = "mountedViewerOverlays.gpuInferenceOutcome" ref = "gpuInferenceOutcomeModal"></GpuInferenceOutcomeModal>
+	<DownloadPreparingModal v-if = "mountedViewerOverlays.downloadPreparing" ref = "downloadPreparingModal"></DownloadPreparingModal>
+	<XyzSettingsModal v-if = "mountedViewerOverlays.xyzSettings"
+					  ref = "xyzSettingsModal"
 					  :saving = "savingXyz"
 					  :spectral-calibration-active = "spectralCalibrationSelectedProfileID.length > 0"
 					  :spectral-calibration-profile-name = "activeSpectralCalibrationProfileLabel"
 					  @save = "saveXyzSettings"></XyzSettingsModal>
-	<SpectralAxisOverwriteModal ref = "spectralAxisOverwriteModal"
+	<SpectralAxisOverwriteModal v-if = "mountedViewerOverlays.spectralAxisOverwrite"
+								ref = "spectralAxisOverwriteModal"
 								:saving = "spectralCalibrationAssignmentSaving"
 								@confirm = "confirmSpectralCalibrationAxisOverwrite"></SpectralAxisOverwriteModal>
-	<CalibrationPanel v-model = "spectralCalibrationPanelOpen"
+	<CalibrationPanel v-if = "spectralCalibrationPanelOpen || mountedViewerOverlays.spectralCalibrationPanel"
+					  v-model = "spectralCalibrationPanelOpen"
 					  data-tutorial = "spectral-calibration-panel"
 					  :project = "project"
 					  :anchor-element = "spectralCalibrationSidebarSection"
@@ -1261,12 +1267,14 @@
 					  @save-profile = "openSpectralCalibrationProfileSaveModal"
 					  @remove-point = "removeSpectralCalibrationPoint"
 					  @focus-point = "setFocusedSpectralCalibrationPointID"></CalibrationPanel>
-	<CalibrationProfileSaveModal ref = "spectralCalibrationProfileSaveModal"
+	<CalibrationProfileSaveModal v-if = "mountedViewerOverlays.spectralCalibrationProfileSave"
+								 ref = "spectralCalibrationProfileSaveModal"
 								 :saving = "spectralCalibrationProfileSaving"
 								 :reserved-names = "spectralCalibrationReservedProfileNames"
 								 :base-disabled-reason = "spectralCalibrationProfileSaveDisabledReason"
 								 @save = "saveSpectralCalibrationProfile"></CalibrationProfileSaveModal>
-	<CustomIndexFormulaModal ref = "customIndexFormulaModal"
+	<CustomIndexFormulaModal v-if = "mountedViewerOverlays.customIndexFormula"
+							 ref = "customIndexFormulaModal"
 							 :axis-values = "customIndexAxisValues"
 							 :axis-unit = "customIndexAxisUnit"
 							 :data-symbol = "customIndexSymbolSettings.data"
@@ -1280,7 +1288,8 @@
 							 :anchor-element = "plottingAreaContainer"
 							 @preview = "previewCustomIndexFormula"
 							 @save = "saveCustomIndexFormulaProfile"></CustomIndexFormulaModal>
-	<CustomIndexProjectProfilesModal ref = "customIndexProjectProfilesModal"
+	<CustomIndexProjectProfilesModal v-if = "mountedViewerOverlays.customIndexProjectProfiles"
+									 ref = "customIndexProjectProfilesModal"
 									 :supported = "customIndexProfilesSupported"
 									 :profiles-loading = "customIndexProfilesLoading"
 									 :saving = "customIndexAssignmentSaving"
@@ -1295,13 +1304,16 @@
 									 @update:active-profile-id = "selectCustomIndexProfile"
 									 @open-settings = "openCustomIndexSettingsFromProjectProfiles"
 									 @done = "handleCustomIndexProjectProfilesModalDone"></CustomIndexProjectProfilesModal>
-	<ProjectChatWindow v-model = "projectChatOpen"
+	<ProjectChatWindow v-if = "projectChatOpen || mountedViewerOverlays.projectChat"
+					   v-model = "projectChatOpen"
 					   :project = "project"></ProjectChatWindow>
-	<ViewerTutorialPrompt :visible = "viewerTutorialPromptVisible"
+	<ViewerTutorialPrompt v-if = "viewerTutorialPromptVisible || mountedViewerOverlays.tutorialPrompt"
+						  :visible = "viewerTutorialPromptVisible"
 						  body = "This tutorial walks through the main hyperspectral workflow, including false-color visualizations, heatmap interaction, spectra panels, spectral calibration, and Raman inference."
 						  @start = "startViewerTutorial"
 						  @skip = "skipViewerTutorialPrompt"></ViewerTutorialPrompt>
-	<ViewerTutorialOverlay :visible = "viewerTutorialVisible"
+	<ViewerTutorialOverlay v-if = "viewerTutorialVisible || mountedViewerOverlays.tutorialOverlay"
+						   :visible = "viewerTutorialVisible"
 						   :step-id = "activeViewerTutorialStep?.id ?? ''"
 						   :title = "activeViewerTutorialStep?.title ?? ''"
 						   :body = "activeViewerTutorialStep?.body ?? ''"
@@ -1339,7 +1351,7 @@
 
 <script setup>
 
-import { ref, shallowRef, watch, computed, nextTick, onBeforeUnmount} from 'vue'
+import { ref, shallowRef, watch, computed, nextTick, onBeforeUnmount, defineAsyncComponent} from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { debounce } from 'lodash'
 const route = useRoute()
@@ -1376,29 +1388,30 @@ import BaseDropdownItem from './navbar/BaseDropdownItem.vue'
 import ProjectNameInput from './navbar/ProjectNameInput.vue'
 import CalibrationControls from './sidebar/CalibrationControls.vue'
 
-import MetadataModal from './modals/MetadataModal.vue'
-import ShareModal from './modals/ShareModal.vue'
-import ZenodoModal  from './modals/ZenodoModal.vue'
-import RoiDescriptionModal from './modals/RoiDescriptionModal.vue'
-import RoiSaveModal from './modals/RoiSaveModal.vue'
-import RoiDeleteModal from './modals/RoiDeleteModal.vue'
-import GpuInferenceModal from './modals/GpuInferenceModal.vue'
-import GpuInferenceOutcomeModal from './modals/GpuInferenceOutcomeModal.vue'
-import DownloadPreparingModal from './modals/DownloadPreparingModal.vue'
-import XyzSettingsModal from './modals/XyzSettingsModal.vue'
-import ProjectChatWindow from './chat/ProjectChatWindow.vue'
 import HeatmapRendererPane from './plot/HeatmapRendererPane.vue'
-import CalibrationPanel from './modals/CalibrationPanel.vue'
-import CalibrationProfileSaveModal from './modals/CalibrationProfileSaveModal.vue'
-import CustomIndexFormulaModal from './modals/CustomIndexFormulaModal.vue'
-import CustomIndexProjectProfilesModal from './modals/CustomIndexProjectProfilesModal.vue'
-import SpectralAxisOverwriteModal from './modals/SpectralAxisOverwriteModal.vue'
 import { createHyperspectrumDisplayRegistry } from './plot/hyperspectrum/displayRegistry.js'
 import DualRangeSlider from './general/DualRangeSlider.vue'
 import FloatingLabelSelect from './general/FloatingLabelSelect.vue'
 import Spinner from './general/Spinner.vue'
-import ViewerTutorialPrompt from './tutorial/ViewerTutorialPrompt.vue'
-import ViewerTutorialOverlay from './tutorial/ViewerTutorialOverlay.vue'
+
+const MetadataModal = defineAsyncComponent(() => import('./modals/MetadataModal.vue'))
+const ShareModal = defineAsyncComponent(() => import('./modals/ShareModal.vue'))
+const ZenodoModal = defineAsyncComponent(() => import('./modals/ZenodoModal.vue'))
+const RoiDescriptionModal = defineAsyncComponent(() => import('./modals/RoiDescriptionModal.vue'))
+const RoiSaveModal = defineAsyncComponent(() => import('./modals/RoiSaveModal.vue'))
+const RoiDeleteModal = defineAsyncComponent(() => import('./modals/RoiDeleteModal.vue'))
+const GpuInferenceModal = defineAsyncComponent(() => import('./modals/GpuInferenceModal.vue'))
+const GpuInferenceOutcomeModal = defineAsyncComponent(() => import('./modals/GpuInferenceOutcomeModal.vue'))
+const DownloadPreparingModal = defineAsyncComponent(() => import('./modals/DownloadPreparingModal.vue'))
+const XyzSettingsModal = defineAsyncComponent(() => import('./modals/XyzSettingsModal.vue'))
+const ProjectChatWindow = defineAsyncComponent(() => import('./chat/ProjectChatWindow.vue'))
+const CalibrationPanel = defineAsyncComponent(() => import('./modals/CalibrationPanel.vue'))
+const CalibrationProfileSaveModal = defineAsyncComponent(() => import('./modals/CalibrationProfileSaveModal.vue'))
+const CustomIndexFormulaModal = defineAsyncComponent(() => import('./modals/CustomIndexFormulaModal.vue'))
+const CustomIndexProjectProfilesModal = defineAsyncComponent(() => import('./modals/CustomIndexProjectProfilesModal.vue'))
+const SpectralAxisOverwriteModal = defineAsyncComponent(() => import('./modals/SpectralAxisOverwriteModal.vue'))
+const ViewerTutorialPrompt = defineAsyncComponent(() => import('./tutorial/ViewerTutorialPrompt.vue'))
+const ViewerTutorialOverlay = defineAsyncComponent(() => import('./tutorial/ViewerTutorialOverlay.vue'))
 import {
 	normalizeSelectionBoundingBox
 } from '../composables/hyperspectrum/selectionBounds.js'
@@ -1453,6 +1466,74 @@ const spectralCalibrationProfileSaveModal = ref(null)
 const spectralAxisOverwriteModal = ref(null)
 const customIndexFormulaModal = ref(null)
 const customIndexProjectProfilesModal = ref(null)
+const mountedViewerOverlays = ref({
+	metadata: false,
+	share: false,
+	zenodo: false,
+	roiDescription: false,
+	roiSave: false,
+	roiDelete: false,
+	gpuInference: false,
+	gpuInferenceOutcome: false,
+	downloadPreparing: false,
+	xyzSettings: false,
+	spectralAxisOverwrite: false,
+	spectralCalibrationPanel: false,
+	spectralCalibrationProfileSave: false,
+	customIndexFormula: false,
+	customIndexProjectProfiles: false,
+	projectChat: false,
+	tutorialPrompt: false,
+	tutorialOverlay: false
+})
+
+const waitForViewerOverlayFrame = () => {
+	return new Promise(( resolve ) => {
+		window.setTimeout( resolve, 16 )
+	})
+}
+
+const viewerOverlayRef = ( key ) => {
+	if( key === "metadata" ) return metadataModal
+	if( key === "share" ) return shareModal
+	if( key === "zenodo" ) return zenodoModal
+	if( key === "roiDescription" ) return roiDescriptionModal
+	if( key === "roiSave" ) return roiSaveModal
+	if( key === "roiDelete" ) return roiDeleteModal
+	if( key === "gpuInference" ) return gpuInferenceModal
+	if( key === "gpuInferenceOutcome" ) return gpuInferenceOutcomeModal
+	if( key === "downloadPreparing" ) return downloadPreparingModal
+	if( key === "xyzSettings" ) return xyzSettingsModal
+	if( key === "spectralAxisOverwrite" ) return spectralAxisOverwriteModal
+	if( key === "spectralCalibrationProfileSave" ) return spectralCalibrationProfileSaveModal
+	if( key === "customIndexFormula" ) return customIndexFormulaModal
+	if( key === "customIndexProjectProfiles" ) return customIndexProjectProfilesModal
+	return null
+}
+
+const ensureViewerOverlayMounted = async ( key ) => {
+	if( typeof key !== "string" || key.length === 0 ) return
+	if( mountedViewerOverlays.value[key] !== true ){
+		mountedViewerOverlays.value = {
+			...mountedViewerOverlays.value,
+			[key]: true
+		}
+	}
+
+	const targetRef = viewerOverlayRef( key )
+	if( targetRef === null ){
+		await nextTick()
+		return
+	}
+
+	for( let attempt = 0; attempt < 20; attempt++ ){
+		await nextTick()
+		if( targetRef.value !== null && targetRef.value !== undefined ){
+			return
+		}
+		await waitForViewerOverlayFrame()
+	}
+}
 const plottingAreaContainer = ref(null)
 const displayInfoTrigger = ref(null)
 const displayOptionsDropdown = ref(null)
@@ -1808,6 +1889,7 @@ const {
 	hyperspectra,
 	gpuInferenceModal,
 	gpuInferenceOutcomeModal,
+	ensureGpuInferenceOutcomeModalMounted: () => ensureViewerOverlayMounted( "gpuInferenceOutcome" ),
 	resetEstimatedVisualizationState: async () => {
 		resetEstimatedVisualizationState()
 	},
@@ -2244,6 +2326,7 @@ const download = async() => {
 	if( downloading.value ) return
 
 	downloading.value = true
+	await ensureViewerOverlayMounted( "downloadPreparing" )
 	downloadPreparingModal.value?.open()
 	var closedOnStart = false
 
@@ -2273,11 +2356,16 @@ const openCustomIndexSettingsFromProjectProfiles = () => {
 	openVisualizationSettings()
 }
 
-const openMetadataModal = () => {
+const openMetadataModal = async () => {
+	await ensureViewerOverlayMounted( "metadata" )
 	metadataModal.value?.open()
 }
 
 const openProjectChat = () => {
+	mountedViewerOverlays.value = {
+		...mountedViewerOverlays.value,
+		projectChat: true
+	}
 	projectChatOpen.value = true
 }
 
@@ -2286,8 +2374,9 @@ const openProjectMenu = async () => {
 	await router.push({ name: "Main menu" })
 }
 
-const openShareModal = () => {
+const openShareModal = async () => {
 	if( project.value?.shared ) return
+	await ensureViewerOverlayMounted( "share" )
 	shareModal.value?.open()
 }
 
@@ -2295,8 +2384,9 @@ const ownedProjectActionTooltip = ( actionLabel ) => {
 	return `${actionLabel} is allowed for owned projects.`
 }
 
-const openZenodoModal = () => {
+const openZenodoModal = async () => {
 	if( project.value?.shared ) return
+	await ensureViewerOverlayMounted( "zenodo" )
 	zenodoModal.value?.open()
 }
 
@@ -3227,6 +3317,7 @@ const openCustomIndexProjectProfilesModal = async () => {
 		return
 	}
 
+	await ensureViewerOverlayMounted( "customIndexProjectProfiles" )
 	customIndexProjectProfilesModal.value?.open?.()
 
 	if(
@@ -3424,6 +3515,7 @@ const openCustomIndexFormulaModal = async () => {
 	customIndexPreviewModel.value = null
 	customIndexPreviewSignature.value = ""
 	customIndexError.value = ""
+	await ensureViewerOverlayMounted( "customIndexFormula" )
 	await customIndexFormulaModal.value?.open?.({
 		expression: "",
 		outputLabel: "",
@@ -4005,6 +4097,7 @@ const {
 	installProjectBackgroundInteractionListeners,
 	removeBackgroundInteractionListeners,
 	clearProjectBackgroundWork,
+	enqueueProjectBackgroundTask,
 	loadVisualizationTargetData,
 	queueProjectBackgroundHydration,
 	scheduleDisplayPayloadPrewarm,
@@ -4735,25 +4828,28 @@ const renderCurrentMatrix = async ( initialize = false ) => {
 	return result
 }
 
-const openRoiSaveModal = () => {
+const openRoiSaveModal = async () => {
 
 	if( canMutateRois.value === false ) return
 	if( hasSelectedRegion.value === false ) return
 
+	await ensureViewerOverlayMounted( "roiSave" )
 	roiSaveModal.value?.open()
 }
 
-const openRoiDeleteModal = () => {
+const openRoiDeleteModal = async () => {
 
 	if( canMutateRois.value === false ) return
 	if( selectedRois.value.length === 0 ) return
 
+	await ensureViewerOverlayMounted( "roiDelete" )
 	roiDeleteModal.value?.open()
 }
 
-const openRoiDescriptionModal = () => {
+const openRoiDescriptionModal = async () => {
 
 	if( selectedRois.value.length === 0 ) return
+	await ensureViewerOverlayMounted( "roiDescription" )
 	roiDescriptionModal.value?.open()
 }
 
@@ -5548,6 +5644,7 @@ const openXyzSettingsModal = async () => {
 
 	try{
 		const axes = xyzAxes.value ?? await loadXyz( "high" )
+		await ensureViewerOverlayMounted( "xyzSettings" )
 		xyzSettingsModal.value?.open( axes )
 	} catch( error ){
 		console.log( error )
@@ -5753,6 +5850,7 @@ const openSpectralAxisOverwriteConfirmation = async ( profile, profileSourceAxis
 		currentSourceAxis
 	}
 
+	await ensureViewerOverlayMounted( "spectralAxisOverwrite" )
 	await spectralAxisOverwriteModal.value?.open?.({
 		profileName: String( profile?.friendlyName ?? profile?.profileID ?? "Selected calibration profile" ).trim(),
 		currentAxis: summarizeSpectralCalibrationSourceAxis( currentSourceAxis ),
@@ -6054,6 +6152,7 @@ const openSpectralCalibrationProfileSaveModal = async () => {
 
 	const activeName = String( activeSpectralCalibrationProfile.value?.friendlyName ?? "" ).trim()
 	const defaultName = String( activeName || project.value?.name || project.value?.id || "" ).trim() || "Spectral calibration profile"
+	await ensureViewerOverlayMounted( "spectralCalibrationProfileSave" )
 	await spectralCalibrationProfileSaveModal.value?.open?.({
 		name: spectralCalibrationProfileNameExists( defaultName ) ? "" : defaultName,
 		description: String( activeSpectralCalibrationProfile.value?.description ?? "" ).trim()
@@ -6702,6 +6801,7 @@ const openGpuInferenceModal = async () => {
 		}
 	}
 
+	await ensureViewerOverlayMounted( "gpuInference" )
 	await openGpuInferenceModalBase()
 }
 
@@ -8207,6 +8307,7 @@ useProjectViewLifecycle({
 	renderCurrentMatrix: ( initialize = false ) => renderCurrentMatrix( initialize ),
 	emitLoadedOnce: () => emitLoadedOnce(),
 	maybeOfferViewerTutorialPrompt: ( requestID ) => maybeOfferViewerTutorialPrompt( requestID ),
+	enqueueProjectBackgroundTask: ( task ) => enqueueProjectBackgroundTask( task ),
 	queueProjectBackgroundHydration: ( requestID, initialLayerIndex, startingDisplayMode ) => {
 		queueProjectBackgroundHydration( requestID, initialLayerIndex, startingDisplayMode )
 	},

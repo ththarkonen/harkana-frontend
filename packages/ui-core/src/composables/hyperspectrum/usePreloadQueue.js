@@ -93,6 +93,7 @@ function useHyperspectrumPreloadQueue( options ){
 		installProjectBackgroundInteractionListeners: backgroundWork.installProjectBackgroundInteractionListeners,
 		removeBackgroundInteractionListeners: backgroundWork.removeBackgroundInteractionListeners,
 		clearProjectBackgroundWork: backgroundWork.clearProjectBackgroundWork,
+		enqueueProjectBackgroundTask: backgroundWork.enqueueProjectBackgroundTask,
 		loadVisualizationTargetData: visualizationTargets.loadVisualizationTargetData,
 		queueProjectBackgroundHydration: visualizationTargets.queueProjectBackgroundHydration,
 		scheduleDisplayPayloadPrewarm: visualizationTargets.scheduleDisplayPayloadPrewarm,

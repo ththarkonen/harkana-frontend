@@ -546,10 +546,11 @@
 
 	</div>
 
-	<MetadataModal ref = "metadataModal" :project = "project"></MetadataModal>
-	<ShareModal ref = "shareModal" :project = "project"></ShareModal>
-	<ZenodoModal ref = "zenodoModal" :project = "project"></ZenodoModal>
-	<CalibrationPanel v-model = "calibrationPanelOpen"
+	<MetadataModal v-if = "mountedViewerOverlays.metadata" ref = "metadataModal" :project = "project"></MetadataModal>
+	<ShareModal v-if = "mountedViewerOverlays.share" ref = "shareModal" :project = "project"></ShareModal>
+	<ZenodoModal v-if = "mountedViewerOverlays.zenodo" ref = "zenodoModal" :project = "project"></ZenodoModal>
+	<CalibrationPanel v-if = "calibrationPanelOpen || mountedViewerOverlays.calibrationPanel"
+					  v-model = "calibrationPanelOpen"
 					  data-tutorial = "spectrum-calibration-panel"
 					  :project = "project"
 					  :anchor-element = "calibrationSidebarSection"
@@ -569,19 +570,23 @@
 					  @save-profile = "openCalibrationProfileSaveModal"
 					  @remove-point = "removeCalibrationPoint"
 					  @focus-point = "setFocusedCalibrationPointID"></CalibrationPanel>
-	<CalibrationProfileSaveModal ref = "calibrationProfileSaveModal"
+	<CalibrationProfileSaveModal v-if = "mountedViewerOverlays.calibrationProfileSave"
+								 ref = "calibrationProfileSaveModal"
 								 :saving = "calibrationProfileSaving"
 								 :reserved-names = "calibrationReservedProfileNames"
 								 :base-disabled-reason = "calibrationProfileSaveDisabledReason"
 								 @save = "saveCalibrationProfile"></CalibrationProfileSaveModal>
-	<ProjectChatWindow v-model = "projectChatOpen"
+	<ProjectChatWindow v-if = "projectChatOpen || mountedViewerOverlays.projectChat"
+					   v-model = "projectChatOpen"
 					   :project = "project"></ProjectChatWindow>
-	<ViewerTutorialPrompt :visible = "tutorialPromptVisible"
+	<ViewerTutorialPrompt v-if = "tutorialPromptVisible || mountedViewerOverlays.tutorialPrompt"
+						  :visible = "tutorialPromptVisible"
 						  title = "Welcome to the spectrum viewer"
 						  body = "This tutorial walks through the spectrum project workflow, including display layouts, comparisons, calibration profiles, project actions, and downloads."
 						  @start = "startTutorial"
 						  @skip = "skipTutorialPrompt"></ViewerTutorialPrompt>
-	<ViewerTutorialOverlay :visible = "tutorialVisible"
+	<ViewerTutorialOverlay v-if = "tutorialVisible || mountedViewerOverlays.tutorialOverlay"
+						   :visible = "tutorialVisible"
 						   :step-id = "activeTutorialStep?.id ?? ''"
 						   :title = "activeTutorialStep?.title ?? ''"
 						   :body = "activeTutorialStep?.body ?? ''"
@@ -600,7 +605,7 @@
 
 <script setup>
 
-import { ref, toRaw, watch, computed, nextTick, onMounted, onBeforeUnmount} from 'vue'
+import { ref, toRaw, watch, computed, nextTick, onMounted, onBeforeUnmount, defineAsyncComponent} from 'vue'
 import { useRoute } from 'vue-router'
 import { debounce } from 'lodash'
 import katex from "katex"
@@ -633,15 +638,17 @@ import BaseDropdown from './navbar/BaseDropdown.vue'
 import BaseDropdownItem from './navbar/BaseDropdownItem.vue'
 import ProjectNameInput from './navbar/ProjectNameInput.vue'
 
-import MetadataModal from './modals/MetadataModal.vue'
-import ShareModal from './modals/ShareModal.vue'
-import ZenodoModal  from './modals/ZenodoModal.vue'
-import CalibrationPanel from './modals/CalibrationPanel.vue'
-import CalibrationProfileSaveModal from './modals/CalibrationProfileSaveModal.vue'
-import ProjectChatWindow from './chat/ProjectChatWindow.vue'
-import ViewerTutorialPrompt from './tutorial/ViewerTutorialPrompt.vue'
-import ViewerTutorialOverlay from './tutorial/ViewerTutorialOverlay.vue'
 import { useSpectrumProjectTutorial } from '../composables/spectrum/useSpectrumProjectTutorial.js'
+import { markViewerLoad, measureViewerLoad } from '../utils/viewerPerformance.js'
+
+const MetadataModal = defineAsyncComponent(() => import('./modals/MetadataModal.vue'))
+const ShareModal = defineAsyncComponent(() => import('./modals/ShareModal.vue'))
+const ZenodoModal = defineAsyncComponent(() => import('./modals/ZenodoModal.vue'))
+const CalibrationPanel = defineAsyncComponent(() => import('./modals/CalibrationPanel.vue'))
+const CalibrationProfileSaveModal = defineAsyncComponent(() => import('./modals/CalibrationProfileSaveModal.vue'))
+const ProjectChatWindow = defineAsyncComponent(() => import('./chat/ProjectChatWindow.vue'))
+const ViewerTutorialPrompt = defineAsyncComponent(() => import('./tutorial/ViewerTutorialPrompt.vue'))
+const ViewerTutorialOverlay = defineAsyncComponent(() => import('./tutorial/ViewerTutorialOverlay.vue'))
 
 const metadataModal = ref(null)
 const shareModal = ref(null)
@@ -650,8 +657,57 @@ const projectNameInput = ref(null)
 const calibrationProfileSaveModal = ref(null)
 const displayOptionsDropdown = ref(null)
 const projectMenuDropdown = ref(null)
+const mountedViewerOverlays = ref({
+	metadata: false,
+	share: false,
+	zenodo: false,
+	calibrationPanel: false,
+	calibrationProfileSave: false,
+	projectChat: false,
+	tutorialPrompt: false,
+	tutorialOverlay: false
+})
+
+const waitForViewerOverlayFrame = () => {
+	return new Promise(( resolve ) => {
+		window.setTimeout( resolve, 16 )
+	})
+}
+
+const viewerOverlayRef = ( key ) => {
+	if( key === "metadata" ) return metadataModal
+	if( key === "share" ) return shareModal
+	if( key === "zenodo" ) return zenodoModal
+	if( key === "calibrationProfileSave" ) return calibrationProfileSaveModal
+	return null
+}
+
+const ensureViewerOverlayMounted = async ( key ) => {
+	if( typeof key !== "string" || key.length === 0 ) return
+	if( mountedViewerOverlays.value[key] !== true ){
+		mountedViewerOverlays.value = {
+			...mountedViewerOverlays.value,
+			[key]: true
+		}
+	}
+
+	const targetRef = viewerOverlayRef( key )
+	if( targetRef === null ){
+		await nextTick()
+		return
+	}
+
+	for( let attempt = 0; attempt < 20; attempt++ ){
+		await nextTick()
+		if( targetRef.value !== null && targetRef.value !== undefined ){
+			return
+		}
+		await waitForViewerOverlayFrame()
+	}
+}
 
 const projectID = route.params.id
+const activeSpectrumProjectLoadRequestID = ref(0)
 const comparisonProjectIDs = ref([])
 const comparisonSearchPattern = ref("")
 
@@ -1627,18 +1683,25 @@ const download = async() => {
 }
 
 const openProjectChat = () => {
+	mountedViewerOverlays.value = {
+		...mountedViewerOverlays.value,
+		projectChat: true
+	}
 	projectChatOpen.value = true
 }
 
-const openMetadataModal = () => {
+const openMetadataModal = async () => {
+	await ensureViewerOverlayMounted( "metadata" )
 	metadataModal.value?.open()
 }
 
-const openShareModal = () => {
+const openShareModal = async () => {
+	await ensureViewerOverlayMounted( "share" )
 	shareModal.value?.open()
 }
 
-const openZenodoModal = () => {
+const openZenodoModal = async () => {
+	await ensureViewerOverlayMounted( "zenodo" )
 	zenodoModal.value?.open()
 }
 
@@ -2150,6 +2213,7 @@ const openCalibrationProfileSaveModal = async () => {
 	}
 
 	const defaultName = String( calibrationProfileName.value ?? savedCalibrationProfileName.value ?? project.value?.name ?? project.value?.id ?? "" ).trim() || "Calibration profile"
+	await ensureViewerOverlayMounted( "calibrationProfileSave" )
 	await calibrationProfileSaveModal.value?.open?.({
 		name: calibrationProfileNameExists( defaultName ) ? "" : defaultName,
 		description: calibrationProfileDescription.value
@@ -3474,58 +3538,106 @@ watch( [calibrationReferenceLines, calibrating], async () => {
 	await syncCalibrationReferenceLines()
 }, { deep: true })
 
+const isActiveSpectrumProjectLoad = ( requestID ) => {
+	return requestID === activeSpectrumProjectLoadRequestID.value
+}
+
+const hydrateInitialSpectrumEstimate = async ( requestID ) => {
+	const loadedEstimate = await results.load( project.value, "estimate" )
+	if( isActiveSpectrumProjectLoad( requestID ) === false ) return
+
+	estimate.value = loadedEstimate
+	await renderSpectrumLayout()
+
+	if( hasEstimate.value === false && projectEstimateJobId.value.length > 0 ){
+		void pollEstimateJobStatus()
+	}
+}
+
+const hydrateInitialSpectrumCalibration = async ( requestID ) => {
+	const loadedAssignedCalibration = await loadAssignedCalibration()
+	if( isActiveSpectrumProjectLoad( requestID ) === false ) return
+
+	if( loadedAssignedCalibration === false ){
+		const loadedCalibration = await results.load( project.value, "calibration" )
+		if( isActiveSpectrumProjectLoad( requestID ) === false ) return
+
+		savedCalibrationSnapshot.value = loadedCalibration instanceof Error
+			? normalizeCalibrationModel({ x: 0, polynomialOrder: 0, includedOrders: [ 0 ], points: [] })
+			: normalizeCalibrationModel( loadedCalibration )
+		data.value.calibration = cloneCalibrationModel( savedCalibrationSnapshot.value )
+		savedCalibrationProfileName.value = String( project.value?.name ?? project.value?.id ?? "Calibration profile" )
+		calibrationProfileName.value = String( project.value?.name ?? project.value?.id ?? "Calibration profile" )
+		savedCalibrationProfileDescription.value = ""
+		calibrationProfileDescription.value = ""
+		syncCalibrationDraftFromSavedData()
+	}
+
+	await renderSpectrumLayout()
+}
+
+const hydrateDeferredSpectrumProjectState = async ( requestID ) => {
+	const deferredTasks = [
+		hydrateInitialSpectrumEstimate( requestID ),
+		hydrateInitialSpectrumCalibration( requestID )
+	]
+
+	await Promise.allSettled( deferredTasks )
+	if( isActiveSpectrumProjectLoad( requestID ) === false ) return
+
+	if( project.value?.shared === false && calibrationProfilesSupported.value ){
+		void refreshCalibrationProfiles()
+	}
+
+	markViewerLoad( "spectrum:deferred-ready", { projectID: String( project.value?.id ?? "" ) })
+	maybeOfferTutorialPrompt()
+}
+
 onMounted( async () => {
 
     try{
+		const requestID = activeSpectrumProjectLoadRequestID.value + 1
+		activeSpectrumProjectLoadRequestID.value = requestID
+		markViewerLoad( "spectrum:route-mounted", { projectID: String( projectID ?? "" ) })
 
-        var savedSettings = await settingslib.get()
+        const [ savedSettings, listedProjects ] = await Promise.all([
+			settingslib.get(),
+			projectlib.list()
+		])
 
         settings.value = savedSettings;
 		seedSplitSpectrumLegendVisibility()
-        projects.value = await projectlib.list();
+        projects.value = listedProjects;
         project.value = projects.value[ projectID ];
+		markViewerLoad( "spectrum:project-metadata-ready", { projectID: String( project.value?.id ?? "" ) })
 
 		data.value = await results.load( project.value, "data");
-		estimate.value = await results.load( project.value, "estimate");
-		const loadedAssignedCalibration = await loadAssignedCalibration()
-		if( loadedAssignedCalibration === false ){
-			const loadedCalibration = await results.load( project.value, "calibration")
-			savedCalibrationSnapshot.value = loadedCalibration instanceof Error
-				? normalizeCalibrationModel({ x: 0, polynomialOrder: 0, includedOrders: [ 0 ], points: [] })
-				: normalizeCalibrationModel( loadedCalibration )
-			data.value.calibration = cloneCalibrationModel( savedCalibrationSnapshot.value )
-			savedCalibrationProfileName.value = String( project.value?.name ?? project.value?.id ?? "Calibration profile" )
-			calibrationProfileName.value = String( project.value?.name ?? project.value?.id ?? "Calibration profile" )
-			savedCalibrationProfileDescription.value = ""
-			calibrationProfileDescription.value = ""
-			syncCalibrationDraftFromSavedData()
-		}
-
-		if( project.value?.shared === false && calibrationProfilesSupported.value ){
-			void refreshCalibrationProfiles()
-		}
+		markViewerLoad( "spectrum:first-data-ready", { projectID: String( project.value?.id ?? "" ) })
 
         await nextTick()
 		window.addEventListener( "resize", handleWindowResize )
 		connectSpectraPaneResizeObserver()
 		await prepareSplitPaneLayoutForRender()
+		markViewerLoad( "spectrum:first-plot-render-start", { projectID: String( project.value?.id ?? "" ) })
         await renderSpectrumLayout()
+		markViewerLoad( "spectrum:first-plot-render-end", { projectID: String( project.value?.id ?? "" ) })
+		measureViewerLoad(
+			"spectrum:first-plot-render",
+			"spectrum:first-plot-render-start",
+			"spectrum:first-plot-render-end"
+		)
+		emit("loaded")
 
-		if( hasEstimate.value === false && projectEstimateJobId.value.length > 0 ){
-			void pollEstimateJobStatus()
-		}
-
-		maybeOfferTutorialPrompt()
+		void hydrateDeferredSpectrumProjectState( requestID )
 
     } catch( error ){
 		console.log( error )
         navigation.route("Main menu", {})
     }
-
-    emit("loaded")
 })
 
 onBeforeUnmount(() => {
+	activeSpectrumProjectLoadRequestID.value += 1
 	clearEstimatePollTimeout()
 	detachCalibrationPlotClickListeners()
 	stopCalibrationPulse()

@@ -14,10 +14,15 @@
     "./CheckoutSuccess": "./src/components/CheckoutSuccess.vue",
     "./SignIn": "./src/components/SignIn.vue",
     "./Application": "./src/components/Application.vue",
+    "./fontawesome": "./src/fontawesome.js",
+    "./mathjax": "./src/mathjax.js",
     "./HyperspectrumViewer": "./src/components/HyperspectrumViewer.vue"
   },
   "dependencies": {
     "@aws-amplify/ui-vue": "^3.1.30",
+    "@fortawesome/fontawesome-svg-core": "^7.1.0",
+    "@fortawesome/free-regular-svg-icons": "^7.1.0",
+    "@fortawesome/free-solid-svg-icons": "^7.1.0",
     "@harkana/ui-loading": "workspace:*",
     "@harkana/plot": "workspace:*",
     "@harkana/tokens": "workspace:*",

@@ -2,7 +2,8 @@
   "name": "@harkana/plot",
   "private": true,
   "exports": {
-    ".": "./index.js"
+    ".": "./index.js",
+    "./mathjax": "./mathjax.js"
   },
   "devDependencies": {
     "plotly.js-dist": "^2.35.3"

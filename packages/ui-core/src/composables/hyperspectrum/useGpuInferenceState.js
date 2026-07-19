@@ -15,6 +15,7 @@ export function useGpuInferenceState( options ){
 	const hyperspectra = options.hyperspectra
 	const gpuInferenceModal = options.gpuInferenceModal
 	const gpuInferenceOutcomeModal = options.gpuInferenceOutcomeModal
+	const ensureGpuInferenceOutcomeModalMounted = options.ensureGpuInferenceOutcomeModalMounted
 	const resetEstimatedVisualizationState = options.resetEstimatedVisualizationState
 	const clearEstimatedCacheForProject = options.clearEstimatedCacheForProject
 
@@ -130,6 +131,9 @@ export function useGpuInferenceState( options ){
 			nextEstimateSpectraReady === true &&
 			nextStatus !== "SUCCEEDED"
 		if( becameEstimateReady ){
+			if( typeof ensureGpuInferenceOutcomeModalMounted === "function" ){
+				await ensureGpuInferenceOutcomeModalMounted()
+			}
 			await gpuInferenceOutcomeModal.value?.open?.( "ESTIMATE_READY" )
 			return
 		}
@@ -137,6 +141,9 @@ export function useGpuInferenceState( options ){
 		if( GPU_NON_TERMINAL_STATUSES.has( previousStatus ) === false ) return
 		if( GPU_TERMINAL_STATUSES.has( nextStatus ) === false ) return
 
+		if( typeof ensureGpuInferenceOutcomeModalMounted === "function" ){
+			await ensureGpuInferenceOutcomeModalMounted()
+		}
 		await gpuInferenceOutcomeModal.value?.open?.( nextStatus, {
 			errorCode: payload?.errorCode,
 			errorMessage: payload?.errorMessage

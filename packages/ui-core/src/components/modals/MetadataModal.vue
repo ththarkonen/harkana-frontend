@@ -36,12 +36,13 @@
 
 <script setup>
 
-import JsonEditorVue from 'json-editor-vue'
 import { metadata as md, utils} from "@harkana/tools"
 
-import { ref, toRaw} from 'vue'
+import { defineAsyncComponent, ref, toRaw} from 'vue'
 import Modal from "./Modal.vue"
 import ModalButton from './ModalButton.vue'
+
+const JsonEditorVue = defineAsyncComponent(() => import('json-editor-vue'))
 
 const props = defineProps({
     project: { type: Object, required: true }
