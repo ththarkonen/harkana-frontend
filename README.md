@@ -110,10 +110,42 @@ VITE_PADDLE_CLIENT_SIDE_TOKEN=live_a6a88d5201b7fa4feb1ba762f20
 VITE_PADDLE_PRICE_ID=pri_01kcszjfg5g33epm31h9nzhh8q
 ```
 
+Social sign-in is enabled when the Cognito Hosted UI domain is configured for an application:
+
+```env
+# Cognito Hosted UI domain, for example auth.example.auth.eu-north-1.amazoncognito.com
+VITE_COGNITO_OAUTH_DOMAIN=
+
+# Optional comma-separated overrides. Defaults are shown.
+VITE_COGNITO_OAUTH_SCOPES=openid,email,profile
+VITE_COGNITO_SOCIAL_PROVIDERS=google,microsoft
+VITE_COGNITO_OAUTH_RESPONSE_TYPE=code
+VITE_COGNITO_MICROSOFT_PROVIDER_NAME=Microsoft
+VITE_COGNITO_MICROSOFT_PERSONAL_PROVIDER_NAME=Microsoft
+VITE_COGNITO_MICROSOFT_WORK_PROVIDER_NAME=MicrosoftWork
+
+# Optional comma-separated callback/logout URLs. Defaults to the current origin.
+VITE_COGNITO_REDIRECT_SIGN_IN=
+VITE_COGNITO_REDIRECT_SIGN_OUT=
+```
+
+To show separate Microsoft buttons, use provider ids:
+
+```env
+VITE_COGNITO_SOCIAL_PROVIDERS=google,microsoft-personal,microsoft-work
+VITE_COGNITO_MICROSOFT_PERSONAL_PROVIDER_NAME=Microsoft
+VITE_COGNITO_MICROSOFT_WORK_PROVIDER_NAME=MicrosoftWork
+```
+
+The corresponding Cognito custom OIDC providers must exist and be enabled on the app client. A typical split is:
+
+- `Microsoft`: personal Microsoft accounts, using the Microsoft `/consumers/v2.0` authority.
+- `MicrosoftWork`: institutional work or school accounts, using either a tenant-specific authority or an organizational authority that Cognito accepts for the target setup.
+
 The .env files can be found inside the CARS and Raman application folders
 
 **Notes:**
-- These variables are frontend-only; no AWS Amplify configuration is required here.
+- These variables are frontend-only; Cognito identity providers, app-client callback URLs, and provider secrets are configured in AWS.
 - `VITE_DATA_TYPE` determines which workflow (Raman or CARS) the application handles.
 - `VITE_VERSION` is automatically injected from your `package.json` for version tracking.
 

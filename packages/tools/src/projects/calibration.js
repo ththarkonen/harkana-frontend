@@ -1,6 +1,7 @@
 import { Amplify, Storage} from 'aws-amplify'
 import awsconfig from '@/aws-exports.js'
-Amplify.configure( awsconfig )
+import { configureAmplify } from '../authConfig.js'
+configureAmplify( Amplify, awsconfig )
 
 export var set = async function( project, calibration){
 

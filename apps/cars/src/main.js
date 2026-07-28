@@ -1,6 +1,7 @@
 import { Amplify } from "aws-amplify"
 import awsconfig from "./aws-exports"
-Amplify.configure( awsconfig )
+import { configureAmplify } from "@harkana/tools/authConfig"
+configureAmplify( Amplify, awsconfig )
 
 import Application from "@harkana/ui-core/Application"
 import { registerHarkanaFontAwesomeIcons } from "@harkana/ui-core/fontawesome"

@@ -5,6 +5,7 @@
     ".": "./tokens.js"
   },
   "devDependencies": {
+    "@harkana/tools": "workspace:*",
     "aws-amplify": "^5.3.38",
     "axios": "^1.18.1"
   }

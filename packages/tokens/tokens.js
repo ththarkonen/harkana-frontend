@@ -1,8 +1,9 @@
 import { Amplify } from 'aws-amplify'
 import awsconfig from '@/aws-exports.js'
+import { configureAmplify } from '@harkana/tools/authConfig'
 import axios from 'axios';
 
-Amplify.configure( awsconfig )
+configureAmplify( Amplify, awsconfig )
 const Auth = Amplify.Auth;
 
 var apiParameters = async function(){

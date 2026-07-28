@@ -68,11 +68,8 @@
 
 <script setup>
 
-import { Amplify } from 'aws-amplify'
-const Auth = Amplify.Auth
-
 import { ref, computed } from 'vue'
-import { sharing } from "@harkana/tools"
+import { auth as authlib, sharing } from "@harkana/tools"
 
 import Modal from "./Modal.vue"
 import ModalButton from './ModalButton.vue'
@@ -111,7 +108,8 @@ const addCollaborator = async () => {
         errorMessage.value = ""
         addingCollaborator.value = true
 
-        if( Auth.user.attributes.email === inputEmail.value ){
+        const profile = await authlib.getCurrentUserProfile()
+        if( profile.email.toLowerCase() === inputEmail.value.trim().toLowerCase() ){
             throw new Error("Cannot share the project with yourself.")
         }
 

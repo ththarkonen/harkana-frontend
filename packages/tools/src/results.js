@@ -1,6 +1,7 @@
 import { Amplify, Storage } from 'aws-amplify';
-import awsconfig from '@/aws-exports.js';
-Amplify.configure( awsconfig );
+import awsconfig from '@/aws-exports.js'
+import { configureAmplify } from './authConfig.js';
+configureAmplify( Amplify, awsconfig );
 
 import { get as getCalibration, set as setCalibration} from './projects/calibration.js';
 import share from "./sharing.js"

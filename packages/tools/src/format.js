@@ -1,8 +1,9 @@
 
 import { Amplify } from 'aws-amplify';
-import awsconfig from '@/aws-exports.js';
+import awsconfig from '@/aws-exports.js'
+import { configureAmplify } from './authConfig.js';
 
-Amplify.configure( awsconfig );
+configureAmplify( Amplify, awsconfig );
 const Auth = Amplify.Auth;
 
 var owner = project => {
