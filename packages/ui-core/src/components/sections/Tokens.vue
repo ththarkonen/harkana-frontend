@@ -520,12 +520,9 @@
 
 <script setup>
 
-import { Amplify } from 'aws-amplify'
-const Auth = Amplify.Auth;
-
 import { ref, computed, nextTick, onMounted} from "vue"
 import { initializePaddle } from '@paddle/paddle-js';
-import { settings as settingslib, tokens, utils} from "@harkana/tools"
+import { auth as authlib, settings as settingslib, tokens, utils} from "@harkana/tools"
 
 import SettingsButton from "../settings/SettingsButton.vue"
 
@@ -1228,7 +1225,11 @@ const createTokenGroup = async() => {
 const buy = async( groupID ) => {
 
     const items = [{ priceId: import.meta.env.VITE_PADDLE_PRICE_ID, quantity: 1}]
-    const custom = { userID: Auth.user.attributes.sub, groupID: groupID}
+    const profile = await authlib.getCurrentUserProfile()
+    if( profile.sub.length === 0 ){
+        throw new Error( "Could not resolve the authenticated user." )
+    }
+    const custom = { userID: profile.sub, groupID: groupID}
     const successUrl = window.location.origin + "/checkout-success"
     const settings = {
         locale: "en",

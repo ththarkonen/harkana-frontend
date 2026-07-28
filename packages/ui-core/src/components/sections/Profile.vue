@@ -129,10 +129,11 @@ import QRCode from "qrcode"
 
 import { Amplify } from 'aws-amplify'
 import awsconfig from '@/aws-exports.js'
+import { configureAmplify } from "@harkana/tools/authConfig"
 
-import { account, utils } from "@harkana/tools"
+import { account, auth as authlib, utils } from "@harkana/tools"
 
-Amplify.configure( awsconfig )
+configureAmplify( Amplify, awsconfig )
 const Auth = Amplify.Auth
 
 import SettingsButton from "../settings/SettingsButton.vue"
@@ -187,7 +188,18 @@ const startAccountDeletion = async () => {
         accountDeletionError.value = String( error?.detail ?? error?.message ?? "Failed to start account deletion." ).trim()
     } finally {
         deletingAccount.value = false
-    }
+	}
+}
+
+const syncProfileFieldsFromAuth = async ( options = {} ) => {
+
+	const profile = await authlib.getCurrentUserProfile( options )
+
+	if ( givenName.value === "" ) givenName.value = profile.given_name
+	if ( familyName.value === "" ) familyName.value = profile.family_name
+	if ( email.value === "" ) email.value = profile.email
+
+	return profile
 }
 
 const updateName = async () => {
@@ -225,14 +237,10 @@ const updateEmail = async () => {
 		var newAttributes = {}
 		newAttributes.email = email.value;
 
-		var user = await Auth.currentAuthenticatedUser();
+		const user = await Auth.currentAuthenticatedUser();
 		const result = await Auth.updateUserAttributes( user, newAttributes);
 
-		user = await Auth.currentAuthenticatedUser();
-
-		givenName.value = user.attributes.given_name;
-		familyName.value = user.attributes.family_name;
-		email.value = user.attributes.email;
+		await syncProfileFieldsFromAuth({ bypassCache: true })
 
 	} catch (error) {
 
@@ -280,7 +288,8 @@ const setupMFA = async () => {
     secret.value = await Auth.setupTOTP( user )
 
     const issuer = 'HARKANA'
-    const username = user.attributes.email
+    const profile = await authlib.getCurrentUserProfile()
+    const username = profile.email || profile.username
     console.log( user )
 
     const otpAuthUrl =
@@ -316,11 +325,7 @@ const verifyMFA = async () => {
 
 onMounted( async () => {
 
-	const user = await Auth.currentAuthenticatedUser();
-
-	if ( givenName.value === "" ) givenName.value = user.attributes.given_name ?? "";
-	if ( familyName.value === "" ) familyName.value = user.attributes.family_name ?? "";
-	if ( email.value === "" ) email.value = user.attributes.email ?? "";
+	await syncProfileFieldsFromAuth()
 })
 
 </script>

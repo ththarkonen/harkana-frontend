@@ -17,11 +17,12 @@ import { onMounted, onUnmounted, ref, watch, nextTick} from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthenticator } from "@aws-amplify/ui-vue"
 import { account } from "@harkana/tools"
+import { configureAmplify } from "@harkana/tools/authConfig"
 
 import { Amplify } from 'aws-amplify'
 import awsconfig from '@/aws-exports'
 
-Amplify.configure(awsconfig)
+configureAmplify( Amplify, awsconfig )
 
 import SignIn from "./SignIn"
 import { LoadingOverlay } from "@harkana/ui-loading"

@@ -2,7 +2,8 @@
   "name": "@harkana/tools",
   "private": true,
   "exports": {
-    ".": "./index.js"
+    ".": "./index.js",
+    "./authConfig": "./src/authConfig.js"
   },
   "devDependencies": {
     "@zip.js/zip.js": "^2.8.11",

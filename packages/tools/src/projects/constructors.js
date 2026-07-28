@@ -1,14 +1,16 @@
 import { Amplify } from 'aws-amplify'
 import awsconfig from '@/aws-exports.js'
+import { configureAmplify } from '../authConfig.js'
+import { getCurrentUserProfile } from '../api/auth.ts'
 import version from '../version.js'
 
-Amplify.configure( awsconfig )
+configureAmplify( Amplify, awsconfig )
 const Auth = Amplify.Auth;
 
 var project = async function( id, fileName, rawFileName){
 
 	const date = Date.now();
-	const user = Auth.user;
+	const userProfile = await getCurrentUserProfile()
 	const userID = Auth.Credentials._identityId;
 
 	var project = {};
@@ -21,8 +23,8 @@ var project = async function( id, fileName, rawFileName){
     project.lastModified = date;
 
 	project.owner = {};
-	project.owner.firstName = user.attributes.given_name;
-	project.owner.familyName = user.attributes.family_name;
+	project.owner.firstName = userProfile.given_name;
+	project.owner.familyName = userProfile.family_name;
 	project.owner.id = userID;
 
     return project;

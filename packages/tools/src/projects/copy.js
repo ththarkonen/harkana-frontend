@@ -1,9 +1,11 @@
 import { Amplify, Storage} from 'aws-amplify';
 import awsconfig from '@/aws-exports.js';
+import { configureAmplify } from '../authConfig.js';
+import { getCurrentUserProfile } from '../api/auth.ts';
 import utils from '../utils.js';
 import { getProjects, setProjects, setInfo} from './helpers.js';
 
-Amplify.configure( awsconfig );
+configureAmplify( Amplify, awsconfig );
 const Auth = Amplify.Auth;
 
 var copy = async function( sourceProject ){
@@ -22,7 +24,7 @@ var copy = async function( sourceProject ){
 
     const projectFiles = await Storage.list( project.id + "/", accessSettings);
 
-    const user = Auth.user;
+    const userProfile = await getCurrentUserProfile();
     const userId = Auth.Credentials._identityId;
 
     const date = Date.now();
@@ -35,8 +37,8 @@ var copy = async function( sourceProject ){
     projectObject.lastModified = date;
 
     projectObject.owner = {};
-    projectObject.owner.firstName = user.attributes.given_name;
-    projectObject.owner.familyName = user.attributes.family_name;
+    projectObject.owner.firstName = userProfile.given_name;
+    projectObject.owner.familyName = userProfile.family_name;
     projectObject.owner.id = userId;
 
     var projectInfoObject = {};
@@ -45,8 +47,8 @@ var copy = async function( sourceProject ){
     projectInfoObject.name = project.name + "(copy)";
 
     projectInfoObject.owner = {};
-    projectInfoObject.owner.firstName = user.attributes.given_name;
-    projectInfoObject.owner.familyName = user.attributes.family_name;
+    projectInfoObject.owner.firstName = userProfile.given_name;
+    projectInfoObject.owner.familyName = userProfile.family_name;
     projectInfoObject.owner.id = userId;
     projectInfoObject.lastModified = date;
 
