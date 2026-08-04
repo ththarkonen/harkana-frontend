@@ -1,5 +1,7 @@
+import { COGNITO_SOCIAL_SIGN_IN_CONFIG } from "./cognitoSocialSignInConfig"
+
 const DEFAULT_OAUTH_SCOPES = [ "openid", "email", "profile" ]
-const DEFAULT_SOCIAL_PROVIDERS = [ "google", "microsoft" ]
+const DEFAULT_SOCIAL_PROVIDERS = [ "google", "microsoft-personal" ]
 const DEFAULT_MICROSOFT_PROVIDER_NAME = "Microsoft"
 const DEFAULT_MICROSOFT_WORK_PROVIDER_NAME = "MicrosoftWork"
 
@@ -87,11 +89,26 @@ function normalizeRedirectList( value ){
 	return normalizeOriginUrl()
 }
 
+function configuredValue( envValue, generatedValue, fallbackValue ){
+	const normalizedEnvValue = String( envValue ?? "" ).trim()
+	if( normalizedEnvValue.length > 0 ){
+		return envValue
+	}
+
+	if( Array.isArray( generatedValue ) ){
+		return generatedValue.length > 0 ? generatedValue : fallbackValue
+	}
+
+	const normalizedGeneratedValue = String( generatedValue ?? "" ).trim()
+	return normalizedGeneratedValue.length > 0 ? generatedValue : fallbackValue
+}
+
 function normalizeOauthConfig( awsconfig ){
 	const existingOauth = awsconfig?.oauth ?? {}
 	const domain = String(
 		import.meta.env.VITE_COGNITO_OAUTH_DOMAIN
 		?? existingOauth.domain
+		?? COGNITO_SOCIAL_SIGN_IN_CONFIG.domain
 		?? ""
 	).trim()
 
@@ -99,15 +116,31 @@ function normalizeOauthConfig( awsconfig ){
 		return existingOauth
 	}
 
+	const scopes = splitList( configuredValue(
+		import.meta.env.VITE_COGNITO_OAUTH_SCOPES,
+		existingOauth.scope,
+		COGNITO_SOCIAL_SIGN_IN_CONFIG.scope
+	))
+
 	return {
 		...existingOauth,
 		domain,
-		scope: splitList( import.meta.env.VITE_COGNITO_OAUTH_SCOPES ?? existingOauth.scope ).length > 0
-			? splitList( import.meta.env.VITE_COGNITO_OAUTH_SCOPES ?? existingOauth.scope )
-			: DEFAULT_OAUTH_SCOPES,
-		redirectSignIn: normalizeRedirectList( import.meta.env.VITE_COGNITO_REDIRECT_SIGN_IN ?? existingOauth.redirectSignIn ),
-		redirectSignOut: normalizeRedirectList( import.meta.env.VITE_COGNITO_REDIRECT_SIGN_OUT ?? existingOauth.redirectSignOut ),
-		responseType: String( import.meta.env.VITE_COGNITO_OAUTH_RESPONSE_TYPE ?? existingOauth.responseType ?? "code" ).trim() || "code"
+		scope: scopes.length > 0 ? scopes : DEFAULT_OAUTH_SCOPES,
+		redirectSignIn: normalizeRedirectList( configuredValue(
+			import.meta.env.VITE_COGNITO_REDIRECT_SIGN_IN,
+			existingOauth.redirectSignIn,
+			COGNITO_SOCIAL_SIGN_IN_CONFIG.redirectSignIn
+		)),
+		redirectSignOut: normalizeRedirectList( configuredValue(
+			import.meta.env.VITE_COGNITO_REDIRECT_SIGN_OUT,
+			existingOauth.redirectSignOut,
+			COGNITO_SOCIAL_SIGN_IN_CONFIG.redirectSignOut
+		)),
+		responseType: String( configuredValue(
+			import.meta.env.VITE_COGNITO_OAUTH_RESPONSE_TYPE,
+			existingOauth.responseType,
+			COGNITO_SOCIAL_SIGN_IN_CONFIG.responseType
+		)).trim() || "code"
 	}
 }
 
@@ -120,6 +153,10 @@ function resolveSocialProviders( awsconfig, oauthConfig ){
 	const generated = splitList( awsconfig?.aws_cognito_social_providers )
 	if( generated.length > 0 ){
 		return uniqueList( generated.map( normalizeSocialProviderKey ))
+	}
+
+	if( COGNITO_SOCIAL_SIGN_IN_CONFIG.socialProviders.length > 0 ){
+		return uniqueList( COGNITO_SOCIAL_SIGN_IN_CONFIG.socialProviders.map( normalizeSocialProviderKey ))
 	}
 
 	return String( oauthConfig?.domain ?? "" ).trim().length > 0
@@ -152,7 +189,11 @@ function getConfiguredSocialSignInProviders( awsconfig = {} ){
 }
 
 function getMicrosoftCognitoProviderName(){
-	return String( import.meta.env.VITE_COGNITO_MICROSOFT_PROVIDER_NAME ?? DEFAULT_MICROSOFT_PROVIDER_NAME ).trim()
+	return String(
+		import.meta.env.VITE_COGNITO_MICROSOFT_PROVIDER_NAME
+		?? COGNITO_SOCIAL_SIGN_IN_CONFIG.providerNames.microsoftPersonal
+		?? DEFAULT_MICROSOFT_PROVIDER_NAME
+	).trim()
 		|| DEFAULT_MICROSOFT_PROVIDER_NAME
 }
 
@@ -160,6 +201,7 @@ function getMicrosoftPersonalCognitoProviderName(){
 	return String(
 		import.meta.env.VITE_COGNITO_MICROSOFT_PERSONAL_PROVIDER_NAME
 		?? import.meta.env.VITE_COGNITO_MICROSOFT_PROVIDER_NAME
+		?? COGNITO_SOCIAL_SIGN_IN_CONFIG.providerNames.microsoftPersonal
 		?? DEFAULT_MICROSOFT_PROVIDER_NAME
 	).trim() || DEFAULT_MICROSOFT_PROVIDER_NAME
 }
@@ -168,6 +210,7 @@ function getMicrosoftWorkCognitoProviderName(){
 	return String(
 		import.meta.env.VITE_COGNITO_MICROSOFT_WORK_PROVIDER_NAME
 		?? import.meta.env.VITE_COGNITO_MICROSOFT_INSTITUTIONAL_PROVIDER_NAME
+		?? COGNITO_SOCIAL_SIGN_IN_CONFIG.providerNames.microsoftWork
 		?? DEFAULT_MICROSOFT_WORK_PROVIDER_NAME
 	).trim() || DEFAULT_MICROSOFT_WORK_PROVIDER_NAME
 }

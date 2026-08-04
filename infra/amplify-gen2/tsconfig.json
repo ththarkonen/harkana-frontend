@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "noEmit": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "target": "ES2022",
+    "lib": [ "ESNext" ],
+    "types": [ "node" ]
+  },
+  "include": [
+    "cars/**/*.ts",
+    "hcars/**/*.ts",
+    "raman/**/*.ts",
+    "shared/**/*.ts"
+  ]
+}
