@@ -24,6 +24,9 @@ pnpm-debug.log*
 *.sw?
 
 **/amplify
+!infra/
+!infra/amplify-gen2/
+!infra/amplify-gen2/**
 #amplify-do-not-edit-begin
 amplify/\#current-cloud-backend
 amplify/.config/local-*
@@ -33,6 +36,9 @@ amplify/mock-api-resources
 amplify/backend/amplify-meta.json
 amplify/backend/.temp
 build/
+!build/
+build/*
+!build/versioning.mjs
 dist/
 node_modules/
 aws-exports.js
@@ -48,3 +54,4 @@ amplifytools.xcconfig
 
 # local workflow notes
 FRONTEND_VERSIONING_GUIDE.txt
+FRONTEND_BUILD_PUBLISH_GUIDE.txt

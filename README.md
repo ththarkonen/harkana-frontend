@@ -142,6 +142,21 @@ The corresponding Cognito custom OIDC providers must exist and be enabled on the
 - `Microsoft`: personal Microsoft accounts, using the Microsoft `/consumers/v2.0` authority.
 - `MicrosoftWork`: institutional work or school accounts, using either a tenant-specific authority or an organizational authority that Cognito accepts for the target setup.
 
+The current production Cognito Hosted UI state is also captured as non-secret frontend defaults in
+`packages/tools/src/cognitoSocialSignInConfig.js`. Environment variables still override these values, but the
+checked defaults prevent regenerated `aws-exports.js` files with `oauth: {}` from disabling social sign-in.
+Provider client IDs and secrets are not stored in this repository.
+
+Amplify Gen 2 migration scaffolds live in `infra/amplify-gen2`. They reference the existing Cognito and S3
+resources and should be tested through sandbox commands before any production deployment:
+
+```bash
+pnpm run gen2:typecheck
+pnpm run gen2:cars:sandbox
+pnpm run gen2:hcars:sandbox
+pnpm run gen2:raman:sandbox
+```
+
 The .env files can be found inside the CARS and Raman application folders
 
 **Notes:**
@@ -152,17 +167,52 @@ The .env files can be found inside the CARS and Raman application folders
 
 ## Build and deployment
 
-Build the application:
+Build one application:
 
 ```bash
-npm run build
+pnpm --filter cars-platform build
+pnpm --filter raman-platform build
+pnpm --filter hypercars-platform build
+pnpm --filter harkana-landing-page build
 ```
 
-Each sub-application is deployed using AWS Amplify Hosting with a dedicated Amplify environment.
+Publish static frontend artifacts to the existing hosting buckets:
+
+```bash
+pnpm run publish:cars -- --profile default
+pnpm run publish:raman -- --profile default
+pnpm run publish:hcars -- --profile default
+pnpm run publish:landing -- --profile default
+pnpm run publish:uis -- --profile default
+pnpm run publish:all -- --profile default
+```
+
+Check the publish workflow without building or uploading:
+
+```bash
+pnpm run publish:dry-run
+```
+
+The publish scripts build the selected app, sync `dist/` to the existing S3 hosting bucket, and create a
+CloudFront invalidation. They intentionally do not run `amplify publish`, because that command also pushes backend
+resources.
+
+Build version metadata is injected during Vite builds:
+
+- `VITE_APP_VERSION` is read from the application package version.
+- `VITE_APP_BUILD_SHA` is the current git commit SHA, or `--build-sha` when provided.
+- `VITE_APP_BUILD_DATE` is the publish timestamp, or `--build-date` when provided.
+- `VITE_VERSION` combines the release version and commit SHA for display.
+
+Production publishes refuse dirty worktrees by default. Use `--allow-dirty` only when the deployed artifact is
+intentionally built from local uncommitted changes.
+
+Each sub-application is hosted independently.
 
 - Landing: harkana.com
 - Raman: raman.harkana.com
 - CARS: cars.harkana.com
+- H-CARS: hcars.harkana.com
 
 The `main` branch reflects the currently deployed, production-ready state.
 
@@ -173,6 +223,7 @@ frontend/
 ├── apps/             # Individual applications
 │   ├── cars/         # CARS spectroscopy frontend
 │   ├── landing/      # Landing site
+│   ├── hcars/        # Hyperspectral CARS frontend
 │   └── raman/        # Raman spectroscopy frontend
 ├── packages/         # Shared frontend packages
 │   ├── plot/         # Plotting utilities and components
@@ -189,7 +240,7 @@ frontend/
 
 **Notes:**
 
-- `apps/` contains the three deployed applications (landing, Raman, CARS).  
+- `apps/` contains the deployed applications (landing, Raman, CARS, H-CARS).  
 - `packages/` contains shared code that is reused across apps.  
 - This layout follows a **monorepo pattern** managed with `pnpm workspaces`.
 
