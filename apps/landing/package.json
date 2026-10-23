@@ -22,7 +22,7 @@
     "autoprefixer": "^10.4.22",
     "postcss": "^8.5.19",
     "tailwindcss": "^4.1.17",
-    "vite": "^7.3.2",
+    "vite": "^7.3.7",
     "vite-plugin-vue-devtools": "^8.0.3"
   },
   "overrides": {
